@@ -17,6 +17,12 @@ const rootDir = path.dirname(fileURLToPath(import.meta.url))
  */
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  optimizeDeps: {
+    exclude: ['maplibre-gl'],
+  },
+  ssr: {
+    noExternal: ['maplibre-gl'],
+  },
   resolve: {
     tsconfigPaths: true,
     alias: {

@@ -34,15 +34,22 @@ jobs:
       - uses: julia-actions/setup-julia@v2
         with:
           version: '1.11'
-      - name: Cache tectonic bundle
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/Tectonic
-          key: tectonic-bundle-v1
       - name: Install tectonic (latex compile check)
         run: |
           curl -fsSL https://drop-sh.fullyjustified.net | sh
           sudo mv tectonic /usr/local/bin/
+      - name: Resolve tectonic cache dir
+        id: tcdir
+        # The static ~/.cache/Tectonic guess never existed on the runner
+        # ("Path Validation Error ... no cache is being saved"), so every run
+        # re-downloaded the bundle and died whenever the relay rate-limited.
+        # Ask tectonic itself for the real per-user cache directory.
+        run: echo "dir=$(tectonic -X show user-cache-dir)" >> "$GITHUB_OUTPUT"
+      - name: Cache tectonic bundle
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.tcdir.outputs.dir }}
+          key: tectonic-bundle-v1
       - name: Warm tectonic bundle
         run: |
           # Body exercises the exact union of LaTeX constructs used across every shipped

@@ -3,8 +3,8 @@
  * Positions from the library are in km; we expose SI (m, m/s) for the app.
  */
 
-// Use pure-JS surface (not package root): root re-exports WASM workers that
-// crash Node serverless (Vercel /api) and Vite worker IIFE builds.
+/* Use pure-JS surface (not package root): root re-exports WASM workers that
+   crash Node serverless (Vercel /api) and Vite worker IIFE builds. */
 import {
   twoline2satrec,
   propagate,
@@ -111,6 +111,17 @@ export function propagateEci(satrec: SatRec, date: Date): EciStateSi | null {
   }
 }
 
+/**
+ * Greenwich mean sidereal time, radians.
+ *
+ * The angle between the inertial and Earth-fixed frames, exposed because a
+ * caller that CACHES inertial geometry has to undo and redo exactly this
+ * rotation rather than approximate it.
+ */
+export function gmstRad(date: Date): number {
+  return gstime(date)
+}
+
 /** ECI (m) → ECEF/ECF position (m) at `date`. */
 export function eciSiToEcefSi(rM: Vec3, date: Date): Vec3 {
   const gmst = gstime(date)
@@ -213,7 +224,7 @@ export function observerEciPosition(observer: GeodeticDeg, date: Date): Vec3 {
  * Wraps vendor `sunPos` (Vallado low-precision solar ephemeris, valid
  * 1950-2050, ~0.01 deg accuracy). Read from `node_modules/satellite.js/dist/sun.js`:
  * it takes a Julian date and returns a "geocentric equatorial position
- * vector" in AU, i.e. the mean equator/equinox-of-date (MOD) frame — not
+ * vector" in AU, i.e. the mean equator/equinox-of-date (MOD) frame, not
  * exactly the TEME frame SGP4 propagation uses. The MOD/TEME difference is
  * arcseconds to sub-degree, far below the whole-degree accuracy this
  * pass-visibility classifier needs, so both are treated as the same ECI
@@ -249,7 +260,7 @@ export function isSatSunlitSi(rSatM: Vec3, date: Date): boolean {
  * Elevation (rad) of the Sun above the observer's local horizon at `date`.
  *
  * Reuses `lookAnglesFromEci` with `sunEciSi`: its ECI→ECEF→look-angle chain
- * (a rotation by GMST, then `asin`/`atan2` on topocentric SEZ components —
+ * (a rotation by GMST, then `asin`/`atan2` on topocentric SEZ components:
  * see `ecfToLookAngles` in `node_modules/satellite.js/dist/transforms.js`)
  * makes no near-Earth assumption, so it is equally valid at solar range.
  */

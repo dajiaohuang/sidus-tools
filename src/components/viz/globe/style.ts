@@ -17,6 +17,7 @@ import type {
   StyleSpecification,
 } from 'maplibre-gl'
 import { cssRgbaWithAlpha } from './color'
+import { DAYLIGHT_BANDS, type DaylightBandId } from './terminator'
 
 const PALETTE = {
   background: '#050506',
@@ -28,12 +29,31 @@ const PALETTE = {
   placeState: '#6e6e6e',
   placeCity: '#cccccc',
   placeCapital: '#f2f2f2',
-  night: '#f2f2f2',
+  daylight: '#ffe3b0',
   marker: '#f2f2f2',
+  sunDisk: '#fff6de',
+  sunGlow: '255, 214, 120',
 } as const
+
+/**
+ * Daylight opacities. The lit caps are nested and overlap, so each layer
+ * composites over the one under it: the per-layer alpha below is derived from
+ * the intended cumulative ramp 0.02 / 0.045 / 0.08 / 0.13 by
+ * a_n = 1 - (1 - cum_n) / (1 - cum_(n-1)). Full night is left untouched, so
+ * the dark base map IS the night side.
+ */
+const DAYLIGHT_LAYER_OPACITY: Record<DaylightBandId, number> = {
+  astronomical: 0.02,
+  nautical: 0.0255,
+  civil: 0.0367,
+  day: 0.0543,
+}
 
 /** Fallback marker color when the caller does not pass one. */
 export const DEFAULT_MARKER_COLOR: string = PALETTE.marker
+/** Sun billboard colors, kept with the rest of the globe palette. */
+export const SUN_DISK_COLOR: string = PALETTE.sunDisk
+export const SUN_GLOW_RGB: string = PALETTE.sunGlow
 
 export const OPENMAPTILES_SOURCE_ID = 'openmaptiles'
 export const NIGHT_SOURCE_ID = 'night'
@@ -43,6 +63,10 @@ export const MARKERS_FIRST_LAYER_ID = 'markers-dot-static'
 export const SATELLITE_MARKER_LAYER_IDS = ['markers-dot-satellite', 'markers-label-satellite']
 
 export const EMPTY_FEATURE_COLLECTION = { type: 'FeatureCollection' as const, features: [] }
+
+export function daylightLayerId(band: DaylightBandId): string {
+  return `daylight-${band}`
+}
 
 /*
  * boundary layer fields (verified against the real OpenMapTiles schema
@@ -134,14 +158,22 @@ export function buildBaseStyle(): StyleSpecification {
         'source-layer': 'water',
         paint: { 'fill-color': PALETTE.water, 'fill-antialias': true },
       },
-      {
-        /* Night hemisphere. Antialiasing off so the closing edge at the
-           mercator latitude limit does not read as a drawn line. */
-        id: 'night-fill',
-        type: 'fill',
-        source: NIGHT_SOURCE_ID,
-        paint: { 'fill-color': PALETTE.night, 'fill-opacity': 0.09, 'fill-antialias': false },
-      },
+      /* Daylight bands, faintest (astronomical twilight) first so the higher
+         sun elevations add light on top. Antialiasing off so the closing edge
+         at the mercator latitude limit does not read as a drawn line. */
+      ...DAYLIGHT_BANDS.map(
+        (band): LayerSpecification => ({
+          id: daylightLayerId(band.id),
+          type: 'fill',
+          source: NIGHT_SOURCE_ID,
+          filter: ['==', ['get', 'band'], band.id],
+          paint: {
+            'fill-color': PALETTE.daylight,
+            'fill-opacity': DAYLIGHT_LAYER_OPACITY[band.id],
+            'fill-antialias': false,
+          },
+        }),
+      ),
       {
         id: 'boundaries-admin0',
         type: 'line',
@@ -343,11 +375,76 @@ export function trailLayerIds(satelliteId: string): string[] {
  * Shared with the runtime repaint path, which re-applies them when the
  * caller's trail window (and therefore the fraction) changes.
  */
+/**
+ * Colours satellites are assigned, in order, as they are selected.
+ *
+ * Chosen for the same reason the sky paths have their own map: a trail is a
+ * one-pixel line on a dark globe, so neighbours have to separate on hue, not on
+ * lightness. Every pair is at least 40/255 apart in some channel, twice the
+ * bar the sky palette holds, because these lines cross each other constantly
+ * rather than running parallel. The first entry is the gold the ISS has always
+ * been drawn in, so the default view is unchanged. The list wraps: past its
+ * length the population is large enough that identity comes from selecting a
+ * satellite, not from telling its colour apart.
+ */
+export const SATELLITE_PALETTE: readonly string[] = [
+  '#b8a55a', // gold, the ISS as it has always been
+  '#e65c5c', // red
+  '#e6e65c', // yellow
+  '#7db247', // olive
+  '#5ce65c', // green
+  '#47b27d', // jade
+  '#5ce6e6', // cyan
+  '#477db2', // steel blue
+  '#5c5ce6', // indigo
+  '#7d47b2', // violet
+  '#e65ce6', // magenta
+  '#b2477d', // rose
+]
+
+/** The colour for the nth selected satellite, wrapping past the palette. */
+export function satelliteColorAt(index: number): string {
+  return SATELLITE_PALETTE[index % SATELLITE_PALETTE.length]
+}
+
+/**
+ * How heavily a trail is drawn, given how many are on screen at once.
+ *
+ * One satellite is the subject of the view and gets the full weight. Once
+ * several share the globe the trails stop being the subject and become
+ * context: each one thins and dims so the bundle reads as a population rather
+ * than a tangle, and so the ground beneath stays visible. Stepped rather than
+ * continuous, so adding one satellite does not visibly restyle the others
+ * except at the boundaries; the steps were set by eye at 1, 3, 10 and 30
+ * satellites on a 1280x900 canvas.
+ */
+export function trailWeightFor(satelliteCount: number): { widthPx: number; alpha: number } {
+  if (satelliteCount <= 1) return { widthPx: 1.4, alpha: 1 }
+  if (satelliteCount <= 5) return { widthPx: 1.2, alpha: 0.8 }
+  /* 0.9 runs to the end of the named tier so that a trail carrying a name is
+     always wide enough to carry a dash pattern too; 0.6 belongs to the dense
+     tier, where the lines are drawn solid because a dash at that width reads
+     as noise rather than as direction. */
+  if (satelliteCount <= 30) return { widthPx: 0.9, alpha: 0.6 }
+  return { widthPx: 0.6, alpha: 0.4 }
+}
+
+/**
+ * Whether a trail of this weight is drawn dashed. The dash marks the part of
+ * the orbit not yet flown, which is worth saying while a trail is a subject
+ * and not worth the noise once it is one line in a crowd.
+ */
+export function trailIsDashed(weight: { widthPx: number }): boolean {
+  return weight.widthPx >= 0.9
+}
+
 export function trailFadeGradients(
   color: string,
   fadeFraction: number,
+  alpha = 1,
 ): { solid: ExpressionSpecification; dashed: ExpressionSpecification } {
   const transparent = cssRgbaWithAlpha(color, 0)
+  color = alpha >= 1 ? color : cssRgbaWithAlpha(color, alpha)
   return {
     solid: [
       'interpolate',
@@ -374,15 +471,30 @@ export function trailFadeGradients(
   }
 }
 
+/**
+ * Dash paint for the future half of a flat trail, or nothing at the dense tier.
+ *
+ * These lengths are in MapLibre's own dasharray units, which scale with the
+ * line WIDTH in pixels, not with metres on the ground. The pattern is therefore
+ * already effectively screen-constant and is not the zoom-degrading class the
+ * elevated layer's metre-based dashes were: nothing here needs converting to
+ * the ground-resolution mechanism.
+ */
+function futureDash(weight: { widthPx: number }): { 'line-dasharray'?: [number, number] } {
+  return trailIsDashed(weight) ? { 'line-dasharray': [2, 2] } : {}
+}
+
 /** Trail layers for one satellite: solid past and dashed future, each split into body and fade. */
 export function trailLayerSpecs(
   satelliteId: string,
   color: string,
   fadeFraction: number,
+  weight = trailWeightFor(1),
 ): LayerSpecification[] {
   const sources = trailSourceIds(satelliteId)
   const [solidFade, solidBody, dashedBody, dashedFade] = trailLayerIds(satelliteId)
-  const gradients = trailFadeGradients(color, fadeFraction)
+  const gradients = trailFadeGradients(color, fadeFraction, weight.alpha)
+  const bodyColor = weight.alpha >= 1 ? color : cssRgbaWithAlpha(color, weight.alpha)
   return [
     {
       /* Oldest tail of the past (solid) trail: fades in from transparent.
@@ -393,7 +505,7 @@ export function trailLayerSpecs(
       type: 'line',
       source: sources.fade,
       filter: ['==', ['get', 'future'], false],
-      paint: { 'line-width': 1.4, 'line-gradient': gradients.solid },
+      paint: { 'line-width': weight.widthPx, 'line-gradient': gradients.solid },
     },
     {
       /* Everything else of the past trail: full opacity, no gradient. Reads
@@ -404,15 +516,15 @@ export function trailLayerSpecs(
       type: 'line',
       source: sources.body,
       filter: ['==', ['get', 'future'], false],
-      paint: { 'line-color': color, 'line-width': 1.4 },
+      paint: { 'line-color': bodyColor, 'line-width': weight.widthPx },
     },
     {
-      /* Everything of the future (dashed) trail except its furthest tip. */
+      /* Everything of the future trail except its furthest tip. */
       id: dashedBody,
       type: 'line',
       source: sources.body,
       filter: ['==', ['get', 'future'], true],
-      paint: { 'line-color': color, 'line-width': 1.4, 'line-dasharray': [2, 2] },
+      paint: { 'line-color': bodyColor, 'line-width': weight.widthPx, ...futureDash(weight) },
     },
     {
       /* Furthest tip of the future trail: fades out to transparent. */
@@ -420,7 +532,11 @@ export function trailLayerSpecs(
       type: 'line',
       source: sources.fade,
       filter: ['==', ['get', 'future'], true],
-      paint: { 'line-width': 1.4, 'line-dasharray': [2, 2], 'line-gradient': gradients.dashed },
+      paint: {
+        'line-width': weight.widthPx,
+        ...futureDash(weight),
+        'line-gradient': gradients.dashed,
+      },
     },
   ]
 }

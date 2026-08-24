@@ -351,6 +351,11 @@ export const TOOL_OG: Record<string, ToolOgMeta> = {
     accent: '#7a9bb8',
     blurb: 'Interactive 3D orbit view',
   },
+  'orbital-view': {
+    formula: 'SGP4 → TEME → ECEF → φ, λ, h  ·  live ground track',
+    accent: '#b8a55a',
+    blurb: 'Live orbital globe view',
+  },
   'isentropic-nozzle': {
     formula: "Me² = 2/(γ−1) [(pe/pc)^{−(γ−1)/γ} − 1]  ·  ε = Ae/At",
     accent: '#c47a5a',

@@ -52,6 +52,48 @@ export function transformMat4Vec4(
  * vec4(posInTile, elevation, 1.0)`: no spherical math, no tileMercatorCoords
  * remapping, elevation in mercator units).
  */
+/**
+ * Same projection, but returned in normalised device coordinates and without
+ * the on-screen test. A follow camera has to be able to steer toward a target
+ * that is currently OUTSIDE the frame, which is exactly the case the screen
+ * variant rejects: at a steep pitch an orbiting satellite can project many
+ * screen heights above the viewport (measured ndc.y near 10, some 4000 px
+ * above the top, at pitch 80 and zoom 9).
+ */
+export function projectElevatedToNdc(
+  lon: number,
+  lat: number,
+  elevationMeters: number,
+  projectionData: ProjectionData,
+  variantName: string | null,
+): { x: number; y: number } | null {
+  const merc = MercatorCoordinate.fromLngLat({ lng: lon, lat })
+
+  let clip: [number, number, number, number]
+  if (variantName === 'mercator') {
+    const elevationMercUnits = elevationMeters * merc.meterInMercatorCoordinateUnits()
+    clip = transformMat4Vec4(projectionData.mainMatrix, [merc.x, merc.y, elevationMercUnits, 1])
+  } else {
+    const tmc = projectionData.tileMercatorCoords
+    const mercatorPos = [tmc[0] + tmc[2] * merc.x, tmc[1] + tmc[3] * merc.y]
+    const sphericalX = mercatorPos[0] * Math.PI * 2 + Math.PI
+    const sphericalY =
+      2 * Math.atan(Math.exp(Math.PI - mercatorPos[1] * Math.PI * 2)) - Math.PI * 0.5
+    const len = Math.cos(sphericalY)
+    const spherePos = [Math.sin(sphericalX) * len, Math.sin(sphericalY), Math.cos(sphericalX) * len]
+    const scale = 1 + elevationMeters / GLOBE_RADIUS_M
+    clip = transformMat4Vec4(projectionData.mainMatrix, [
+      spherePos[0] * scale,
+      spherePos[1] * scale,
+      spherePos[2] * scale,
+      1,
+    ])
+  }
+
+  if (clip[3] <= 0) return null // behind the camera
+  return { x: clip[0] / clip[3], y: clip[1] / clip[3] }
+}
+
 export function projectElevatedToScreen(
   lon: number,
   lat: number,

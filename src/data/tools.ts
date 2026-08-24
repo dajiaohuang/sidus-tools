@@ -18,6 +18,11 @@ export type ToolMeta = {
   tags: string[]
   formulaId?: string
   status: 'live' | 'wave1' | 'catalog'
+  /**
+   * Takes over the whole viewport: no site header, footer, tool bar or panel
+   * chrome. For visual tools where the canvas IS the page.
+   */
+  fullscreen?: boolean
   sourceIds?: string[]
   /** ISO 8601 calendar date (YYYY-MM-DD) when the tool first landed. */
   created?: string
@@ -978,6 +983,19 @@ const TOOLS_RAW: ToolMeta[] = [
     formulaId: 'orbit-3d',
     status: 'live',
     sourceIds: ['vallado', 'curtis'],
+  },
+  {
+    /* Visualization tool: no formulaId and no snippets, since there is no
+       single closed-form result to export. */
+    id: 'orbital-view',
+    category: 'utilities',
+    title: 'Live orbital view',
+    description:
+      'Fullscreen globe with the live ISS ground track, day/night terminator and true-altitude orbit view.',
+    tags: ['visualization', 'satellite', 'orbital'],
+    status: 'live',
+    fullscreen: true,
+    sourceIds: ['satellite-js', 'celestrak', 'vallado'],
   },
   // Discovery batch (engines / GNSS / optical / RF / ADCS / mission)
   {

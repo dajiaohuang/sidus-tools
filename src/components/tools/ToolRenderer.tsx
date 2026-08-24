@@ -100,6 +100,7 @@ const MAP: Record<string, LazyTool> = {
   'patched-conic-depart': L(() => import('./PatchedConicDepartTool').then((m) => ({ default: m.PatchedConicDepartTool }))),
   'surface-access': L(() => import('./SurfaceAccessTool').then((m) => ({ default: m.SurfaceAccessTool }))),
   'orbit-3d': L(() => import('./Orbit3dTool').then((m) => ({ default: m.Orbit3dTool }))),
+  'orbital-view': L(() => import('./OrbitalViewTool').then((m) => ({ default: m.OrbitalViewTool }))),
   'isentropic-nozzle': L(() => import('./IsentropicNozzleTool').then((m) => ({ default: m.IsentropicNozzleTool }))),
   'characteristic-velocity-cstar': L(() => import('./CharacteristicVelocityCstarTool').then((m) => ({ default: m.CharacteristicVelocityCstarTool }))),
   'throat-area-sizing': L(() => import('./ThroatAreaSizingTool').then((m) => ({ default: m.ThroatAreaSizingTool }))),

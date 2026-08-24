@@ -441,6 +441,13 @@ export const TOOL_PRECISION: Record<string, ToolPrecision> = {
     limits: `Interactive 3D teaching view of circular rings / transfer ellipse. ${IEEE}`,
     referenceHint: 'Keplerian geometry visualization',
   },
+  'orbital-view': {
+    modelClass: 'utility',
+    errorClass:
+      'Visualization of SGP4 output; accuracy follows the TLE age (kilometres near epoch, degrading fast beyond it).',
+    limits: `Ground track, terminator and altitude rendering from a single TLE. Not a tracking service and not flight software. ${IEEE}`,
+    referenceHint: 'SGP4 / TEME to geodetic, CelesTrak TLE',
+  },
 }
 
 export function getToolPrecision(toolId: string): ToolPrecision {

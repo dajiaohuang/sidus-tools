@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { CELESTRAK_CATALOG_URL, searchCelestrak, tleText } from '@/lib/celestrak'
 import { ToolShell } from '@/components/shared/ToolShell'
 import { ParamsGrid } from '@/components/shared/ParamsGrid'
 import { LaunchSitePresets } from '@/components/shared/LaunchSitePresets'
@@ -49,7 +50,7 @@ const SCHEMA = {
   at: strParam(''),
   tz: strParam(''),
   mark: strParam('aos', ['now', 'aos', 'peak']),
-  view: strParam('3d', ['3d', 'map']),
+  view: strParam('map', ['3d', 'map']),
   vis: strParam('0', ['0', '1']),
 } as const
 
@@ -58,9 +59,8 @@ const TRAIL_STEP_S = 30
 const TRAIL_BUCKET_MS = 30_000
 const SEARCH_STEP_S = 20
 const LIVE_MARKER_INTERVAL_MS = 100
-const CELESTRAK_GP_URL = 'https://celestrak.org/NORAD/elements/gp.php'
-const CELESTRAK_CATALOG_URL = 'https://celestrak.org/NORAD/elements/'
-const CELESTRAK_FETCH_TIMEOUT_MS = 10_000
+/** Looked up when the field is left empty: the satellite this tool opens on. */
+const DEFAULT_CATNR = '25544'
 const TLE_STALE_DAYS = 14
 
 /** Live countdown as "H h M min S s", omitting leading zero units. */
@@ -78,20 +78,6 @@ function SectionKicker({ children }: { children: string }) {
       {children}
     </p>
   )
-}
-
-/** First complete (name, line 1, line 2) TLE triple in a CelesTrak TLE-format response. */
-function firstTleTriple(text: string): string | null {
-  const lines = text
-    .split(/\r?\n/)
-    .map((l) => l.trim())
-    .filter((l) => l.length > 0)
-  for (let i = 0; i < lines.length - 2; i++) {
-    if (lines[i + 1].startsWith('1 ') && lines[i + 2].startsWith('2 ')) {
-      return `${lines[i]}\n${lines[i + 1]}\n${lines[i + 2]}`
-    }
-  }
-  return null
 }
 
 export function PassPredictTool() {
@@ -115,9 +101,9 @@ export function PassPredictTool() {
   const parsed = useMemo(() => parseTle(tle), [tle])
   const start = useMemo(() => resolveUtcParam(p.at), [p.at])
 
-  // Once a found pass's LOS has elapsed, the search re-anchors to LOS + one
-  // search step so the next window rolls in automatically (see the effect
-  // below). Reset whenever the user re-anchors the search explicitly.
+  /* Once a found pass's LOS has elapsed, the search re-anchors to LOS + one
+     search step so the next window rolls in automatically (see the effect
+     below). Reset whenever the user re-anchors the search explicitly. */
   useEffect(() => {
     setRollForwardMs(null)
   }, [start])
@@ -194,10 +180,10 @@ export function PassPredictTool() {
     return t('fields.pass_headline', { ...vars, countdown })
   }, [pass, localFmt, passStarted, nowMs, t])
 
-  // Live AOS/LOS countdown, ticking every 1 s. `pass` rolls forward on its
-  // own (see the roll-forward effect above) once its LOS elapses, so this
-  // only ever needs to distinguish BEFORE (now < aos) from DURING (aos <= now
-  // < los); the post-LOS instant is a single tick that resolves itself.
+  /* Live AOS/LOS countdown, ticking every 1 s. `pass` rolls forward on its
+     own (see the roll-forward effect above) once its LOS elapses, so this
+     only ever needs to distinguish BEFORE (now < aos) from DURING (aos <= now
+     < los); the post-LOS instant is a single tick that resolves itself. */
   const countdownLine = useMemo(() => {
     if (!pass) return ''
     if (nowMs < pass.aos.getTime()) {
@@ -241,8 +227,8 @@ export function PassPredictTool() {
     return `${fmt.time}.${ms}`
   }, [effectiveMark, liveClockMs, zone, i18n.language])
 
-  // Marker positions (ISS + observer): refreshed every 100 ms while live; the
-  // trail keeps its own coarser 30 s bucket below.
+  /* Marker positions (ISS + observer): refreshed every 100 ms while live; the
+     trail keeps its own coarser 30 s bucket below. */
   useEffect(() => {
     if (effectiveMark !== 'now') return
     setLiveMarkerMs(Date.now())
@@ -276,9 +262,9 @@ export function PassPredictTool() {
 
   const trail = useMemo(() => trailPoints.map((pt) => pt.r), [trailPoints])
 
-  // Direction encoding: already-flown (solid) vs not-yet-flown (dashed) about
-  // the marked instant. The two segments share their boundary point so the
-  // solid/dashed pieces connect with no visible gap.
+  /* Direction encoding: already-flown (solid) vs not-yet-flown (dashed) about
+     the marked instant. The two segments share their boundary point so the
+     solid/dashed pieces connect with no visible gap. */
   const flownTrack = useMemo(() => {
     const idx = trailPoints.findIndex((pt) => pt.tMs > instant.getTime())
     const cut = idx === -1 ? trailPoints.length : idx
@@ -333,8 +319,8 @@ export function PassPredictTool() {
     return out
   }, [trailPoints])
 
-  // Per-frame provider for the globe's follow chase: propagates at the
-  // requested instant instead of interpolating the 30 s trail samples.
+  /* Per-frame provider for the globe's follow chase: propagates at the
+     requested instant instead of interpolating the 30 s trail samples. */
   const globePositionAt = useCallback(
     (date: Date): GlobeTrackPoint | null => {
       if (!parsed.ok) return null
@@ -388,34 +374,20 @@ export function PassPredictTool() {
     )
   }
 
+  /*
+   * The catalogue lookup lives in src/lib/celestrak.ts, which owns the query
+   * grammar, the timeout and the two-hour cache CelesTrak's etiquette asks for.
+   */
   async function onFetchSatTle() {
     setFetchingTle(true)
     setTleFetchError('')
-    const controller = new AbortController()
-    const timeoutId = window.setTimeout(() => controller.abort(), CELESTRAK_FETCH_TIMEOUT_MS)
     try {
-      const query = satQuery.trim()
-      const isAllDigits = query !== '' && /^\d+$/.test(query)
-      const selector =
-        query === ''
-          ? 'CATNR=25544'
-          : isAllDigits
-            ? `CATNR=${query}`
-            : `NAME=${encodeURIComponent(query)}`
-      const res = await fetch(`${CELESTRAK_GP_URL}?FORMAT=TLE&${selector}`, {
-        signal: controller.signal,
-      })
-      const text = await res.text()
-      const triple = res.ok ? firstTleTriple(text) : null
-      if (triple) {
-        setTle(triple)
-      } else {
-        setTleFetchError(t('fields.tle_fetch_failed'))
-      }
+      const [record] = await searchCelestrak(satQuery.trim() || DEFAULT_CATNR)
+      if (record) setTle(tleText(record))
+      else setTleFetchError(t('fields.tle_fetch_failed'))
     } catch {
       setTleFetchError(t('fields.tle_fetch_failed'))
     } finally {
-      window.clearTimeout(timeoutId)
       setFetchingTle(false)
     }
   }
@@ -665,6 +637,7 @@ export function PassPredictTool() {
                   subsolar={{ latDeg: subsolar.latDeg, lonDeg: subsolar.lonDeg }}
                   title={t('fields.title_pass_globe')}
                   caption={t('fields.subtitle_pass_globe')}
+                  height={340}
                 />
               ) : (
                 <OrbitScene3D

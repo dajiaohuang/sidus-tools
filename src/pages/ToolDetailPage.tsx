@@ -61,6 +61,42 @@ export function ToolDetailPage() {
     ? `${tool.title}: ${meta.blurb}. Live pure-SI result from shared parameters.`
     : tool.description
 
+  const seo = (
+    <SeoHead
+      title={`${tool.title} · SIDUS`}
+      description={description.slice(0, 160)}
+      path={path}
+      search={searchParams}
+      imageAlt={`${tool.title}: ${meta.formula}`}
+      jsonLd={{
+        '@context': 'https://schema.org',
+        '@type': 'SoftwareApplication',
+        name: tool.title,
+        description: tool.description,
+        applicationCategory: 'EducationalApplication',
+        url: `https://sidus.tools${path}`,
+        operatingSystem: 'Web',
+        offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
+        keywords: tool.tags.join(', '),
+        ...(tool.created ? { datePublished: tool.created } : {}),
+        ...(tool.updated ? { dateModified: tool.updated } : {}),
+      }}
+    />
+  )
+
+  /* Fullscreen tools own the viewport: no bar, no hero, no panel sections. The
+     tool component draws its own overlay chrome on top of the canvas. */
+  if (tool.fullscreen) {
+    return (
+      <div className="relative h-dvh w-full min-w-0 overflow-hidden" data-tool-fullscreen="1">
+        {seo}
+        <ToolUiLayoutProvider value={ui}>
+          <ToolRenderer id={tool.id} />
+        </ToolUiLayoutProvider>
+      </div>
+    )
+  }
+
   // Focus mode always uses tight inset (matches vertical rhythm); fullwidth slots too
   const tightPad = usesTightPagePad(ui) || ui.chrome.focus
   const showPrecision = ui.chrome.precision
@@ -76,26 +112,7 @@ export function ToolDetailPage() {
       data-focus={ui.chrome.focus ? '1' : '0'}
       data-page-pad={tightPad ? 'gap' : 'standard'}
     >
-      <SeoHead
-        title={`${tool.title} · SIDUS`}
-        description={description.slice(0, 160)}
-        path={path}
-        search={searchParams}
-        imageAlt={`${tool.title}: ${meta.formula}`}
-        jsonLd={{
-          '@context': 'https://schema.org',
-          '@type': 'SoftwareApplication',
-          name: tool.title,
-          description: tool.description,
-          applicationCategory: 'EducationalApplication',
-          url: `https://sidus.tools${path}`,
-          operatingSystem: 'Web',
-          offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
-          keywords: tool.tags.join(', '),
-          ...(tool.created ? { datePublished: tool.created } : {}),
-          ...(tool.updated ? { dateModified: tool.updated } : {}),
-        }}
-      />
+      {seo}
 
       {/* Sticky strip + hero: must be direct children of this full-page root */}
       {ui.chrome.focus ? (

@@ -10,6 +10,7 @@ import { ToolDetailPage } from '@/pages/ToolDetailPage'
 import { ResourcesPage } from '@/pages/ResourcesPage'
 import { PrivacyPage } from '@/pages/PrivacyPage'
 import { HomeAltPage } from '@/pages/HomeAltPage'
+import { getTool } from '@/data/tools'
 import { trackPageView } from '@/lib/gtm'
 import { cn } from '@/lib/utils'
 
@@ -17,6 +18,8 @@ function useFocusMode(): boolean {
   const [params] = useSearchParams()
   const { pathname } = useLocation()
   if (!pathname.startsWith('/tools/')) return false
+  // Fullscreen tools drop the site chrome unconditionally: the canvas is the page.
+  if (getTool(pathname.slice('/tools/'.length))?.fullscreen) return true
   const focus = params.get('focus')
   const chrome = params.get('chrome')
   if (focus != null && ['1', 'true', 'yes', 'on'].includes(focus.toLowerCase())) return true

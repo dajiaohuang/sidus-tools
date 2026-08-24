@@ -17,8 +17,10 @@
  *     pitch 0: the full camera transform is supplied every frame the same
  *     way it is for every built-in layer.
  *
- * The past half is one continuous line strip; the future half is drawn as
- * disconnected fixed-screen-length dashes (see buildDashedLineSegments).
+ * The past half is one continuous line strip. The future half is drawn as
+ * disconnected fixed-screen-length dashes (see buildDashedLineSegments) while
+ * a trail is wide enough to carry them, and as a plain strip at the dense
+ * tier, where a dash pattern at 0.6 px reads as noise.
  * The marker is a single gl.POINTS vertex (gl_PointSize set in the same
  * vertex shader, harmless for line draws since it is only read in POINTS
  * mode), masked circular in the fragment shader via gl_PointCoord. Fade is
@@ -45,6 +47,7 @@ import {
   shouldRebuildDashLength,
 } from './track'
 import type { GlobeTrackPoint } from './types'
+import { SPHERE_OCCLUSION_GLSL } from './occlusion'
 
 export const ALTITUDE_LAYER_ID = 'sidus-orbit-altitude'
 
@@ -64,6 +67,12 @@ export type AltitudeTrailInput = {
   future: GlobeTrackPoint[]
   windowStart: Date
   windowEnd: Date
+  /**
+   * Dash the future half, or draw it solid. Solid is what the dense tier gets:
+   * at 0.6 px a dash pattern is noise, and segmenting hundreds of trails into
+   * fixed-screen-length runs is rebuild cost bought for nothing.
+   */
+  dashed: boolean
 }
 
 export type AltitudeLayer = CustomLayerInterface & {
@@ -91,8 +100,16 @@ type SatelliteState = {
   buffers: { past: WebGLBuffer; future: WebGLBuffer; point: WebGLBuffer } | null
   pastCount: number
   futureCount: number
+  /** Solid future halves upload as one strip; dashed ones as GL_LINES pairs. */
+  futureIsStrip: boolean
   hasPoint: boolean
   pendingLines: Omit<AltitudeTrailInput, 'id' | 'colorRgba'> | null
+  /**
+   * The last trail handed in, kept after upload so a zoom can re-walk the dash
+   * pattern against the new meters-per-pixel without waiting for the caller's
+   * next data update, which is a 30 s bucket away.
+   */
+  lastLines: Omit<AltitudeTrailInput, 'id' | 'colorRgba'> | null
   pendingPoint: GlobeTrackPoint | null
   /** Kept after upload so the label overlay can re-project it every repaint. */
   livePoint: GlobeTrackPoint | null
@@ -148,8 +165,10 @@ function emptySatellite(colorRgba: Rgba): SatelliteState {
     buffers: null,
     pastCount: 0,
     futureCount: 0,
+    futureIsStrip: false,
     hasPoint: false,
     pendingLines: null,
+    lastLines: null,
     pendingPoint: null,
     livePoint: null,
     dashLengthMeters: null,
@@ -201,6 +220,12 @@ export function createAltitudeLayer(options: {
     sat.dashLengthMeters = DASH_SCREEN_TARGET_PX * metersPerPixel
     sat.gapLengthMeters = GAP_SCREEN_TARGET_PX * metersPerPixel
     sat.lastDashZoomBuild = currentZoom
+    /* A new meters-per-dash figure is inert until the geometry is walked again
+       with it. Re-arming the last trail here is what makes the dash length a
+       SCREEN length: without it the pattern keeps the previous zoom's meters
+       until the caller's next data update, stretching or shrinking on screen
+       in the meantime. */
+    if (sat.lastLines) sat.pendingLines = sat.lastLines
     logDebugStage(
       'dash-length',
       `rebuilt zoom=${currentZoom.toFixed(2)} lat=${lat.toFixed(2)} dashM=${sat.dashLengthMeters.toFixed(0)} gapM=${sat.gapLengthMeters.toFixed(0)}`,
@@ -211,9 +236,14 @@ export function createAltitudeLayer(options: {
     const cached = shaderMap.get(shaderDescription.variantName)
     if (cached) return cached
 
+    /* Same override as the swarm layers: the prelude's horizon-plane z cuts
+       high-orbit geometry off mid-air, so under the globe it is replaced with
+       the exact sphere occlusion from occlusion.ts. */
+    const globeVariant = shaderDescription.variantName === 'globe'
     const vertexSource = `#version 300 es
     ${shaderDescription.vertexShaderPrelude}
     ${shaderDescription.define}
+    ${globeVariant ? SPHERE_OCCLUSION_GLSL : ''}
 
     in vec2 a_pos;
     in float a_elevation;
@@ -222,6 +252,13 @@ export function createAltitudeLayer(options: {
 
     void main() {
         gl_Position = projectTileFor3D(a_pos, a_elevation);
+        ${
+          globeVariant
+            ? `gl_Position.z =
+        sphereOcclusionClipZ(projectToSphere(a_pos) * (1.0 + a_elevation / GLOBE_RADIUS)) *
+        gl_Position.w;`
+            : ''
+        }
         gl_PointSize = 6.0;
         v_alpha = a_alpha;
     }`
@@ -296,8 +333,9 @@ export function createAltitudeLayer(options: {
     }
 
     if (sat.pendingLines) {
-      const { past, future, windowStart, windowEnd } = sat.pendingLines
+      const { past, future, windowStart, windowEnd, dashed } = sat.pendingLines
       sat.pendingLines = null
+      sat.futureIsStrip = !dashed
 
       const pastVerts = past.map((p) =>
         toVertex(p, fadeAlphaAt(p.date, windowStart, windowEnd), useMercatorElevationUnits),
@@ -308,17 +346,25 @@ export function createAltitudeLayer(options: {
          time so the pattern tracks the moving solid/dashed split point, it
          just uses whatever length is currently valid. */
       if (sat.dashLengthMeters === null) refreshDashLength(sat, true)
-      const dashSegments = buildDashedLineSegments(
-        future,
-        sat.dashLengthMeters ?? 0,
-        sat.gapLengthMeters ?? 0,
-      )
       const futureSegmentVerts: [number, number, number, number][] = []
-      for (const [a, b] of dashSegments) {
-        futureSegmentVerts.push(
-          toVertex(a, fadeAlphaAt(a.date, windowStart, windowEnd), useMercatorElevationUnits),
-          toVertex(b, fadeAlphaAt(b.date, windowStart, windowEnd), useMercatorElevationUnits),
+      if (dashed) {
+        const dashSegments = buildDashedLineSegments(
+          future,
+          sat.dashLengthMeters ?? 0,
+          sat.gapLengthMeters ?? 0,
         )
+        for (const [a, b] of dashSegments) {
+          futureSegmentVerts.push(
+            toVertex(a, fadeAlphaAt(a.date, windowStart, windowEnd), useMercatorElevationUnits),
+            toVertex(b, fadeAlphaAt(b.date, windowStart, windowEnd), useMercatorElevationUnits),
+          )
+        }
+      } else {
+        for (const point of future) {
+          futureSegmentVerts.push(
+            toVertex(point, fadeAlphaAt(point.date, windowStart, windowEnd), useMercatorElevationUnits),
+          )
+        }
       }
 
       gl.bindBuffer(gl.ARRAY_BUFFER, sat.buffers.past)
@@ -413,7 +459,9 @@ export function createAltitudeLayer(options: {
         future: input.future,
         windowStart: input.windowStart,
         windowEnd: input.windowEnd,
+        dashed: input.dashed,
       }
+      sat.lastLines = sat.pendingLines
       logDebugStage('setTrail', `pending pastPts=${input.past.length} futurePts=${input.future.length}`)
       /* Every path that sets pending data also asks for a redraw, so nothing
          depends on some other code path happening to repaint this frame. */
@@ -439,6 +487,7 @@ export function createAltitudeLayer(options: {
 
     refreshDashLengths(force) {
       for (const sat of satellites.values()) refreshDashLength(sat, force)
+      map.triggerRepaint()
     },
 
     livePointOf(id) {
@@ -528,7 +577,7 @@ export function createAltitudeLayer(options: {
           if (sat.futureCount > 0) {
             bindAttribs(sat.buffers.future)
             gl.uniform1f(uIsPoint, 0)
-            gl.drawArrays(gl.LINES, 0, sat.futureCount)
+            gl.drawArrays(sat.futureIsStrip ? gl.LINE_STRIP : gl.LINES, 0, sat.futureCount)
           }
 
           if (sat.hasPoint) {

@@ -144,6 +144,7 @@ export function toolSourcePath(toolId: string): string {
     'lunisolar-rates': 'src/components/tools/LunisolarRatesTool.tsx',
     'pump-crank': 'src/components/tools/PumpCrankTool.tsx',
     'schweighart-sedwick': 'src/components/tools/SchweighartSedwickTool.tsx',
+    'orbital-view': 'src/components/tools/OrbitalViewTool.tsx',
   }
   return MAP[toolId] ?? 'src/data/tools.ts'
 }

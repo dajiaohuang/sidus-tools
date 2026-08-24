@@ -200,5 +200,6 @@ export const TOOL_DATES: Record<string, ToolDates> = {
   'lunisolar-rates': { created: '2026-08-18', updated: '2026-08-18' },
   'pump-crank': { created: '2026-08-18', updated: '2026-08-18' },
   'schweighart-sedwick': { created: '2026-08-18', updated: '2026-08-18' },
+  'orbital-view': { created: '2026-08-20', updated: '2026-08-20' },
 }
 

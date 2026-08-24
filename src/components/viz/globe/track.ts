@@ -93,11 +93,10 @@ export function extractFadeAndBody(
  * off that flag avoids the documented dasharray-scale distortion that real
  * MapLibre source confirms lineMetrics:true GeoJSON sources have
  * (src/data/bucket/line_bucket.ts: lineClips-based scaledDistance
- * realignment), which previously applied to the dashed body layer too
- * since it shared the SAME (lineMetrics:true) source as the gradient
- * layers despite never using line-progress itself. `fade` is not a feature
- * property (each source only ever holds one kind), so layer filters only
- * need to distinguish future from past.
+ * realignment), a distortion that would hit the dashed body layer too if it
+ * shared the gradient layers' lineMetrics:true source. `fade` is not a
+ * feature property (each source only ever holds one kind), so layer filters
+ * only need to distinguish future from past.
  */
 export function buildTrailGeojsonPair(
   past: GlobeTrackPoint[],
