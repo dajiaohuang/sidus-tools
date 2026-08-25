@@ -1,5 +1,5 @@
 import { normalizeTags } from '../lib/tags'
-import { TOOL_DATES } from './toolDates'
+import { TOOL_DATES } from './tool-dates'
 
 export type ToolCategory =
   | 'orbital'

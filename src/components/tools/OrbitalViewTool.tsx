@@ -11,7 +11,7 @@ import type { GlobeObserver, GlobeSatellite, GlobeTrackPoint } from '@/component
 import { getBody, parseTle, eciSiToGeodetic, sunEciSi, type Vec3 } from '@/lib/physics'
 import { cn } from '@/lib/utils'
 import { SKY_BODY_IDS, type SkyBody, type SkyBodyId } from '@/components/viz/globe/celestial'
-import { strParam, useToolSearchParams } from '@/lib/useToolSearchParams'
+import { strParam, useToolSearchParams } from '@/lib/use-tool-search-params'
 import { useSatelliteSwarm } from '@/lib/use-satellite-swarm'
 import { satelliteColorAt } from '@/components/viz/globe/style'
 import { appearanceFor, trailRevolutionsFor } from '@/components/viz/globe/appearance'

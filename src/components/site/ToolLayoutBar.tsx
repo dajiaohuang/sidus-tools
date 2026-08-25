@@ -20,8 +20,8 @@ import {
   saveLayoutPrefs,
   type LayoutPresetId,
   type SlotSize,
-} from '@/lib/toolUiLayout'
-import { catalogFilterPath } from '@/lib/catalogTags'
+} from '@/lib/tool-ui-layout'
+import { catalogFilterPath } from '@/lib/catalog-tags'
 import { tooltipProps } from '@/components/shared/tooltip'
 import { cn } from '@/lib/utils'
 

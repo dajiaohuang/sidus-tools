@@ -11,7 +11,7 @@ import {
   toSi,
   orbitLifetimeRough,
 } from '@/lib/physics'
-import { numParam, strParam, useToolSearchParams } from '@/lib/useToolSearchParams'
+import { numParam, strParam, useToolSearchParams } from '@/lib/use-tool-search-params'
 
 const SCHEMA = {
   rho: numParam(1e-12, { min: 1e-20 }),

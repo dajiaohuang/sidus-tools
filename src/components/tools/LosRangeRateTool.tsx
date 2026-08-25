@@ -7,7 +7,7 @@ import { UiVector3 } from '@/components/shared/UiVector3'
 import { ResultCard } from '@/components/shared/ResultCard'
 import { CodeExport } from '@/components/shared/CodeExport'
 import { losRangeRate, TOOL_UNIT_SETS } from '@/lib/physics'
-import { numParam, useToolSearchParams } from '@/lib/useToolSearchParams'
+import { numParam, useToolSearchParams } from '@/lib/use-tool-search-params'
 
 const SCHEMA = {
   x: numParam(1000),

@@ -6,7 +6,7 @@ import { UiUnitField } from '@/components/shared/UiUnitField'
 import { ResultCard } from '@/components/shared/ResultCard'
 import { CodeExport } from '@/components/shared/CodeExport'
 import { G0, TOOL_UNIT_SETS, thrustToWeight, toSi } from '@/lib/physics'
-import { numParam, strParam, useToolSearchParams } from '@/lib/useToolSearchParams'
+import { numParam, strParam, useToolSearchParams } from '@/lib/use-tool-search-params'
 
 const SCHEMA = {
   F: numParam(7600, { min: 0 }),

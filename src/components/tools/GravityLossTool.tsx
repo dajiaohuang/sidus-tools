@@ -11,7 +11,7 @@ import {
   toSi,
   gravityLossDv,
 } from '@/lib/physics'
-import { numParam, strParam, useToolSearchParams } from '@/lib/useToolSearchParams'
+import { numParam, strParam, useToolSearchParams } from '@/lib/use-tool-search-params'
 
 const SCHEMA = {
   g: numParam(9.80665,{min:0.001}),

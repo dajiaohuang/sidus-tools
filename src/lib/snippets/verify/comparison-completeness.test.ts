@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { safeIdent } from '../liveValues'
+import { safeIdent } from '../live-values'
 import type { CodeLang } from '../types'
 import { EXPECTED } from './expected'
 import { put } from './expected/shared'

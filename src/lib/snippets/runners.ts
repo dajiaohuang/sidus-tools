@@ -1,5 +1,5 @@
 import type { CodeLang } from './types'
-import { stripTsTypes } from './liveValues'
+import { stripTsTypes } from './live-values'
 
 export type OnlineRunner = {
   id: string

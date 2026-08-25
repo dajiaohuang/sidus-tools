@@ -16,7 +16,7 @@ import {
   TOOL_UNIT_SETS,
   porkchopEarthMarsGrid,
 } from '@/lib/physics'
-import { numParam, strParam, useToolSearchParams } from '@/lib/useToolSearchParams'
+import { numParam, strParam, useToolSearchParams } from '@/lib/use-tool-search-params'
 
 const SCHEMA = {
   dep: strParam('2026-11-01'),

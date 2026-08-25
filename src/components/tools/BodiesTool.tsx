@@ -16,7 +16,7 @@ import {
   formatNumber,
 } from '@/lib/physics/format'
 import { cn } from '@/lib/utils'
-import { strParam, useToolSearchParams } from '@/lib/useToolSearchParams'
+import { strParam, useToolSearchParams } from '@/lib/use-tool-search-params'
 
 const SCHEMA = {
   id: strParam(

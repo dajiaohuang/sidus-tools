@@ -6,7 +6,7 @@ import { UiField } from '@/components/shared/UiField'
 import { ResultCard } from '@/components/shared/ResultCard'
 import { CodeExport } from '@/components/shared/CodeExport'
 import { angleBetween, type Vec3 } from '@/lib/physics'
-import { numParam, useToolSearchParams } from '@/lib/useToolSearchParams'
+import { numParam, useToolSearchParams } from '@/lib/use-tool-search-params'
 
 const SCHEMA = {
   ax: numParam(1),

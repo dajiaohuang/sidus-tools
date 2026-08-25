@@ -7,7 +7,7 @@ import { UiUnitField } from '@/components/shared/UiUnitField'
 import { ResultCard } from '@/components/shared/ResultCard'
 import { CodeExport } from '@/components/shared/CodeExport'
 import { BODIES, escapeVelocity, getBody, TOOL_UNIT_SETS, toSi } from '@/lib/physics'
-import { numParam, strParam, useToolSearchParams } from '@/lib/useToolSearchParams'
+import { numParam, strParam, useToolSearchParams } from '@/lib/use-tool-search-params'
 const SCHEMA = { body: strParam('jupiter', BODIES.map(b=>b.id)), h: numParam(100000,{min:0}), hu: strParam('km', TOOL_UNIT_SETS.altitude), vinf: numParam(10,{min:0}), vu: strParam('kmps', TOOL_UNIT_SETS.velocity) } as const
 export function FlybySpeedTool() {
   const { t } = useTranslation()

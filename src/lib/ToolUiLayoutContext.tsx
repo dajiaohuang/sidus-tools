@@ -1,6 +1,6 @@
 import { createContext, useContext, type ReactNode } from 'react'
-import type { ToolUiLayout } from './toolUiLayout'
-import { parseToolUiLayout } from './toolUiLayout'
+import type { ToolUiLayout } from './tool-ui-layout'
+import { parseToolUiLayout } from './tool-ui-layout'
 
 const defaultLayout = parseToolUiLayout(new URLSearchParams())
 

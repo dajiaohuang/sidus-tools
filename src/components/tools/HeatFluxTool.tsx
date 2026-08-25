@@ -6,7 +6,7 @@ import { UiUnitField } from '@/components/shared/UiUnitField'
 import { ResultCard } from '@/components/shared/ResultCard'
 import { CodeExport } from '@/components/shared/CodeExport'
 import { SUTTON_GRAVES_K_EARTH, suttonGravesHeatFlux, TOOL_UNIT_SETS, toSi } from '@/lib/physics'
-import { numParam, strParam, useToolSearchParams } from '@/lib/useToolSearchParams'
+import { numParam, strParam, useToolSearchParams } from '@/lib/use-tool-search-params'
 
 const SCHEMA = {
   rho: numParam(1e-4, { min: 0 }),

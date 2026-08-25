@@ -9,7 +9,7 @@ import {
   TOOL_UNIT_SETS,
   tankPropellantMass,
 } from '@/lib/physics'
-import { numParam, useToolSearchParams } from '@/lib/useToolSearchParams'
+import { numParam, useToolSearchParams } from '@/lib/use-tool-search-params'
 
 const SCHEMA = {
   V: numParam(0.5,{min:0.000001}),

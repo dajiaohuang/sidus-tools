@@ -11,7 +11,7 @@ import {
   toSi,
   sarAzimuthResolution,
 } from '@/lib/physics'
-import { numParam, strParam, useToolSearchParams } from '@/lib/useToolSearchParams'
+import { numParam, strParam, useToolSearchParams } from '@/lib/use-tool-search-params'
 
 const SCHEMA = {
   lam: numParam(0.03,{min:1e-9}),

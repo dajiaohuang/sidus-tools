@@ -4,7 +4,7 @@
  * Single source of the educational free-var values injected into every rendered
  * snippet, so the compile matrix and the numeric verifier exercise identical inputs.
  */
-import { formatCodeNumber, type LiveCodeValues } from '../liveValues'
+import { formatCodeNumber, type LiveCodeValues } from '../live-values'
 import { SCENARIOS } from './scenarios'
 
 /**

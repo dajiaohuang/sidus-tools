@@ -38,7 +38,7 @@ import { toSi } from '../physics/units'
 import { toolOgMeta } from './catalog'
 import type { OgMetric, OgPayload } from './types'
 import { SITE_ORIGIN } from './types'
-import { LAYOUT_PARAM_KEYS } from '../toolUiLayout'
+import { LAYOUT_PARAM_KEYS } from '../tool-ui-layout'
 
 /** Layout/chrome URL keys never belong on /api/og (live formula image). */
 const OG_STRIP = new Set<string>([...LAYOUT_PARAM_KEYS, 'mcp', 'tool', 'page'])

@@ -6,7 +6,7 @@ import { UiField } from '@/components/shared/UiField'
 import { ResultCard } from '@/components/shared/ResultCard'
 import { CodeExport } from '@/components/shared/CodeExport'
 import { wheelMomentum, wheelTorque } from '@/lib/physics'
-import { numParam, useToolSearchParams } from '@/lib/useToolSearchParams'
+import { numParam, useToolSearchParams } from '@/lib/use-tool-search-params'
 
 const SCHEMA = {
   I: numParam(0.05, { min: 0.0001 }),

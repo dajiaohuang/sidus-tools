@@ -20,7 +20,7 @@ Follow **CONVENTIONS.md** for every change. This file is a short checklist only.
 - **Source code, comments, Markdown, commits: English only.**
 - **User-facing strings only via `t(...)`**: locales under `src/i18n/locales/`.
 - Locales: `en`, `it`, `de`, `fr`, `es`, `ru`, `zh`, `ja`, `ko`, `pt`.
-- Numbers: `src/lib/localeNumber.ts` (active i18n language).
+- Numbers: `src/lib/locale-number.ts` (active i18n language).
 
 ## Stack
 

@@ -173,7 +173,7 @@ import { pumpCrankSnippets } from './tools/pump-crank'
 import { schweighartSedwickSnippets } from './tools/schweighart-sedwick'
 
 export * from './types'
-export * from './liveValues'
+export * from './live-values'
 export * from './runners'
 
 const MAP: Record<string, FormulaSnippet> = {

@@ -7,7 +7,7 @@ import { ResultCard } from '@/components/shared/ResultCard'
 import { CodeExport } from '@/components/shared/CodeExport'
 import { TOOL_UNIT_SETS, triadQuest } from '@/lib/physics'
 import { formatNumber } from '@/lib/physics/format'
-import { numParam, useToolSearchParams } from '@/lib/useToolSearchParams'
+import { numParam, useToolSearchParams } from '@/lib/use-tool-search-params'
 
 const SCHEMA = {
   w1x: numParam(0),

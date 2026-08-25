@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { TooltipLabel, tooltipProps } from '@/components/shared/tooltip'
-import { tipForLabel } from '@/lib/fieldTips'
+import { tipForLabel } from '@/lib/field-tips'
 import {
   fromSi,
   getUnit,

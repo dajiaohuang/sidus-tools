@@ -5,7 +5,7 @@ import {
   fromUtcDatetimeLocalValue,
   nowUtcIso,
   toUtcDatetimeLocalValue,
-} from '@/lib/utcInput'
+} from '@/lib/utc-input'
 import { cn } from '@/lib/utils'
 
 type Props = {

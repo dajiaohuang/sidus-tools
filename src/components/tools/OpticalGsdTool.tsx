@@ -10,7 +10,7 @@ import {
   toSi,
   opticalGsd,
 } from '@/lib/physics'
-import { numParam, strParam, useToolSearchParams } from '@/lib/useToolSearchParams'
+import { numParam, strParam, useToolSearchParams } from '@/lib/use-tool-search-params'
 
 const SCHEMA = {
   h: numParam(500,{min:0}),

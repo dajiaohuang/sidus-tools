@@ -13,7 +13,7 @@ import {
   toSi,
   geoPropellantBudget,
 } from '@/lib/physics'
-import { numParam, strParam, useToolSearchParams } from '@/lib/useToolSearchParams'
+import { numParam, strParam, useToolSearchParams } from '@/lib/use-tool-search-params'
 
 // 2 t dry GEO sat, hydrazine SK ~50 m/s/yr, 15 yr life (classic educational)
 const SCHEMA = {

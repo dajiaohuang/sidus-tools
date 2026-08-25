@@ -7,7 +7,7 @@ import { UiUnitField } from '@/components/shared/UiUnitField'
 import { ResultCard } from '@/components/shared/ResultCard'
 import { CodeExport } from '@/components/shared/CodeExport'
 import { BODIES, characteristicEnergy, getBody, TOOL_UNIT_SETS, toSi } from '@/lib/physics'
-import { numParam, strParam, useToolSearchParams } from '@/lib/useToolSearchParams'
+import { numParam, strParam, useToolSearchParams } from '@/lib/use-tool-search-params'
 
 // LEO periapsis class with clear hyperbolic energy (vesc@6678 km ≈ 10.9 km/s)
 const SCHEMA = {

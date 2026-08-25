@@ -8,8 +8,8 @@
  */
 
 import { useId, useMemo } from 'react'
-import { useElementSize } from './useElementSize'
-import { useDataDomain, type DataDomain } from './useDataDomain'
+import { useElementSize } from './use-element-size'
+import { useDataDomain, type DataDomain } from './use-data-domain'
 import { VizControls } from './VizControls'
 
 export type PlotPoint = { x: number; y: number }

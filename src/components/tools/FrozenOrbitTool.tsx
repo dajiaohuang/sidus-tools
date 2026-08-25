@@ -13,7 +13,7 @@ import {
   frozenEccentricityJ2J3,
   toSi,
 } from '@/lib/physics'
-import { numParam, strParam, useToolSearchParams } from '@/lib/useToolSearchParams'
+import { numParam, strParam, useToolSearchParams } from '@/lib/use-tool-search-params'
 
 const SCHEMA = {
   a: numParam(7178, { min: 0 }),

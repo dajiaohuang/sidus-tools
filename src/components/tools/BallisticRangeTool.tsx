@@ -11,7 +11,7 @@ import {
   toSi,
   ballisticRangeFlat,
 } from '@/lib/physics'
-import { numParam, strParam, useToolSearchParams } from '@/lib/useToolSearchParams'
+import { numParam, strParam, useToolSearchParams } from '@/lib/use-tool-search-params'
 
 const SCHEMA = {
   v0: numParam(100,{min:0}),

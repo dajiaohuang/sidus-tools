@@ -13,7 +13,7 @@ import {
   toSi,
   fromSi,
 } from '@/lib/physics'
-import { numParam, strParam, useToolSearchParams } from '@/lib/useToolSearchParams'
+import { numParam, strParam, useToolSearchParams } from '@/lib/use-tool-search-params'
 
 const SCHEMA = {
   A: numParam(20, { min: 0.001 }),

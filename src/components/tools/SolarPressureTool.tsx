@@ -14,7 +14,7 @@ import {
   TOOL_UNIT_SETS,
   toSi,
 } from '@/lib/physics'
-import { numParam, strParam, useToolSearchParams } from '@/lib/useToolSearchParams'
+import { numParam, strParam, useToolSearchParams } from '@/lib/use-tool-search-params'
 
 const SCHEMA = {
   m: numParam(500, { min: 0.001 }),

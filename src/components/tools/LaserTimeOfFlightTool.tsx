@@ -11,7 +11,7 @@ import {
   laserRangeFromRtt,
   laserRangeFromTof,
 } from '@/lib/physics'
-import { numParam, strParam, useToolSearchParams } from '@/lib/useToolSearchParams'
+import { numParam, strParam, useToolSearchParams } from '@/lib/use-tool-search-params'
 
 const SCHEMA = {
   t: numParam(0.002,{min:1e-12}),

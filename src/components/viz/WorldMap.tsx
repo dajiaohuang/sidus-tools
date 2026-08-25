@@ -5,8 +5,8 @@
  */
 
 import { useMemo } from 'react'
-import { useElementSize } from './useElementSize'
-import { useVizViewport } from './useVizViewport'
+import { useElementSize } from './use-element-size'
+import { useVizViewport } from './use-viz-viewport'
 import { VizControls } from './VizControls'
 
 const MAP_W = 720

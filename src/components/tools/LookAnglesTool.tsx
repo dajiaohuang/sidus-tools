@@ -17,8 +17,8 @@ import {
   TOOL_UNIT_SETS,
   toSi,
 } from '@/lib/physics'
-import { resolveUtcParam } from '@/lib/utcInput'
-import { numParam, strParam, useToolSearchParams } from '@/lib/useToolSearchParams'
+import { resolveUtcParam } from '@/lib/utc-input'
+import { numParam, strParam, useToolSearchParams } from '@/lib/use-tool-search-params'
 
 const SCHEMA = {
   lat: numParam(DEFAULT_LAUNCH_SITE.latDeg),

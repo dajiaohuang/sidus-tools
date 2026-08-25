@@ -11,7 +11,7 @@ import {
   toSi,
   flightPathAngle,
 } from '@/lib/physics'
-import { numParam, strParam, useToolSearchParams } from '@/lib/useToolSearchParams'
+import { numParam, strParam, useToolSearchParams } from '@/lib/use-tool-search-params'
 
 const SCHEMA = {
   e: numParam(0.2,{min:0}),

@@ -7,8 +7,8 @@
 
 import { useId, useMemo, useState } from 'react'
 import { TooltipLabel } from '@/components/shared/tooltip'
-import { useElementSize } from './useElementSize'
-import { useVizViewport } from './useVizViewport'
+import { useElementSize } from './use-element-size'
+import { useVizViewport } from './use-viz-viewport'
 import { VizControls } from './VizControls'
 
 export type OrbitDiagramProps = {

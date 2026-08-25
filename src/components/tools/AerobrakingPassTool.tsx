@@ -11,7 +11,7 @@ import {
   toSi,
   aerobrakingDv,
 } from '@/lib/physics'
-import { numParam, strParam, useToolSearchParams } from '@/lib/useToolSearchParams'
+import { numParam, strParam, useToolSearchParams } from '@/lib/use-tool-search-params'
 
 const SCHEMA = {
   ball: numParam(0.01,{min:1e-9}),

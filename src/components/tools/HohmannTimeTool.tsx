@@ -7,7 +7,7 @@ import { UiUnitField } from '@/components/shared/UiUnitField'
 import { ResultCard } from '@/components/shared/ResultCard'
 import { CodeExport } from '@/components/shared/CodeExport'
 import { BODIES, getBody, hohmannTransfer, TOOL_UNIT_SETS, toSi } from '@/lib/physics'
-import { numParam, strParam, useToolSearchParams } from '@/lib/useToolSearchParams'
+import { numParam, strParam, useToolSearchParams } from '@/lib/use-tool-search-params'
 const SCHEMA = { body: strParam('earth', BODIES.map(b=>b.id)), h1: numParam(200,{min:0}), h2: numParam(35786,{min:0}), hu: strParam('km', TOOL_UNIT_SETS.altitude) } as const
 export function HohmannTimeTool() {
   const { t } = useTranslation()

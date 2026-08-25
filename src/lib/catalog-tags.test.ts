@@ -3,7 +3,7 @@ import {
   catalogFilterPath,
   parseCatalogTagsParam,
   serializeCatalogTags,
-} from './catalogTags'
+} from './catalog-tags'
 
 describe('catalogFilterPath', () => {
   it('builds the same ?tags= URL as the catalog filter', () => {

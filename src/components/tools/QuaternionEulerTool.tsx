@@ -16,7 +16,7 @@ import {
   toSi,
 } from '@/lib/physics'
 import { formatNumber } from '@/lib/physics/format'
-import { numParam, strParam, useToolSearchParams } from '@/lib/useToolSearchParams'
+import { numParam, strParam, useToolSearchParams } from '@/lib/use-tool-search-params'
 
 const MODES = ['euler', 'quat'] as const
 

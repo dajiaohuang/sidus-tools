@@ -12,7 +12,7 @@ import {
   type CodeDep,
   type CodeLang,
 } from '@/lib/snippets'
-import { renderLiveCode, type LiveCodeValues } from '@/lib/snippets/liveValues'
+import { renderLiveCode, type LiveCodeValues } from '@/lib/snippets/live-values'
 import { tooltipProps } from '@/components/shared/tooltip'
 import { cn } from '@/lib/utils'
 

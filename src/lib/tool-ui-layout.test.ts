@@ -13,7 +13,7 @@ import {
   seedLayoutFromPrefs,
   slotClass,
   usesTightPagePad,
-} from './toolUiLayout'
+} from './tool-ui-layout'
 
 describe('parseToolUiLayout', () => {
   it('defaults to non-focus chrome on', () => {

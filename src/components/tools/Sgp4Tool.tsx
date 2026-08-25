@@ -22,8 +22,8 @@ import {
 import {
   formatNumber,
 } from '@/lib/physics/format'
-import { resolveUtcParam } from '@/lib/utcInput'
-import { numParam, strParam, useToolSearchParams } from '@/lib/useToolSearchParams'
+import { resolveUtcParam } from '@/lib/utc-input'
+import { numParam, strParam, useToolSearchParams } from '@/lib/use-tool-search-params'
 
 const SCHEMA = {
   /** ISO datetime for epoch of propagation (UTC). Empty → now is handled in UI. */

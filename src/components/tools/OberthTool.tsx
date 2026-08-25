@@ -8,7 +8,7 @@ import { UiUnitField } from '@/components/shared/UiUnitField'
 import { ResultCard } from '@/components/shared/ResultCard'
 import { CodeExport } from '@/components/shared/CodeExport'
 import { BODIES, getBody, oberthCompare, TOOL_UNIT_SETS, toSi } from '@/lib/physics'
-import { numParam, strParam, useToolSearchParams } from '@/lib/useToolSearchParams'
+import { numParam, strParam, useToolSearchParams } from '@/lib/use-tool-search-params'
 
 // Classic GTO-class ellipse: rp≈6678 km, ra≈42164 km → a≈24421 km, e≈0.73
 const SCHEMA = {

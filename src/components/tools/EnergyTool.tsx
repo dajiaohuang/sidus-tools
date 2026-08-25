@@ -7,7 +7,7 @@ import { UiUnitField } from '@/components/shared/UiUnitField'
 import { ResultCard } from '@/components/shared/ResultCard'
 import { CodeExport } from '@/components/shared/CodeExport'
 import { BODIES, getBody, specificEnergy, TOOL_UNIT_SETS, toSi, visViva } from '@/lib/physics'
-import { numParam, strParam, useToolSearchParams } from '@/lib/useToolSearchParams'
+import { numParam, strParam, useToolSearchParams } from '@/lib/use-tool-search-params'
 // ISS-class near-circular LEO: a≈r≈6778 km (evaluate energy + vis-viva at same radius)
 const SCHEMA = { body: strParam('earth', BODIES.map(b=>b.id)), a: numParam(6778,{min:0.001}), r: numParam(6778,{min:0.001}), lu: strParam('km', TOOL_UNIT_SETS.length) } as const
 export function EnergyTool() {

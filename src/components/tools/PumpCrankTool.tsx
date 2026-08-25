@@ -8,7 +8,7 @@ import { CodeExport } from '@/components/shared/CodeExport'
 import { TOOL_UNIT_SETS, getBody, pumpCrankFlyby, toSi } from '@/lib/physics'
 import { BodySelect } from '@/components/shared/BodySelect'
 import { formatNumber } from '@/lib/physics/format'
-import { numParam, strParam, useToolSearchParams } from '@/lib/useToolSearchParams'
+import { numParam, strParam, useToolSearchParams } from '@/lib/use-tool-search-params'
 
 const SCHEMA = {
   body: strParam('mars'),

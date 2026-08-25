@@ -11,7 +11,7 @@ import {
 import {
   formatNumber,
 } from '@/lib/physics/format'
-import { numParam, useToolSearchParams } from '@/lib/useToolSearchParams'
+import { numParam, useToolSearchParams } from '@/lib/use-tool-search-params'
 
 const SCHEMA = {
   m: numParam(0.1,{min:1e-9}),

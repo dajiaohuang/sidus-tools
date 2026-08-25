@@ -11,7 +11,7 @@ import {
   toSi,
   captureCircularizeDv,
 } from '@/lib/physics'
-import { numParam, strParam, useToolSearchParams } from '@/lib/useToolSearchParams'
+import { numParam, strParam, useToolSearchParams } from '@/lib/use-tool-search-params'
 
 const SCHEMA = {
   mu: numParam(398600441800000,{min:1}),

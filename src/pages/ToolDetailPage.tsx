@@ -16,7 +16,7 @@ import {
   parseToolUiLayout,
   seedLayoutFromPrefs,
   usesTightPagePad,
-} from '@/lib/toolUiLayout'
+} from '@/lib/tool-ui-layout'
 import { tooltipProps } from '@/components/shared/tooltip'
 import { cn } from '@/lib/utils'
 

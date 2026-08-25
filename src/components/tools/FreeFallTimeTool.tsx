@@ -12,7 +12,7 @@ import {
   freeFallTimeConstG,
   freeFallSpeedConstG,
 } from '@/lib/physics'
-import { numParam, strParam, useToolSearchParams } from '@/lib/useToolSearchParams'
+import { numParam, strParam, useToolSearchParams } from '@/lib/use-tool-search-params'
 
 const SCHEMA = {
   h: numParam(100,{min:0}),

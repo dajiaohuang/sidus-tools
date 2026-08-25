@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { ArrowRight, FlaskConical } from 'lucide-react'
 import { TOOLS, primaryTag } from '@/data/tools'
-import { catalogFilterPath } from '@/lib/catalogTags'
+import { catalogFilterPath } from '@/lib/catalog-tags'
 import { RESOURCES } from '@/data/resources'
 import { BODIES } from '@/lib/physics'
 import { SeoHead } from '@/components/site/SeoHead'
@@ -10,7 +10,7 @@ import { McpConnectCard } from '@/components/site/McpConnectCard'
 import { AsciiOrbitField } from '@/components/site/AsciiOrbitField'
 import { ToolExampleCarousel } from '@/components/site/ToolExampleCarousel'
 import { RevealOnScroll } from '@/components/site/home/RevealOnScroll'
-import { useCountUpWhenVisible } from '@/components/site/home/useCountUpWhenVisible'
+import { useCountUpWhenVisible } from '@/components/site/home/use-count-up-when-visible'
 import {
   AgentsSvg,
   OrbitSvg,

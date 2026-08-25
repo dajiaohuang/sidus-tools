@@ -59,7 +59,7 @@ src/
   components/site/     Header, footer, home chrome
   lib/physics/         Pure SI
   lib/snippets/        Code export
-  lib/localeNumber.ts  Locale number parse/format
+  lib/locale-number.ts  Locale number parse/format
   data/                tools, sources, precision
   i18n/locales/        en it de fr es ru zh ja ko pt
 public/                robots, sitemap, llms, favicon, static og

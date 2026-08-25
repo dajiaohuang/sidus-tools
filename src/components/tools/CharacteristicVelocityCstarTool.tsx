@@ -15,7 +15,7 @@ import {
 import {
   formatNumber,
 } from '@/lib/physics/format'
-import { numParam, strParam, useToolSearchParams } from '@/lib/useToolSearchParams'
+import { numParam, strParam, useToolSearchParams } from '@/lib/use-tool-search-params'
 
 // Defaults yield η_c* ≈ 0.85–0.95 (measured ≤ ideal). Avoid c*_meas > c*_ideal.
 // pc·At/mdot ≈ 1.45 km/s; ideal ≈ 1.71 km/s for γ=1.2, R=350, Tc=3500 K.

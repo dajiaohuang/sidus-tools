@@ -11,7 +11,7 @@ import {
 import {
   formatNumber,
 } from '@/lib/physics/format'
-import { numParam, useToolSearchParams } from '@/lib/useToolSearchParams'
+import { numParam, useToolSearchParams } from '@/lib/use-tool-search-params'
 
 const SCHEMA = {
   rate: numParam(20,{min:0}),

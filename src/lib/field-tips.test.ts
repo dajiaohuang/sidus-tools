@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { tipForLabel } from './fieldTips'
+import { tipForLabel } from './field-tips'
 
 describe('fieldTips', () => {
   it('resolves common labels', () => {

@@ -6,7 +6,7 @@ import {
   formatEditableNumber,
   isPartialLocaleNumber,
   parseLocaleNumber,
-} from '@/lib/localeNumber'
+} from '@/lib/locale-number'
 import { convertById, getUnit, unitsForCategory, type UnitCategory } from '@/lib/physics'
 import { cn } from '@/lib/utils'
 

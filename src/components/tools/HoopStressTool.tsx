@@ -14,7 +14,7 @@ import {
 import {
   formatNumber,
 } from '@/lib/physics/format'
-import { numParam, strParam, useToolSearchParams } from '@/lib/useToolSearchParams'
+import { numParam, strParam, useToolSearchParams } from '@/lib/use-tool-search-params'
 
 const SCHEMA = {
   press: numParam(10,{min:0}),

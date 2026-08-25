@@ -18,7 +18,7 @@ import {
   portPythonToZig,
   willEmitSystemsLangs,
 } from './make'
-import { renderLiveCode } from './liveValues'
+import { renderLiveCode } from './live-values'
 import {
   createRunnerUrl,
   primaryRunnerUrl,

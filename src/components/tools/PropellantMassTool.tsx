@@ -14,7 +14,7 @@ import {
   TOOL_UNIT_SETS,
   toSi,
 } from '@/lib/physics'
-import { numParam, strParam, useToolSearchParams } from '@/lib/useToolSearchParams'
+import { numParam, strParam, useToolSearchParams } from '@/lib/use-tool-search-params'
 
 // Stage-class: Isp 320 s, Δv 3.2 km/s, dry 5 t (upper-stage educational)
 const SCHEMA = {

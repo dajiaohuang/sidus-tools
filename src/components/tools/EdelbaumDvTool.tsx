@@ -10,7 +10,7 @@ import {
   toSi,
   edelbaumDv,
 } from '@/lib/physics'
-import { numParam, strParam, useToolSearchParams } from '@/lib/useToolSearchParams'
+import { numParam, strParam, useToolSearchParams } from '@/lib/use-tool-search-params'
 
 const SCHEMA = {
   v1: numParam(7.7,{min:0}),

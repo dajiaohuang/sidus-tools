@@ -10,7 +10,7 @@ import { FunctionPlot } from '@/components/viz/FunctionPlot'
 import {
   formatNumber,
 } from '@/lib/physics/format'
-import { numParam, strParam, useToolSearchParams } from '@/lib/useToolSearchParams'
+import { numParam, strParam, useToolSearchParams } from '@/lib/use-tool-search-params'
 
 const PRESETS = [
   { label: 'sin(x)', expr: 'sin(x)', xMin: -10, xMax: 10 },

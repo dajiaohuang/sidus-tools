@@ -18,7 +18,7 @@ import {
 import {
   formatNumber,
 } from '@/lib/physics/format'
-import { numParam, strParam, useToolSearchParams } from '@/lib/useToolSearchParams'
+import { numParam, strParam, useToolSearchParams } from '@/lib/use-tool-search-params'
 
 const FLUIDS: Record<string, { cp: number; labelKey: string }> = {
   water: { cp: 4184, labelKey: 'fields.fluid_water' },

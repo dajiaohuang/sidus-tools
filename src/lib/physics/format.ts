@@ -1,4 +1,4 @@
-import { formatLocaleNumber } from '../localeNumber'
+import { formatLocaleNumber } from '../locale-number'
 
 /**
  * Format a number for UI results.

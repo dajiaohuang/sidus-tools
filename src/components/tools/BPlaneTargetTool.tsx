@@ -7,7 +7,7 @@ import { ResultCard } from '@/components/shared/ResultCard'
 import { CodeExport } from '@/components/shared/CodeExport'
 import { EARTH_MU, EARTH_RADIUS, TOOL_UNIT_SETS, bPlaneTarget, toSi } from '@/lib/physics'
 import { formatNumber } from '@/lib/physics/format'
-import { numParam, strParam, useToolSearchParams } from '@/lib/useToolSearchParams'
+import { numParam, strParam, useToolSearchParams } from '@/lib/use-tool-search-params'
 
 const SCHEMA = {
   vx: numParam(3),

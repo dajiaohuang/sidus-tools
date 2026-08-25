@@ -38,8 +38,8 @@ import {
   isValidTimeZone,
   listTimeZones,
 } from '@/lib/timezone'
-import { resolveUtcParam } from '@/lib/utcInput'
-import { numParam, strParam, useToolSearchParams } from '@/lib/useToolSearchParams'
+import { resolveUtcParam } from '@/lib/utc-input'
+import { numParam, strParam, useToolSearchParams } from '@/lib/use-tool-search-params'
 
 const SCHEMA = {
   lat: numParam(DEFAULT_LAUNCH_SITE.latDeg),

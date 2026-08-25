@@ -13,7 +13,7 @@ import {
   herrickGibbs,
   positionArcs,
 } from '@/lib/physics'
-import { numParam, strParam, useToolSearchParams } from '@/lib/useToolSearchParams'
+import { numParam, strParam, useToolSearchParams } from '@/lib/use-tool-search-params'
 
 const METHODS = ['herrick', 'gibbs'] as const
 

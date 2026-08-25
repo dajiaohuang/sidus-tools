@@ -10,7 +10,7 @@ import {
   safeIdent,
   stripTsTypes,
   wrapAsRunnable,
-} from './liveValues'
+} from './live-values'
 import { getSnippets } from './index'
 
 describe('live code values', () => {

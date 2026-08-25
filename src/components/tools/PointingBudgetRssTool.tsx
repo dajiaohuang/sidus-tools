@@ -10,7 +10,7 @@ import {
   toSi,
   pointingBudgetRss,
 } from '@/lib/physics'
-import { numParam, strParam, useToolSearchParams } from '@/lib/useToolSearchParams'
+import { numParam, strParam, useToolSearchParams } from '@/lib/use-tool-search-params'
 
 const SCHEMA = {
   s1: numParam(10,{min:0}),

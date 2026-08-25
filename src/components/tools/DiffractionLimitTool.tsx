@@ -9,7 +9,7 @@ import {
   TOOL_UNIT_SETS,
   diffractionLimitAngle,
 } from '@/lib/physics'
-import { numParam, useToolSearchParams } from '@/lib/useToolSearchParams'
+import { numParam, useToolSearchParams } from '@/lib/use-tool-search-params'
 
 const SCHEMA = {
   lam: numParam(5.5e-7,{min:1e-12}),

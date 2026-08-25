@@ -5,7 +5,7 @@
 import { describe, expect, it } from 'vitest'
 import { sgp4Snippets } from './sgp4'
 import { passPredictSnippets } from './pass-predict'
-import { wrapAsRunnable } from './liveValues'
+import { wrapAsRunnable } from './live-values'
 
 const SYSTEMS_LANGS = ['c', 'cpp', 'rust', 'zig', 'fortran'] as const
 

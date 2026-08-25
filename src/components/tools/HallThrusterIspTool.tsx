@@ -13,7 +13,7 @@ import {
 import {
   formatNumber,
 } from '@/lib/physics/format'
-import { numParam, useToolSearchParams } from '@/lib/useToolSearchParams'
+import { numParam, useToolSearchParams } from '@/lib/use-tool-search-params'
 
 const SCHEMA = {
   V: numParam(300,{min:1}),

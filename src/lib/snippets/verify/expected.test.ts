@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { getSnippets } from '../index'
-import { safeIdent } from '../liveValues'
+import { safeIdent } from '../live-values'
 import type { CodeLang } from '../types'
 import { EXPECTED, UNVERIFIABLE } from './expected'
 import { asInjected, inputBagFor, scenariosFor } from './inputs'

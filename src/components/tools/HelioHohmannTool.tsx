@@ -14,7 +14,7 @@ import {
   heliocentricSynodic,
   TOOL_UNIT_SETS,
 } from '@/lib/physics'
-import { strParam, useToolSearchParams } from '@/lib/useToolSearchParams'
+import { strParam, useToolSearchParams } from '@/lib/use-tool-search-params'
 
 const PLANETS = Object.keys(HELIO_SMA_M)
 

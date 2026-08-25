@@ -15,7 +15,7 @@ import {
   TOOL_UNIT_SETS,
   toSi,
 } from '@/lib/physics'
-import { numParam, strParam, useToolSearchParams } from '@/lib/useToolSearchParams'
+import { numParam, strParam, useToolSearchParams } from '@/lib/use-tool-search-params'
 
 const SCHEMA = {
   mode: numParam(0), // 0: mdot+ve, 1: F+Isp

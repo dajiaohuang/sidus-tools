@@ -6,7 +6,7 @@ import { UiUnitField } from '@/components/shared/UiUnitField'
 import { ResultCard } from '@/components/shared/ResultCard'
 import { CodeExport } from '@/components/shared/CodeExport'
 import { EARTH_MU, EARTH_RADIUS, orbitalPeriod, ssoInclination, TOOL_UNIT_SETS, toSi } from '@/lib/physics'
-import { numParam, strParam, useToolSearchParams } from '@/lib/useToolSearchParams'
+import { numParam, strParam, useToolSearchParams } from '@/lib/use-tool-search-params'
 const SCHEMA = {
   h: numParam(600, { min: 0 }),
   hu: strParam('km', TOOL_UNIT_SETS.altitude) } as const

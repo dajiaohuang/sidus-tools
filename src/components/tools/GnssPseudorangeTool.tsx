@@ -9,7 +9,7 @@ import {
   TOOL_UNIT_SETS,
   gnssPseudorange,
 } from '@/lib/physics'
-import { numParam, useToolSearchParams } from '@/lib/useToolSearchParams'
+import { numParam, useToolSearchParams } from '@/lib/use-tool-search-params'
 
 const SCHEMA = {
   tTx: numParam(0),

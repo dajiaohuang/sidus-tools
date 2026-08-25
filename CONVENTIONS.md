@@ -18,7 +18,7 @@ Related: [CONTRIBUTING.md](./CONTRIBUTING.md) · [INDEX.md](./INDEX.md) ·
 | Locale files | `src/i18n/locales/*.ts`: **EN is source of truth** (`TMessages`) |
 | Supported locales | `en`, `it`, `de`, `fr`, `es`, `ru`, `zh`, `ja`, `ko`, `pt` |
 | New string | Add key to `en.ts` first, then **every** locale file |
-| Numbers in UI | Locale-aware via `src/lib/localeNumber.ts` + active i18n language |
+| Numbers in UI | Locale-aware via `src/lib/locale-number.ts` + active i18n language |
 | URL numbers | Search params stay **invariant** (dot decimal) |
 
 **Forbidden:** hard-coded English (or any language) labels, hints, buttons,
@@ -76,7 +76,7 @@ When adding or renaming a tool:
 | Artifact | Update |
 |----------|--------|
 | `src/data/tools.ts` | `id`, `category`, `title`, `description`, `tags`, `formulaId`, `status`, `sourceIds` |
-| `src/data/toolDates.ts` | `created`, `updated` ISO 8601 dates (YYYY-MM-DD), merged onto `ToolMeta` |
+| `src/data/tool-dates.ts` | `created`, `updated` ISO 8601 dates (YYYY-MM-DD), merged onto `ToolMeta` |
 | `src/components/tools/*Tool.tsx` | Implementation |
 | `src/components/tools/ToolRenderer.tsx` | Lazy map entry |
 | `src/lib/snippets/` | Snippets for `formulaId` |
@@ -170,8 +170,8 @@ After deploy, verify:
 
 | Area | Convention |
 |------|------------|
-| Tools | `PascalCaseTool.tsx` matching `id` in kebab-case in catalog |
-| Physics modules | `camelCase` or domain name `.ts` |
+| React components | `PascalCase.tsx`, named after the file's primary exported component; tools match their kebab-case catalog `id` |
+| All other source files | `kebab-case.ts` / `kebab-case.tsx` (hooks, layers, workers, physics, data, tests) |
 | Snippet tools | `src/lib/snippets/tools/<formulaId>.ts` |
 | Locales | ISO 639-1 short codes: `en.ts`, `ko.ts`, … |
 | Docs | `SCREAMING` or `Title` for top-level policy docs |

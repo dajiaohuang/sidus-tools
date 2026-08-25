@@ -6,7 +6,7 @@ import {
   isPartialLocaleNumber,
   parseLocaleNumber,
   resolveIntlLocale,
-} from './localeNumber'
+} from './locale-number'
 
 describe('localeNumber', () => {
   it('resolves short codes to BCP 47', () => {

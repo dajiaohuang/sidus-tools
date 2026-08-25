@@ -4,7 +4,7 @@ import {
   formatEditableNumber,
   isPartialLocaleNumber,
   parseLocaleNumber,
-} from '@/lib/localeNumber'
+} from '@/lib/locale-number'
 import { Field } from '@/components/shared/Field'
 import { cn } from '@/lib/utils'
 

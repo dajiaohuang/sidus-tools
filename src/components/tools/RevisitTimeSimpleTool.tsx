@@ -10,7 +10,7 @@ import {
   toSi,
   revisitTimeSimple,
 } from '@/lib/physics'
-import { numParam, strParam, useToolSearchParams } from '@/lib/useToolSearchParams'
+import { numParam, strParam, useToolSearchParams } from '@/lib/use-tool-search-params'
 
 const SCHEMA = {
   T: numParam(95,{min:0}),

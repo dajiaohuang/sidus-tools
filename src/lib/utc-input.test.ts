@@ -3,7 +3,7 @@ import {
   fromUtcDatetimeLocalValue,
   resolveUtcParam,
   toUtcDatetimeLocalValue,
-} from './utcInput'
+} from './utc-input'
 
 describe('utcInput', () => {
   it('round-trips UTC datetime-local without shifting timezone', () => {

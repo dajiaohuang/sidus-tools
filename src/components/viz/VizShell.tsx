@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { VizControls } from './VizControls'
-import { useElementSize } from './useElementSize'
+import { useElementSize } from './use-element-size'
 import { cn } from '@/lib/utils'
 
 type Props = {

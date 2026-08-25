@@ -1,6 +1,6 @@
 import { useId, type ButtonHTMLAttributes, type ReactNode } from 'react'
 import { describeControl, TooltipLabel, tooltipProps } from '@/components/shared/tooltip'
-import { tipForLabel } from '@/lib/fieldTips'
+import { tipForLabel } from '@/lib/field-tips'
 import { cn } from '@/lib/utils'
 
 export type FieldProps = {

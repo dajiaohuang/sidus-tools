@@ -23893,7 +23893,7 @@ var LAUNCH_SITES = [
 ];
 var DEFAULT_LAUNCH_SITE = LAUNCH_SITES[0];
 
-// src/lib/physics/orbitPresets.ts
+// src/lib/physics/orbit-presets.ts
 var EARTH_ORBIT_ALT_M = {
   /** Low LEO parking / injection class */
   LEO_LOW: 2e5,

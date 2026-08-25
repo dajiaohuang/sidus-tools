@@ -15,7 +15,7 @@ import {
   TOOL_UNIT_SETS,
   toSi,
 } from '@/lib/physics'
-import { numParam, strParam, useToolSearchParams } from '@/lib/useToolSearchParams'
+import { numParam, strParam, useToolSearchParams } from '@/lib/use-tool-search-params'
 
 const PHASE_KEYS = ['d1', 'd2', 'd3', 'd4', 'd5', 'd6'] as const
 

@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { Panel } from './Panel'
 import { cn } from '@/lib/utils'
 import { useToolUiLayout } from '@/lib/ToolUiLayoutContext'
-import type { SlotSize, ToolUiLayout } from '@/lib/toolUiLayout'
+import type { SlotSize, ToolUiLayout } from '@/lib/tool-ui-layout'
 
 type Props = {
   parameters: ReactNode

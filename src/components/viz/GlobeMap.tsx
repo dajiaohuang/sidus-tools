@@ -23,7 +23,7 @@ import {
 import { cn } from '@/lib/utils'
 import { MapPin } from 'lucide-react'
 import type { CustomLayerInterface, CustomRenderMethodInput, ProjectionData } from 'maplibre-gl'
-import { ALTITUDE_LAYER_ID, createAltitudeLayer, type AltitudeLayer, type AltitudeTrailInput } from './globe/altitudeLayer'
+import { ALTITUDE_LAYER_ID, createAltitudeLayer, type AltitudeLayer, type AltitudeTrailInput } from './globe/altitude-layer'
 import {
   centerForElevatedTarget,
   elevatedCenterLeadRad,

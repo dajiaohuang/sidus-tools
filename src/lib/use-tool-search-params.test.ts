@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { numParam, strParam } from './useToolSearchParams'
+import { numParam, strParam } from './use-tool-search-params'
 
 describe('param readers treat bogus literals as absent', () => {
   /**

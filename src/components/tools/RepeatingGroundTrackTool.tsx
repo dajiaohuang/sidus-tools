@@ -9,7 +9,7 @@ import {
   TOOL_UNIT_SETS,
   repeatingGroundTrackPeriod,
 } from '@/lib/physics'
-import { numParam, useToolSearchParams } from '@/lib/useToolSearchParams'
+import { numParam, useToolSearchParams } from '@/lib/use-tool-search-params'
 
 const SCHEMA = {
   k: numParam(14,{min:1}),

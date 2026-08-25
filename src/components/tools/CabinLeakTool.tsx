@@ -16,7 +16,7 @@ import {
   toSi,
   fromSi,
 } from '@/lib/physics'
-import { numParam, strParam, useToolSearchParams } from '@/lib/useToolSearchParams'
+import { numParam, strParam, useToolSearchParams } from '@/lib/use-tool-search-params'
 
 const SCHEMA = {
   /** Free volume in `Vu` (default SI-friendly m³) */

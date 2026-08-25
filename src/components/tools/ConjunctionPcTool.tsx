@@ -8,7 +8,7 @@ import { ResultCard } from '@/components/shared/ResultCard'
 import { CodeExport } from '@/components/shared/CodeExport'
 import { TOOL_UNIT_SETS, conjunctionPcReport, toSi } from '@/lib/physics'
 import { formatNumber } from '@/lib/physics/format'
-import { numParam, strParam, useToolSearchParams } from '@/lib/useToolSearchParams'
+import { numParam, strParam, useToolSearchParams } from '@/lib/use-tool-search-params'
 
 const METHODS = ['chan', 'foster'] as const
 

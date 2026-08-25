@@ -11,7 +11,7 @@ import {
   toSi,
   starTrackerNoiseRad,
 } from '@/lib/physics'
-import { numParam, strParam, useToolSearchParams } from '@/lib/useToolSearchParams'
+import { numParam, strParam, useToolSearchParams } from '@/lib/use-tool-search-params'
 
 const SCHEMA = {
   pix: numParam(20,{min:0}),
