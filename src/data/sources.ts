@@ -52,8 +52,8 @@ export const SOURCES: Record<string, SourceRef> = {
   },
   celestrak: {
     id: 'celestrak',
-    name: 'CelesTrak',
-    org: 'CelesTrak',
+    name: 'CelesTrak™',
+    org: 'CelesTrak™',
     url: 'https://celestrak.org/',
     note: 'TLE sets, NORAD element documentation, and Vallado software companion hosting.',
   },

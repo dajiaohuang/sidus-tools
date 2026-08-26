@@ -31,10 +31,10 @@ export const FALLBACK_TRACK_HALF_SPAN_S = 46 * 60
 export const TRACK_MAX_SAMPLES = 2400
 
 /** Ground track point for one satellite at an instant, or null if it will not propagate. */
-export function trackPointAt(satrec: SatRec, date: Date): GlobeTrackPoint | null {
+export function trackPointAt(satrec: SatRec, date: Date, freezeEpoch?: Date): GlobeTrackPoint | null {
   const state = propagateEci(satrec, date)
   if (!state) return null
-  const geo = eciSiToGeodetic(state.r, date)
+  const geo = eciSiToGeodetic(state.r, freezeEpoch ?? date)
   if (!geo) return null
   return { lon: geo.lonDeg, lat: geo.latDeg, altKm: geo.heightM / 1000, date }
 }
@@ -61,6 +61,92 @@ export function samplePeriodTrack(
   for (let dt = -halfSpanS; dt <= halfSpanS; dt += stepS) {
     const point = trackPointAt(satrec, new Date(centerMs + dt * 1000))
     if (point) points.push(point)
+  }
+  return points
+}
+
+/** Samples of one inertial ellipse, for the elevated globe trail. */
+export const INERTIAL_TRACK_SAMPLES = 1440
+
+const TAU = Math.PI * 2
+
+function wrapPi(angle: number): number {
+  let a = angle % TAU
+  if (a > Math.PI) a -= TAU
+  if (a < -Math.PI) a += TAU
+  return a
+}
+
+/** Kepler: mean anomaly → true anomaly. Newton on the eccentric anomaly. */
+export function keplerMeanToTrue(M: number, e: number): number {
+  const m = wrapPi(M)
+  let E = m
+  for (let k = 0; k < 20; k++) {
+    const dE = (E - e * Math.sin(E) - m) / (1 - e * Math.cos(E))
+    E -= dE
+    if (Math.abs(dE) < 1e-14) break
+  }
+  return 2 * Math.atan2(Math.sqrt(1 + e) * Math.sin(E / 2), Math.sqrt(1 - e) * Math.cos(E / 2))
+}
+
+/** Kepler: true anomaly → mean anomaly. */
+export function keplerTrueToMean(nu: number, e: number): number {
+  const n = wrapPi(nu)
+  const E = 2 * Math.atan2(Math.sqrt(1 - e) * Math.sin(n / 2), Math.sqrt(1 + e) * Math.cos(n / 2))
+  return wrapPi(E - e * Math.sin(E))
+}
+
+/**
+ * One inertial ellipse as geodetic points.
+ *
+ * Sample times are spaced in TRUE anomaly around `epochMs`, then each state
+ * still comes from SGP4. Time-uniform sampling of a deep ellipse (MMS 4
+ * e≈0.83) puts ~20° of perigee into one step; drawing those steps as chords
+ * is the yellow fan through the Earth. Equal true-anomaly steps keep
+ * consecutive radius vectors at a fixed angle, so the polyline follows the
+ * ellipse.
+ *
+ * Greenwich conversion is `freezeMs` (default `epochMs`). Sample TIMES may
+ * re-anchor on a short bucket; the conversion epoch must not. The swarm
+ * latches one Earth orientation for the whole load, and the identified
+ * satellite's trail has to use that same angle: a 30 s conversion bucket is
+ * a different longitude, and hover then jumps the live point onto a trail
+ * that is not the path the swarm had been flying.
+ */
+export function sampleInertialGeodeticTrack(
+  satrec: SatRec,
+  epochMs: number,
+  revolutions: number,
+  samples = INERTIAL_TRACK_SAMPLES,
+  freezeMs = epochMs,
+): GlobeTrackPoint[] {
+  const n = satrec.no
+  const e = satrec.ecco
+  const M0 = satrec.mo
+  if (!Number.isFinite(n) || n <= 0 || samples < 2 || !(e >= 0) || e >= 1) return []
+  const tleEpochMs = (satrec.jdsatepoch - 2440587.5) * 86_400_000
+  const Mnow = M0 + n * ((epochMs - tleEpochMs) / 60_000)
+  const nuNow = keplerMeanToTrue(Mnow, e)
+  const nuHalf = revolutions * TAU
+  const freeze = new Date(freezeMs)
+  const points: GlobeTrackPoint[] = []
+  let prevM: number | null = null
+  for (let i = 0; i < samples; i++) {
+    const nu = nuNow - nuHalf + (2 * nuHalf * i) / (samples - 1)
+    let M = keplerTrueToMean(nu, e)
+    if (prevM == null) {
+      M += TAU * Math.round((Mnow - nuHalf - M) / TAU)
+    } else {
+      M += TAU * Math.round((prevM - M) / TAU)
+      if (M < prevM) M += TAU
+    }
+    prevM = M
+    const at = new Date(tleEpochMs + ((M - M0) / n) * 60_000)
+    const state = propagateEci(satrec, at)
+    if (!state) continue
+    const geo = eciSiToGeodetic(state.r, freeze)
+    if (!geo) continue
+    points.push({ lon: geo.lonDeg, lat: geo.latDeg, altKm: geo.heightM / 1000, date: at })
   }
   return points
 }

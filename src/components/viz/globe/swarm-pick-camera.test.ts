@@ -180,11 +180,11 @@ describe('swarm pick against a synthetic camera', () => {
   it('answers about the CURRENT geometry after a looped re-production', () => {
     /*
      * The looping producer overwrites every trail about once a minute, and
-     * the index skips the bucket re-push when the trail has barely moved.
-     * The promise that skip rests on: the exact stage reads the OVERWRITTEN
-     * data, so the answer tracks the fresh geometry even through a skipped
-     * re-index, and a delivery that DOES move far gets re-indexed and found
-     * at its new place.
+     * the index rebuilds a fresh generation from those deliveries, swapping
+     * it in when the cycle completes. The promise this pins: queries answer
+     * about the CURRENT geometry through any number of re-productions, both
+     * for a trail that has barely crept and for one handed a genuinely
+     * different orbit plane.
      */
     const index = createSwarmPickIndex()
     index.reset(2)
@@ -209,8 +209,19 @@ describe('swarm pick against a synthetic camera', () => {
     // ...while satellite 1 is handed a genuinely different orbit plane.
     const moved = inclinedTrail(70, 250)
     index.addBatch(pack([crept, moved]), 0, 2)
-    const q = moved[30]
-    const qScreen = project(q.mercatorX, q.mercatorY, q.elevationM)
+    /* Sample 30 of 96 used to sit in front of this camera. 360 samples put
+       that index on the far side, so pick a vertex the camera can actually
+       see — the same skip the composition test above already uses. */
+    let q = moved[0]
+    let qScreen: { x: number; y: number } | null = null
+    for (const p of moved) {
+      const screen = project(p.mercatorX, p.mercatorY, p.elevationM)
+      if (!screen) continue
+      if (screen.x < 5 || screen.x > WIDTH - 5 || screen.y < 5 || screen.y > HEIGHT - 5) continue
+      q = p
+      qScreen = screen
+      break
+    }
     expect(qScreen).not.toBeNull()
     candidates = index.candidatesAt(q.mercatorX, q.mercatorY)
     found = nearestCandidateSegment(index, candidates, qScreen!.x, qScreen!.y, project)

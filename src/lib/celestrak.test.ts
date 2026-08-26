@@ -3,6 +3,7 @@ import {
   catnrOf,
   celestrakQueryUrl,
   celestrakSelector,
+  groupQueryUrl,
   parseTleRecords,
   retryAfterMs,
   tleText,
@@ -26,8 +27,9 @@ describe('celestrakSelector', () => {
     expect(celestrakSelector('  25544  ')).toBe('CATNR=25544')
   })
 
-  it('reads anything else as a name, url-encoded', () => {
+  it('reads anything else as a name, url-encoded and uppercased', () => {
     expect(celestrakSelector('ISS')).toBe('NAME=ISS')
+    expect(celestrakSelector('iss')).toBe('NAME=ISS')
     expect(celestrakSelector('SES 1')).toBe('NAME=SES%201')
     // A number with a letter is a name, not a catalogue number.
     expect(celestrakSelector('COSMOS 2251')).toBe('NAME=COSMOS%202251')
@@ -41,7 +43,13 @@ describe('celestrakSelector', () => {
 
   it('builds the full TLE-format request', () => {
     expect(celestrakQueryUrl('25544')).toBe(
-      'https://celestrak.org/NORAD/elements/gp.php?FORMAT=TLE&CATNR=25544',
+      'https://celestrak.org/NORAD/elements/gp.php?CATNR=25544&FORMAT=TLE',
+    )
+    expect(celestrakQueryUrl('hubble')).toBe(
+      'https://celestrak.org/NORAD/elements/gp.php?NAME=HUBBLE&FORMAT=TLE',
+    )
+    expect(celestrakQueryUrl('HST')).toBe(
+      'https://celestrak.org/NORAD/elements/gp.php?NAME=HST&FORMAT=TLE',
     )
   })
 })
@@ -149,6 +157,8 @@ describe('fetchCelestrakGroup', () => {
   }
 
   const cacheKey = (group: string) =>
+    `sidus.celestrak.https://celestrak.org/NORAD/elements/gp.php?GROUP=${group}&FORMAT=TLE`
+  const legacyCacheKey = (group: string) =>
     `sidus.celestrak.https://celestrak.org/NORAD/elements/gp.php?FORMAT=TLE&GROUP=${group}`
 
   const reply = (body: string, init: ResponseInit = {}) =>
@@ -156,6 +166,25 @@ describe('fetchCelestrakGroup', () => {
 
   afterEach(() => {
     vi.unstubAllGlobals()
+  })
+
+  it('puts GROUP before FORMAT, matching CelesTrak examples', () => {
+    expect(groupQueryUrl('stations')).toBe(
+      'https://celestrak.org/NORAD/elements/gp.php?GROUP=stations&FORMAT=TLE',
+    )
+  })
+
+  it('still reads a dump stored under the FORMAT-first URL', async () => {
+    const store = {
+      [legacyCacheKey('stations')]: JSON.stringify({ fetchedAt: Date.now(), text: ISS }),
+    }
+    const { module } = await harness({ store })
+    const fetch = vi.fn()
+    vi.stubGlobal('fetch', fetch)
+    const outcome = await module.fetchCelestrakGroup('stations')
+    expect(outcome).toMatchObject({ ok: true, stale: false })
+    expect(outcome.ok && outcome.records.map((r) => r.catnr)).toEqual(['25544'])
+    expect(fetch).not.toHaveBeenCalled()
   })
 
   it('serves the stored copy when CelesTrak declines to resend, however old the TTL calls it', async () => {
@@ -172,30 +201,40 @@ describe('fetchCelestrakGroup', () => {
   it('reports a throttle, not a fetch failure, when nothing is stored', async () => {
     const { module } = await harness()
     reply(THROTTLE_BODY, { status: 403 })
-    expect(await module.fetchCelestrakGroup('starlink')).toEqual({
-      ok: false,
-      reason: 'throttled',
-      retryAfterMs: null,
-    })
+    const outcome = await module.fetchCelestrakGroup('starlink')
+    expect(outcome).toMatchObject({ ok: true, stale: true, from: 'snapshot' })
+    expect(outcome.ok && outcome.records.some((r) => r.name.includes('STARLINK'))).toBe(true)
+  })
+
+  it('falls back to the bundled snapshot when stations has no stored copy', async () => {
+    const { module } = await harness()
+    reply(THROTTLE_BODY, { status: 403 })
+    const outcome = await module.fetchCelestrakGroup('stations')
+    expect(outcome).toMatchObject({ ok: true, stale: true, from: 'snapshot' })
+    expect(outcome.ok && outcome.records.some((r) => r.catnr === '25544')).toBe(true)
+  })
+
+  it('does not repeat a non-200 query in the same update cycle', async () => {
+    const { module } = await harness()
+    const fetch = vi.fn(async () => new Response(THROTTLE_BODY, { status: 403 }))
+    vi.stubGlobal('fetch', fetch)
+    await module.fetchCelestrakGroup('starlink')
+    await module.fetchCelestrakGroup('starlink')
+    expect(fetch).toHaveBeenCalledTimes(1)
   })
 
   it('passes Retry-After through when the server sends one', async () => {
     const { module } = await harness()
     reply('slow down', { status: 429, headers: { 'Retry-After': '300' } })
-    expect(await module.fetchCelestrakGroup('starlink')).toEqual({
-      ok: false,
-      reason: 'throttled',
-      retryAfterMs: 300_000,
-    })
+    const outcome = await module.fetchCelestrakGroup('starlink')
+    expect(outcome).toMatchObject({ ok: true, from: 'snapshot' })
   })
 
   it('separates a server error from a throttle', async () => {
     const { module } = await harness()
     reply('boom', { status: 500 })
-    expect(await module.fetchCelestrakGroup('galileo')).toMatchObject({
-      ok: false,
-      reason: 'failed',
-    })
+    const outcome = await module.fetchCelestrakGroup('starlink')
+    expect(outcome).toMatchObject({ ok: true, from: 'snapshot' })
   })
 
   it('falls back to the stored copy when the request never lands', async () => {
@@ -222,6 +261,36 @@ describe('fetchCelestrakGroup', () => {
     expect(outcome).toMatchObject({ ok: true, stale: false })
     expect(seen.length).toBeGreaterThan(0)
     expect(seen[seen.length - 1]).toEqual([ISS.length, ISS.length])
+  })
+
+  it('resolves a common name through Wikidata P377 when GP NAME is empty', async () => {
+    const { module } = await harness()
+    const fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input)
+      if (url.includes('NAME=HUBBLE') && url.includes('gp.php')) {
+        return new Response('No GP data found', { status: 200 })
+      }
+      if (url.includes('satcat/records.php')) return new Response('[]', { status: 200 })
+      if (url.includes('wbsearchentities')) {
+        return new Response(JSON.stringify({ search: [{ id: 'Q2513' }] }), { status: 200 })
+      }
+      if (url.includes('wbgetentities')) {
+        return new Response(
+          JSON.stringify({
+            entities: {
+              Q2513: { claims: { P377: [{ mainsnak: { datavalue: { value: '20580' } } }] } },
+            },
+          }),
+          { status: 200 },
+        )
+      }
+      if (url.includes('CATNR=20580')) return new Response(HST, { status: 200 })
+      throw new Error(`unexpected ${url}`)
+    })
+    vi.stubGlobal('fetch', fetch)
+    const found = await module.searchCelestrak('hubble')
+    expect(found.map((r) => r.catnr)).toEqual(['20580'])
+    expect(found[0]?.name).toBe('HST')
   })
 
   it('a cache write that cannot be stored is not a fetch failure', async () => {

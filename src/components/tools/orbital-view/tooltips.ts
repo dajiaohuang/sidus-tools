@@ -24,7 +24,13 @@ import { geocentricEciOf } from './sky-bodies'
 
 export type TooltipTranslate = (key: string, options?: Record<string, unknown>) => string
 
-export type Tooltip = { title: string; rows: [string, string][] }
+export type Tooltip = {
+  title: string
+  rows: [string, string][]
+  /** Encyclopedic read-more, omitted when no public page exists. */
+  href?: string
+  linkLabel?: string
+}
 
 /** Window over which the earth-fixed displacement is sampled to judge stationarity. */
 export const GROUND_RATE_WINDOW_S = 60

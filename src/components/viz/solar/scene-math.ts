@@ -174,6 +174,15 @@ export function zoomAtPointer(
   return { ...cam, scalePxPerM: nextScale, centerM: centerOnEclipticPlane(moved, basis) }
 }
 
+/** The wheel-return scale actually reachable inside a clamped zoom range. */
+export function reachableReturnScale(
+  returnPxPerMeter: number,
+  basePxPerMeter: number,
+  zoomMax: number,
+): number {
+  return Math.min(returnPxPerMeter, basePxPerMeter * zoomMax)
+}
+
 /** A unit direction in view space: x right, y down, z toward the camera. */
 export type ViewDir = { x: number; y: number; z: number }
 

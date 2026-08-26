@@ -86,7 +86,7 @@ const SLIDE_META: SlideBase[] = [
     kicker: '06 · RF',
     title: 'Link budget',
     blurb: 'Friis free-space path loss + margins (educational).',
-    footnote: 'link budget · pure SI chain',
+    footnote: 'link budget · SI-first chain',
   },
 ]
 

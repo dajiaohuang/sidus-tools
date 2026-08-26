@@ -11,12 +11,14 @@ import type { GlobeObserver, GlobeSatellite, GlobeTrackPoint } from '@/component
 import { getBody, parseTle, eciSiToGeodetic, sunEciSi, type Vec3 } from '@/lib/physics'
 import { cn } from '@/lib/utils'
 import { SKY_BODY_IDS, type SkyBody, type SkyBodyId } from '@/components/viz/globe/celestial'
-import { strParam, useToolSearchParams } from '@/lib/use-tool-search-params'
+import { numParam, strParam, useToolSearchParams } from '@/lib/use-tool-search-params'
 import { useSatelliteSwarm } from '@/lib/use-satellite-swarm'
 import { satelliteColorAt } from '@/components/viz/globe/style'
+import { isTypingTarget } from '@/components/viz/globe/controls-ui'
 import { appearanceFor, trailRevolutionsFor } from '@/components/viz/globe/appearance'
+
 import { parseCssRgba } from '@/components/viz/globe/color'
-import { swarmScaleTier, globeDrawPath } from './orbital-view/tiers'
+import { swarmScaleTier, globeDrawPath, canDrawPopulationTrails } from './orbital-view/tiers'
 import { listWindowFor, scrollTopForIndex, SELECTED_ROW_HEIGHT_PX } from './orbital-view/list'
 import { SkyPanel } from './orbital-view/SkyPanel'
 import { trailProgressOf, utcStamp } from './orbital-view/clock'
@@ -26,6 +28,8 @@ import {
   useSatelliteSelection,
 } from './orbital-view/use-satellite-selection'
 import {
+  INERTIAL_TRACK_SAMPLES,
+  sampleInertialGeodeticTrack,
   samplePeriodTrack,
   tleAgeDays,
   trackPointAt,
@@ -35,11 +39,23 @@ import {
 import { buildSkyBodies, geocentricEciOf } from './orbital-view/sky-bodies'
 import { satelliteTooltip, skyBodyTooltip } from './orbital-view/tooltips'
 import {
+  isMegaConstellationMember,
+  resolveSatelliteDetail,
+  type SatelliteDetailLink,
+} from '@/lib/satellite-detail'
+import {
   buildSolarRings,
   buildSolarSatellites,
   RING_BUCKET_MS,
 } from './orbital-view/solar-view'
 import { SatellitesPanel } from './orbital-view/SatellitesPanel'
+import {
+  ChromeDock,
+  ChromeSheet,
+  ViewAlert,
+  type OrbitalChromeSheet,
+} from '@/components/viz/globe/chrome-overlay'
+import { useCompactChrome } from '@/lib/use-compact-chrome'
 import { phaseAngleRad, worldDirectionOf } from './orbital-view/sky-math'
 import type { SatRec } from 'satellite.js'
 
@@ -73,6 +89,15 @@ const SKY_NONE = 'none'
 const SWARM_COLOR = 'rgba(200,220,255,0.75)'
 
 
+function roundedNum(defaultValue: number, opts: { min: number; max: number; digits: number }) {
+  const factor = 10 ** opts.digits
+  const base = numParam(defaultValue, { min: opts.min, max: opts.max })
+  return {
+    ...base,
+    serialize: (value: number) => String(Math.round(value * factor) / factor),
+  }
+}
+
 const SCHEMA = {
   /**
    * Comma-separated sky bodies to draw. The Sun is on by default: its billboard
@@ -95,6 +120,16 @@ const SCHEMA = {
    * chips use.
    */
   groups: strParam(''),
+  tw: roundedNum(1, { min: 0.25, max: 4, digits: 2 }),
+  to: roundedNum(1, { min: 0.25, max: 4, digits: 2 }),
+  ts: strParam('1', ['0', '1']),
+  z: roundedNum(1.5, { min: -4, max: 22, digits: 2 }),
+  pitch: roundedNum(0, { min: 0, max: 80, digits: 1 }),
+  brg: roundedNum(0, { min: -180, max: 180, digits: 1 }),
+  lng: roundedNum(0, { min: -180, max: 180, digits: 3 }),
+  lat: roundedNum(20, { min: -90, max: 90, digits: 3 }),
+  follow: strParam('0', ['0', '1']),
+  sel: strParam(''),
 } as const
 
 /**
@@ -120,56 +155,75 @@ export function OrbitalViewTool() {
   const { t } = useTranslation()
   const [params, setParams] = useToolSearchParams({ scene: strParam('globe', SCENES) })
   const onGlobe = params.scene !== 'solar'
+  const compactChrome = useCompactChrome()
+  const [chromeSheet, setChromeSheet] = useState<OrbitalChromeSheet | null>(null)
+  const [trailScopeNotice, setTrailScopeNotice] = useState('')
+  const [dismissedAlerts, setDismissedAlerts] = useState<Record<string, true>>({})
+  const dismissAlert = useCallback((id: string) => {
+    setDismissedAlerts((current) => ({ ...current, [id]: true }))
+  }, [])
+  const refusePopulationTrails = useCallback(
+    (count: number) => {
+      setTrailScopeNotice(t('fields.globe_trail_scope_all_too_many', { count }))
+      setDismissedAlerts((current) => {
+        if (!current.trailScope) return current
+        const next = { ...current }
+        delete next.trailScope
+        return next
+      })
+    },
+    [t],
+  )
+  const closeChromeSheet = useCallback(() => setChromeSheet(null), [])
   /** Scroll position and height of the SELECTED list, driving the row window. */
   const [listScroll, setListScroll] = useState({ top: 0, height: 360 })
   const [listRowHeight, setListRowHeight] = useState(SELECTED_ROW_HEIGHT_PX)
   const listRef = useRef<HTMLDivElement | null>(null)
+  /** The catalogue search input, so the F shortcut can jump straight to it. */
+  const searchInputRef = useRef<HTMLInputElement | null>(null)
   /** The satellite under the pointer in the list, which keeps its full treatment. */
   const [hoveredSatelliteId, setHoveredSatelliteId] = useState<string | null>(null)
 
   /**
-   * A click on the globe PINS a satellite, and pinning it also makes it the
-   * follow target: a click on the thing itself is the strongest way of
-   * saying "this one", and Follow means "chase this one".
+   * A click on the globe or the list PINS a satellite and asks the camera to
+   * turn the planet under it. That is not Follow: Follow is the dedicated
+   * chase control, and the list name only names who it would chase.
    *
-   * Clearing the pin (a click on empty sky) deliberately does NOT clear the
-   * target: Follow keeps something to chase, and un-pinning is about the
-   * highlight, not about revoking a destination.
+   * Clearing the pin (a click on empty sky) does not clear the follow target.
    */
-  const pinSatellite = useCallback((catnr: string | null) => {
-    setPinnedSatelliteId(catnr)
-    if (catnr) setFollowTargetId(catnr)
-  }, [])
+  const [frameTarget, setFrameTarget] = useState<{
+    lon: number
+    lat: number
+    altKm: number
+    nonce: number
+  } | null>(null)
   const [geoError, setGeoError] = useState('')
   const [observer, setObserver] = useState<GlobeObserver | null>(null)
+  const [p, setP] = useToolSearchParams(SCHEMA)
+  const trailAppearance = {
+    width: p.tw,
+    opacity: p.to,
+    onlySelected: p.ts === '1',
+  }
   /**
-   * Multipliers on the swarm trail baselines. Session state on purpose: it is a
-   * viewing preference for the population in front of you, not part of what a
-   * shared link is about, and the URL already carries the selection.
-   *
-   * `onlySelected` opens TRUE: a population's ten thousand overlapping rings
-   * are texture, not information, and the first thing everyone did with the
-   * switch was turn them off. The view opens on the answerable picture, the
-   * one trajectory of the satellite being identified, and drawing the whole
-   * crowd is the deliberate act.
+   * Greenwich freeze for elevated globe geometry: swarm dots, swarm trails and
+   * the identified full-treatment track. Latched while altitude stays on so a
+   * hover cannot promote a Starlink onto a trail converted at a later Earth
+   * orientation than the swarm has been flying.
    */
-  const [trailAppearance, setTrailAppearance] = useState({
-    width: 1,
-    opacity: 1,
-    onlySelected: true,
-  })
-  /**
-   * Every enabled sky body out of sight at once. The bodies are where they are;
-   * an empty sky is the camera pointing elsewhere, and saying so beats letting
-   * a correct view read as a broken one.
-   */
-  const [skyBodiesOffScreen, setSkyBodiesOffScreen] = useState(false)
+  const [storedInertialFreezeMs, setInertialFreezeMs] = useState<number | null>(() =>
+    p.alt === '1' ? Date.now() : null,
+  )
+  const inertialFreezeMs = p.alt === '1' ? (storedInertialFreezeMs ?? Date.now()) : null
+  if (inertialFreezeMs !== storedInertialFreezeMs) setInertialFreezeMs(inertialFreezeMs)
   /**
    * The satellite a click fixed on, which survives the pointer leaving it. Only
    * a click elsewhere moves or clears it, so a name can be read without keeping
    * the mouse perfectly still on a sub-pixel line.
    */
-  const [pinnedSatelliteId, setPinnedSatelliteId] = useState<string | null>(null)
+  const [pinnedSatelliteId, setPinnedSatelliteId] = useState<string | null>(
+    () => p.sel || null,
+  )
   /** The satellite the GLOBE says the pointer is over, pin aside. */
   const [globeHoverId, setGlobeHoverId] = useState<string | null>(null)
   /** The sky body the GLOBE says the pointer is over, for the panel's mark. */
@@ -177,7 +231,16 @@ export function OrbitalViewTool() {
   /* The pin outranks the hover: having asked for one to stay, the viewer should
      not lose it by moving the pointer across the crowd on the way back. */
   const identifiedSatelliteId = pinnedSatelliteId ?? globeHoverId ?? hoveredSatelliteId
-  const [p, setP] = useToolSearchParams(SCHEMA)
+  /**
+   * Encyclopedic read-more per catalogue number. Null means "looked up, none
+   * public"; missing means "not asked yet". Mega-constellation members are
+   * never asked.
+   */
+  const [detailByCatnr, setDetailByCatnr] = useState<
+    ReadonlyMap<string, SatelliteDetailLink | null>
+  >(() => new Map())
+  const detailByCatnrRef = useRef(detailByCatnr)
+  detailByCatnrRef.current = detailByCatnr
   /* The whole selection: what is on the view and where its element sets come
      from. One hook owns it, the URL round-trip included. */
   const selection = useSatelliteSelection({
@@ -209,6 +272,77 @@ export function OrbitalViewTool() {
     toggleGroup,
     refreshSelected,
   } = selection
+  const selectedRef = useRef(selected)
+  selectedRef.current = selected
+  useEffect(() => {
+    if (!p.sel) return
+    setPinnedSatelliteId(p.sel)
+    setFollowTargetId(p.sel)
+  }, [p.sel, setFollowTargetId])
+  const pinSatellite = useCallback(
+    (catnr: string | null) => {
+      setPinnedSatelliteId(catnr)
+      setP({ sel: catnr ?? '' })
+      if (!catnr) return
+      if (compactChrome) setChromeSheet(null)
+      const entry = selectedRef.current.find((row) => row.catnr === catnr)
+      if (!entry) return
+      const parsed = parseTle(entry.tle)
+      if (!parsed.ok) return
+      const freeze = inertialFreezeMs != null ? new Date(inertialFreezeMs) : undefined
+      const point = trackPointAt(parsed.satrec, new Date(), freeze)
+      if (!point) return
+      setFrameTarget((prev) => ({
+        lon: point.lon,
+        lat: point.lat,
+        altKm: point.altKm,
+        nonce: (prev?.nonce ?? 0) + 1,
+      }))
+    },
+    [compactChrome, inertialFreezeMs, setP],
+  )
+  const resetView = useCallback(() => {
+    setParams({ scene: 'globe' })
+    setP({
+      sky: 'sun',
+      alt: '1',
+      sats: ISS_CATNR_TEXT,
+      groups: '',
+      tw: 1,
+      to: 1,
+      ts: '1',
+      z: 1.5,
+      pitch: 0,
+      brg: 0,
+      lng: 0,
+      lat: 20,
+      follow: '0',
+      sel: '',
+    })
+    setPinnedSatelliteId(null)
+    setFrameTarget(null)
+    setInertialFreezeMs(Date.now())
+  }, [setParams, setP])
+  useEffect(() => {
+    const id = identifiedSatelliteId
+    if (!id) return
+    const entry = selected.find((row) => row.catnr === id)
+    if (!entry || isMegaConstellationMember(entry.name)) return
+    if (detailByCatnrRef.current.has(id)) return
+    let cancelled = false
+    void resolveSatelliteDetail(entry.catnr, entry.name).then((link) => {
+      if (cancelled) return
+      setDetailByCatnr((prev) => {
+        if (prev.has(id)) return prev
+        const next = new Map(prev)
+        next.set(id, link)
+        return next
+      })
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [identifiedSatelliteId, selected])
   const [nowMs, setNowMs] = useState(() => Date.now())
   const [liveMarkerMs, setLiveMarkerMs] = useState(() => Date.now())
 
@@ -305,11 +439,9 @@ export function OrbitalViewTool() {
   /**
    * The satellites that need a NAME on screen.
    *
-   * Not a rendering tier: every satellite is drawn the same way, by the worker
-   * and the one GL layer, whether there is one or ten thousand. This is only
-   * about text, which is the one thing that genuinely cannot scale, because
-   * past a few dozen names they overlap into a smear. The count decides how
-   * many there are; the pointer and the chase decide which.
+   * Names cannot scale: past a few dozen they overlap into a smear. The count
+   * decides how many there are; the pointer and the chase decide which. Crowd
+   * members are still drawn, by the swarm, without a main-thread track.
    */
   const labelled = useMemo(() => {
     if (appearance.labelsAlwaysShown) return selected
@@ -384,6 +516,56 @@ export function OrbitalViewTool() {
     [setP],
   )
 
+  /*
+   * TOOL shortcuts: selection and panels, kept separate from GlobeMap's own
+   * camera keys (arrows, tilt, zoom, follow) because those live and repeat on
+   * the map's own keydown, while these fire once against state this
+   * component owns.
+   */
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (isTypingTarget(e.target)) return
+      if (e.ctrlKey || e.metaKey || e.altKey) return
+      switch (e.key) {
+        case 'f':
+        case 'F':
+          // F for Find: jumps to the catalogue search, which reaches every satellite in CelesTrak, not just the current selection.
+          e.preventDefault()
+          if (compactChrome) setChromeSheet('sats')
+          window.setTimeout(() => {
+            searchInputRef.current?.focus()
+            searchInputRef.current?.select()
+          }, 0)
+          break
+        case 'p':
+        case 'P':
+          // P for Planets: the same bulk action as the sky panel's own SHOW ALL / REMOVE ALL button.
+          e.preventDefault()
+          setSkyEnabled(enabledSky.length === 0 ? [...SKY_BODY_IDS] : [])
+          break
+        case 't':
+        case 'T':
+          e.preventDefault()
+          if (p.ts === '1' && !canDrawPopulationTrails(selected.length, compactChrome)) {
+            refusePopulationTrails(selected.length)
+            break
+          }
+          setTrailScopeNotice('')
+          setP({ ts: p.ts === '1' ? '0' : '1' })
+          break
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [compactChrome, enabledSky, setSkyEnabled, p.ts, setP, selected.length, refusePopulationTrails])
+
+  useEffect(() => {
+    if (p.ts === '1') return
+    if (canDrawPopulationTrails(selected.length, compactChrome)) return
+    setP({ ts: '1' })
+    refusePopulationTrails(selected.length)
+  }, [compactChrome, selected.length, p.ts, setP, refusePopulationTrails])
+
   /* Clicking a body's NAME points the camera at it; its checkbox still owns
      visibility. A fresh object each time, so asking twice aims twice. */
   const [aimDirection, setAimDirection] = useState<{
@@ -418,12 +600,11 @@ export function OrbitalViewTool() {
    * not for one orbit looked at up close. Running both also drew every named
    * satellite twice, which is where the two ISS dots came from.
    *
-   * TRAILS and DOTS tiers (above thirty): the swarm owns everything. A
-   * main-thread track per satellite would be thousands of SGP4 calls a bucket,
-   * and the population treatments, one draw call, cached inertial trails,
-   * the identified satellite's trail kept fresh by the worker, are the only
-   * ones that survive those counts. swarmTrails.ts declares this same split
-   * from the other side.
+   * TRAILS and DOTS tiers (above thirty): the swarm owns the crowd. The one
+   * satellite being identified is not crowd: its track and marker go through
+   * the full-treatment path. The swarm keeps packing that slot so deselect
+   * can unhide it on the next frame, and the draw skips it while the
+   * refined marker is up.
    */
   const fullTreatment = onGlobe && globeDrawPath(selected.length) === 'full'
 
@@ -433,11 +614,12 @@ export function OrbitalViewTool() {
    * In the named tier, all of them: that is the ownership rule. Above it the
    * swarm owns the crowd, but the ONE satellite being identified is not crowd:
    * it is the thing being looked at, and it goes through the exact same
-   * code as a lone ISS: same propagated Earth-fixed track, same refinement,
-   * same dashed future. This is the "hovered, pinned or individually added
-   * satellite gets its own precisely refined trail" that swarmTrails.ts has
-   * promised all along; the swarm's ninety-six-sample highlight ring was
-   * standing in for it and could not keep the promise at close zoom.
+   * code as a lone ISS: same track, same refinement, same dashed future,
+   * converted with the swarm's Greenwich freeze so the live point does not
+   * jump onto a parallel ellipse. This is the "hovered, pinned or
+   * individually added satellite gets its own precisely refined trail"
+   * that swarmTrails.ts has promised all along; the swarm's highlight ring
+   * was standing in for it and could not keep the promise at close zoom.
    */
   const trackedIds = useMemo(() => {
     if (!onGlobe) return new Set<string>()
@@ -450,23 +632,30 @@ export function OrbitalViewTool() {
   const trackCenterMs = Math.floor(nowMs / TRACK_BUCKET_MS) * TRACK_BUCKET_MS
   const tracks = useMemo(() => {
     const out = new Map<string, GlobeTrackPoint[]>()
-    /* The span follows the count rule for the satellites being LOOKED AT, not
-       for the selection: one subject gets the triple pass whether it is the
-       only satellite loaded or one identified out of ten thousand. */
-    const revolutions = trailRevolutionsFor(trackedIds.size)
+    const altitudeOn = p.alt === '1'
+    /* Elevated: one inertial ellipse, same ring the solar scene draws.
+       Earth-fixed: the count-rule span, rounded up to a resonant cycle. */
+    const revolutions = altitudeOn ? 0.5 : trailRevolutionsFor(trackedIds.size)
+    const freezeMs = altitudeOn ? (inertialFreezeMs ?? trackCenterMs) : undefined
     for (const entry of propagators) {
       if (!entry.satrec || !trackedIds.has(entry.catnr)) continue
-      /* A resonant ground track has a CYCLE, and the drawn span rounds UP to
-         whole cycles of it: anything else leaves the ends hanging mid-air at
-         different points of the figure. The count rule sets the wish, the
-         orbit's own resonance sets the granularity. */
-      const periodS = ((2 * Math.PI) / entry.satrec.no) * 60
-      const eachSide = trackSpanEachSide(periodS, revolutions)
-      const points = samplePeriodTrack(entry.satrec, trackCenterMs, eachSide)
+      const points = altitudeOn
+        ? sampleInertialGeodeticTrack(
+            entry.satrec,
+            trackCenterMs,
+            revolutions,
+            INERTIAL_TRACK_SAMPLES,
+            freezeMs,
+          )
+        : samplePeriodTrack(
+            entry.satrec,
+            trackCenterMs,
+            trackSpanEachSide(((2 * Math.PI) / entry.satrec.no) * 60, revolutions),
+          )
       if (points.length > 1) out.set(entry.catnr, points)
     }
     return out
-  }, [trackedIds, propagators, trackCenterMs])
+  }, [trackedIds, propagators, trackCenterMs, p.alt, inertialFreezeMs])
 
   /**
    * What the globe needs on the MAIN thread: names and the chase for every
@@ -477,26 +666,40 @@ export function OrbitalViewTool() {
    */
   const satellites = useMemo<GlobeSatellite[]>(
     () =>
-      propagators.map((entry) => ({
-        id: entry.catnr,
-        label: entry.name,
-        color: entry.color,
-        positions: tracks.get(entry.catnr),
-        splitAt: tracks.has(entry.catnr) ? instant : undefined,
-        livePosition: entry.satrec ? (trackPointAt(entry.satrec, instant) ?? undefined) : undefined,
-        positionAt: entry.satrec
-          ? (date: Date) => trackPointAt(entry.satrec as SatRec, date)
-          : undefined,
-      })),
-    [propagators, instant, tracks],
+      propagators.map((entry) => {
+        const owned = tracks.has(entry.catnr)
+        const freeze = inertialFreezeMs != null ? new Date(inertialFreezeMs) : undefined
+        return {
+          id: entry.catnr,
+          label: entry.name,
+          color: entry.color,
+          positions: tracks.get(entry.catnr),
+          splitAt: owned ? instant : undefined,
+          /* Crowd markers belong to the swarm. A second main-thread live
+             point beside an inertial trail is the offset specks on SCIENCE. */
+          livePosition:
+            owned && entry.satrec
+              ? (trackPointAt(entry.satrec, instant, freeze) ?? undefined)
+              : undefined,
+          positionAt:
+            owned && entry.satrec
+              ? (date: Date) => trackPointAt(entry.satrec as SatRec, date, freeze)
+              : undefined,
+        }
+      }),
+    [propagators, instant, tracks, inertialFreezeMs],
   )
 
   const satelliteTooltipFor = useCallback(
     (catnr: string) => {
       const entry = propagators.find((candidate) => candidate.catnr === catnr)
-      return entry?.satrec ? satelliteTooltip(entry.satrec, entry.name, liveMarkerMs, t) : null
+      const tip = entry?.satrec ? satelliteTooltip(entry.satrec, entry.name, liveMarkerMs, t) : null
+      if (!tip) return null
+      const link = detailByCatnr.get(catnr)
+      if (!link) return tip
+      return { ...tip, href: link.href, linkLabel: t('fields.globe_grokipedia') }
     },
-    [propagators, liveMarkerMs, t],
+    [propagators, liveMarkerMs, t, detailByCatnr],
   )
 
   const skyTooltipFor = useCallback(
@@ -542,8 +745,12 @@ export function OrbitalViewTool() {
     identifiedSatelliteId,
     /* Population trails are only produced while something will draw them:
        in only-selected mode the identified satellite's trajectory is the
-       full-treatment track, and ten thousand invisible rings are pure cost. */
-    !trailAppearance.onlySelected,
+       full-treatment track, and ten thousand invisible rings are pure cost.
+       Compact chrome also refuses the dots-tier crowd: that buffer OOMs phones. */
+    !trailAppearance.onlySelected && canDrawPopulationTrails(selected.length, compactChrome),
+    true,
+    p.alt === '1',
+    inertialFreezeMs,
   )
   /*
    * The catalogue numbers the WORKER accepted, in its own order.
@@ -633,6 +840,7 @@ export function OrbitalViewTool() {
     (scene: SceneId) => {
       const action = sceneChipAction(scene, onGlobe ? 'globe' : 'solar', handoffPxPerMeter !== null)
       if (action === 'ignore') return
+      setChromeSheet(null)
       if (action === 'switch') {
         returnToGlobe()
         return
@@ -715,12 +923,47 @@ export function OrbitalViewTool() {
 
 
 
+  const dockItems = onGlobe
+    ? [
+        { id: 'sats' as const, label: t('fields.chrome_sats') },
+        { id: 'sky' as const, label: t('fields.chrome_sky') },
+        { id: 'camera' as const, label: t('fields.chrome_camera') },
+        { id: 'view' as const, label: t('fields.chrome_view') },
+        ...(selected.length > 0
+          ? [{ id: 'trails' as const, label: t('fields.chrome_trails') }]
+          : []),
+      ]
+    : [{ id: 'bodies' as const, label: t('fields.chrome_bodies') }]
+  const globeSheet =
+    chromeSheet === 'camera' || chromeSheet === 'view' || chromeSheet === 'trails'
+      ? chromeSheet
+      : null
+
   return (
     <div className="relative h-full w-full min-w-0 overflow-hidden bg-bg">
       {onGlobe ? (
         <GlobeMap
           satellites={satellites}
-          followTargetId={followTargetId || undefined}
+          followTargetId={p.sel || followTargetId || undefined}
+          followWanted={p.follow === '1'}
+          onFollowChange={(on, id) =>
+            setP({ follow: on ? '1' : '0', sel: id ?? p.sel })
+          }
+          cameraLng={p.lng}
+          cameraLat={p.lat}
+          cameraZoom={p.z}
+          cameraPitch={p.pitch}
+          cameraBearing={p.brg}
+          onViewChange={(view) =>
+            setP({
+              lng: view.center[0],
+              lat: view.center[1],
+              z: view.zoom,
+              brg: view.bearing,
+              pitch: view.pitch,
+            })
+          }
+          onResetView={resetView}
           observer={observer ?? undefined}
           subsolar={{ latDeg: subsolar.latDeg, lonDeg: subsolar.lonDeg }}
           skyBodies={skyBodies}
@@ -731,15 +974,29 @@ export function OrbitalViewTool() {
           swarmColor={SWARM_COLOR}
           swarmPointSizePx={appearance.markerSizePx}
           swarmTrailBatch={swarmTrailBatch}
-          swarmTrailCount={swarmStatus.count}
+          swarmTrailCount={
+            trailAppearance.onlySelected ||
+            !canDrawPopulationTrails(selected.length, compactChrome)
+              ? 0
+              : swarmStatus.count
+          }
           swarmTrailBaseWidthPx={appearance.trailWidthPx}
           swarmTrailBaseAlpha={appearance.trailAlpha}
           swarmTrailWidth={trailAppearance.width}
           swarmTrailOpacity={trailAppearance.opacity}
           swarmTrailOnlySelected={trailAppearance.onlySelected}
           swarmTrailProgress={swarmTrailProgress}
-          onTrailAppearanceChange={setTrailAppearance}
-          onSkyBodiesOffScreen={setSkyBodiesOffScreen}
+          trailScopeNotice={trailScopeNotice}
+          onTrailAppearanceChange={(next) => {
+            if (!next.onlySelected && !canDrawPopulationTrails(selected.length, compactChrome)) {
+              refusePopulationTrails(selected.length)
+              return
+            }
+            setTrailScopeNotice('')
+            const ts = next.onlySelected ? '1' : '0'
+            if (next.width === p.tw && next.opacity === p.to && ts === p.ts) return
+            setP({ tw: next.width, to: next.opacity, ts })
+          }}
           swarmIds={swarmIds}
           onSatelliteHover={setGlobeHoverId}
           onSkyBodyHover={setSkyHoverId}
@@ -748,6 +1005,7 @@ export function OrbitalViewTool() {
           identifiedSatelliteId={identifiedSatelliteId}
           showSatelliteLabels={tier === 'named'}
           aimAt={aimDirection}
+          frameTarget={frameTarget}
           moonPhaseAngleRad={moonPhaseAngleRad}
           showAltitude={p.alt === '1'}
           onAltitudeChange={(on) => setP({ alt: on ? '1' : '0' })}
@@ -764,24 +1022,31 @@ export function OrbitalViewTool() {
               : t('fields.subtitle_orbital_view')
           } ${t('fields.globe_leave_earth_hint')}`}
           height={GLOBE_MIN_HEIGHT_PX}
+          compactChrome={compactChrome}
+          chromeSheet={globeSheet}
+          onChromeSheetClose={closeChromeSheet}
         />
       ) : (
         <SolarSystemScene
           height={GLOBE_MIN_HEIGHT_PX}
           handoff={solarHandoff}
+          onReturnToGlobe={returnToGlobe}
           satellites={solarSatellites}
           flyToReturnNonce={flyInNonce}
+          compactChrome={compactChrome}
+          bodiesSheetOpen={chromeSheet === 'bodies'}
+          onBodiesSheetClose={closeChromeSheet}
         />
       )}
 
-      <div className="pointer-events-none absolute left-4 top-3 z-10 flex flex-col gap-1">
+      <div className="pointer-events-none absolute left-3 top-[max(0.75rem,var(--safe-top))] z-10 flex max-w-[calc(100%-9rem)] flex-col gap-1 sm:left-4">
         <Link
           to="/tools"
           className="pointer-events-auto w-fit font-mono text-[10px] uppercase tracking-[0.14em] text-subtle transition-colors hover:text-fg"
         >
           ← {t('tool.back')}
         </Link>
-        <h1 className="flex flex-wrap items-baseline gap-x-2 font-mono text-xs uppercase tracking-[0.14em] text-fg">
+        <h1 className="flex flex-wrap items-baseline gap-x-2 font-mono text-[10px] uppercase tracking-[0.14em] text-fg sm:text-xs">
           {t('fields.title_orbital_view')}
           {/*
             The clock says WHICH instant the picture is of. Everything here is
@@ -808,7 +1073,8 @@ export function OrbitalViewTool() {
           it scrolled for no reason at all. The max-height squeezes the one
           child built to shrink, the satellite LIST, which scrolls internally
           while the sky panel and the group chips stay put. */}
-      <div className="absolute left-4 top-20 z-10 flex max-h-[calc(100%-12rem)] flex-col gap-2">
+      {compactChrome ? null : (
+      <div className="pointer-events-auto absolute left-4 top-20 z-10 flex max-h-[calc(100%-12rem)] flex-col gap-2">
         {/*
           Globe overlays only: the solar scene has its own body list in the same
           corner. Gated on the SCENE and not on how many bodies are ticked: the
@@ -823,15 +1089,11 @@ export function OrbitalViewTool() {
               onAim={aimAtBody}
               highlighted={skyHoverId}
             />
-            {enabledSky.length > 0 && skyBodiesOffScreen ? (
-              <p className="max-w-64 border border-border bg-bg/80 px-2 py-1.5 font-mono text-[10px] leading-relaxed text-muted backdrop-blur-sm">
-                {t('fields.globe_sky_all_below')}
-              </p>
-            ) : null}
           </div>
         ) : null}
         {onGlobe ? (
           <SatellitesPanel
+            searchInputRef={searchInputRef}
             query={query}
             onQueryChange={setQuery}
             onSearch={() => void runSearch()}
@@ -865,12 +1127,76 @@ export function OrbitalViewTool() {
             groupProgress={groupProgress}
             toggleGroup={(group) => void toggleGroup(group)}
             swarmStatus={swarmStatus}
+            fetchError={tleFetchError}
+            fetchNotice={tleNotice}
           />
         ) : null}
       </div>
+      )}
 
-      {/* Two logical rows: what you are looking at, then what you can do to it. */}
-      <div className="absolute right-4 top-3 z-10 flex flex-col items-end gap-2">
+      {compactChrome && onGlobe ? (
+        <>
+          <ChromeSheet
+            open={chromeSheet === 'sats'}
+            title={t('fields.sat_panel')}
+            onClose={closeChromeSheet}
+            fullHeight
+          >
+            <SatellitesPanel
+              searchInputRef={searchInputRef}
+              query={query}
+              onQueryChange={setQuery}
+              onSearch={() => void runSearch()}
+              fetchingTle={fetchingTle}
+              results={results}
+              addSatellite={addSatellite}
+              selected={selected}
+              visibleSelected={visibleSelected}
+              selectedFilter={selectedFilter}
+              onFilterChange={(next) => {
+                setSelectedFilter(next)
+                setListScroll((current) => ({ ...current, top: 0 }))
+              }}
+              refreshSelected={() => void refreshSelected()}
+              removeAll={removeAll}
+              removeSatellite={removeSatellite}
+              followTargetId={followTargetId}
+              setFollowTargetId={setFollowTargetId}
+              setHoveredSatelliteId={setHoveredSatelliteId}
+              listRef={listRef}
+              identifiedSatelliteId={identifiedSatelliteId}
+              onPin={pinSatellite}
+              onListScroll={(top, height) => setListScroll({ top, height })}
+              listWindow={listWindow}
+              paletteIndexOf={paletteIndexOf}
+              tier={tier}
+              activeGroups={activeGroups}
+              loadingGroup={loadingGroup}
+              groupProgress={groupProgress}
+              toggleGroup={(group) => void toggleGroup(group)}
+              swarmStatus={swarmStatus}
+              fetchError={tleFetchError}
+              fetchNotice={tleNotice}
+              framed={false}
+            />
+          </ChromeSheet>
+          <ChromeSheet
+            open={chromeSheet === 'sky'}
+            title={t('fields.globe_sky_bodies')}
+            onClose={closeChromeSheet}
+          >
+            <SkyPanel
+              enabled={enabledSky}
+              onEnabledChange={setSkyEnabled}
+              onAim={aimAtBody}
+              highlighted={skyHoverId}
+              framed={false}
+            />
+          </ChromeSheet>
+        </>
+      ) : null}
+
+      <div className="absolute right-3 top-[max(0.75rem,var(--safe-top))] z-10 flex flex-col items-end gap-2 sm:right-4">
         {/* Same dress and same gap as the row under it: an active control is
             gold-bordered gold text everywhere on this view, and two adjacent
             rows with different actives read as two different products. The
@@ -897,35 +1223,58 @@ export function OrbitalViewTool() {
       </div>
 
       {!onGlobe ||
-      (!parseError && staleTleDays === null && !tleFetchError && !tleNotice && !geoError) ? null : (
-        <div className="pointer-events-none absolute left-1/2 top-3 z-10 flex max-w-[min(32rem,80vw)] -translate-x-1/2 flex-col items-center gap-1.5">
-          {parseError ? (
-            <p className="border border-border bg-surface/90 px-3 py-2 font-mono text-[11px] leading-relaxed text-muted">
-              {parseError}
-            </p>
+      (!parseError &&
+        staleTleDays === null &&
+        !tleFetchError &&
+        !tleNotice &&
+        !geoError &&
+        !trailScopeNotice) ? null : (
+        <div
+          className={cn(
+            'absolute z-20 flex flex-col gap-1.5',
+            compactChrome
+              ? 'left-[max(0.75rem,var(--safe-left))] right-[max(0.75rem,var(--safe-right))] top-[calc(max(0.75rem,var(--safe-top))+4.5rem)]'
+              : 'left-1/2 top-3 w-full max-w-[min(32rem,calc(100vw-2rem))] -translate-x-1/2',
+          )}
+        >
+          {parseError && !dismissedAlerts.parse ? (
+            <ViewAlert onDismiss={() => dismissAlert('parse')}>{parseError}</ViewAlert>
           ) : null}
-          {staleTleDays !== null ? (
-            <p className="border border-warn/40 bg-warn/10 px-3 py-2 font-mono text-[11px] leading-relaxed text-warn">
+          {staleTleDays !== null && !dismissedAlerts.stale ? (
+            <ViewAlert tone="warn" onDismiss={() => dismissAlert('stale')}>
               {t('fields.tle_stale_warning', { days: staleTleDays })}
-            </p>
+            </ViewAlert>
           ) : null}
-          {tleFetchError ? (
-            <p className="border border-border bg-surface/90 px-3 py-1.5 font-mono text-[10px] leading-relaxed text-subtle">
-              {tleFetchError}
-            </p>
+          {tleFetchError && !dismissedAlerts.tleError ? (
+            <ViewAlert onDismiss={() => dismissAlert('tleError')}>{tleFetchError}</ViewAlert>
           ) : null}
-          {tleNotice ? (
-            <p className="border border-border bg-surface/90 px-3 py-1.5 font-mono text-[10px] leading-relaxed text-muted">
-              {tleNotice}
-            </p>
+          {tleNotice && !dismissedAlerts.tleNotice ? (
+            <ViewAlert onDismiss={() => dismissAlert('tleNotice')}>{tleNotice}</ViewAlert>
           ) : null}
-          {geoError ? (
-            <p className="border border-border bg-surface/90 px-3 py-1.5 font-mono text-[10px] leading-relaxed text-subtle">
-              {geoError}
-            </p>
+          {geoError && !dismissedAlerts.geo ? (
+            <ViewAlert onDismiss={() => dismissAlert('geo')}>{geoError}</ViewAlert>
+          ) : null}
+          {trailScopeNotice && !dismissedAlerts.trailScope ? (
+            <ViewAlert
+              tone="warn"
+              onDismiss={() => {
+                dismissAlert('trailScope')
+                setTrailScopeNotice('')
+              }}
+            >
+              {trailScopeNotice}
+            </ViewAlert>
           ) : null}
         </div>
       )}
+
+      {compactChrome ? (
+        <ChromeDock
+          items={dockItems}
+          active={chromeSheet}
+          onSelect={(id) => setChromeSheet((current) => (current === id ? null : id))}
+        />
+      ) : null}
     </div>
   )
 }

@@ -17,10 +17,12 @@
  *     pitch 0: the full camera transform is supplied every frame the same
  *     way it is for every built-in layer.
  *
- * The past half is one continuous line strip. The future half is drawn as
- * disconnected fixed-screen-length dashes (see buildDashedLineSegments) while
- * a trail is wide enough to carry them, and as a plain strip at the dense
- * tier, where a dash pattern at 0.6 px reads as noise.
+ * Both halves are independent `gl.LINES` pairs, not a strip: a date-line
+ * step or a skipped-perigee chord of a deep ellipse would otherwise draw
+ * a line across the world (SCIENCE CLUSTER / Chandra / XMM). The future
+ * half is dashed in the fragment shader from a cumulative-distance
+ * attribute (the usual WebGL/Three.js LineDashedMaterial pattern:
+ * computeLineDistances + mod in the fragment). No extra 3D vertices.
  * The marker is a single gl.POINTS vertex (gl_PointSize set in the same
  * vertex shader, harmless for line draws since it is only read in POINTS
  * mode), masked circular in the fragment shader via gl_PointCoord. Fade is
@@ -38,13 +40,17 @@ import {
 } from 'maplibre-gl'
 import type { Rgba } from './color'
 import {
-  buildDashedLineSegments,
-  DASH_REBUILD_ZOOM_HYSTERESIS,
+  chordMeters,
   DASH_SCREEN_TARGET_PX,
   fadeAlphaAt,
   GAP_SCREEN_TARGET_PX,
+  GLOBE_MERCATOR_MAX_LAT_DEG,
   groundResolutionMetersPerPixel,
-  shouldRebuildDashLength,
+  isPolarWrap,
+  slerpTrackPoint,
+  lonLatToMercator,
+  trailSegmentConnects,
+  WEB_MERCATOR_MAX_LAT_DEG,
 } from './track'
 import type { GlobeTrackPoint } from './types'
 import { SPHERE_OCCLUSION_GLSL } from './occlusion'
@@ -79,6 +85,14 @@ export type AltitudeLayer = CustomLayerInterface & {
   setTrail(input: AltitudeTrailInput): void
   setPoint(id: string, colorRgba: Rgba, point: GlobeTrackPoint): void
   dropSatellite(id: string): void
+  /**
+   * TRAJECTORIES sliders. Width cannot become a thicker GL line (lineWidth is
+   * 1px), so both multipliers fold into alpha the same way the swarm layer
+   * does: dimmer reads as thinner. The marker stays opaque.
+   */
+  setAppearance(widthMultiplier: number, opacityMultiplier: number): void
+  /** Marker diameter in framebuffer pixels. */
+  setMarkerSize(px: number): void
   /** Re-target the meters-per-dash figure when zoom has drifted (hysteresis). */
   refreshDashLengths(force: boolean): void
   livePointOf(id: string): GlobeTrackPoint | null
@@ -93,6 +107,7 @@ type ShaderEntry = {
   aPos: number
   aElevation: number
   aAlpha: number
+  aDist: number
 }
 
 type SatelliteState = {
@@ -100,22 +115,12 @@ type SatelliteState = {
   buffers: { past: WebGLBuffer; future: WebGLBuffer; point: WebGLBuffer } | null
   pastCount: number
   futureCount: number
-  /** Solid future halves upload as one strip; dashed ones as GL_LINES pairs. */
-  futureIsStrip: boolean
+  futureDashed: boolean
   hasPoint: boolean
   pendingLines: Omit<AltitudeTrailInput, 'id' | 'colorRgba'> | null
-  /**
-   * The last trail handed in, kept after upload so a zoom can re-walk the dash
-   * pattern against the new meters-per-pixel without waiting for the caller's
-   * next data update, which is a 30 s bucket away.
-   */
   lastLines: Omit<AltitudeTrailInput, 'id' | 'colorRgba'> | null
   pendingPoint: GlobeTrackPoint | null
-  /** Kept after upload so the label overlay can re-project it every repaint. */
   livePoint: GlobeTrackPoint | null
-  dashLengthMeters: number | null
-  gapLengthMeters: number | null
-  lastDashZoomBuild: number | null
 }
 
 type GlContext = WebGLRenderingContext | WebGL2RenderingContext
@@ -145,17 +150,23 @@ function toVertex(
   alpha: number,
   useMercatorElevationUnits: boolean,
 ): [number, number, number, number] {
-  const merc = MercatorCoordinate.fromLngLat({ lng: p.lon, lat: p.lat })
+  const { x, y } = lonLatToMercator(
+    p.lon,
+    p.lat,
+    useMercatorElevationUnits ? WEB_MERCATOR_MAX_LAT_DEG : GLOBE_MERCATOR_MAX_LAT_DEG,
+  )
   const elevationMeters = p.altKm * 1000
   const elevation = useMercatorElevationUnits
-    ? elevationMeters * merc.meterInMercatorCoordinateUnits()
+    ? elevationMeters * MercatorCoordinate.fromLngLat({ lng: p.lon, lat: p.lat }).meterInMercatorCoordinateUnits()
     : elevationMeters
-  return [merc.x, merc.y, elevation, alpha]
+  return [x, y, elevation, alpha]
 }
 
-function flattenVerts(verts: [number, number, number, number][]): Float32Array {
-  const arr = new Float32Array(verts.length * 4)
-  verts.forEach((v, i) => arr.set(v, i * 4))
+const VERT_FLOATS = 5
+
+function flattenVerts(verts: number[][]): Float32Array {
+  const arr = new Float32Array(verts.length * VERT_FLOATS)
+  verts.forEach((v, i) => arr.set(v, i * VERT_FLOATS))
   return arr
 }
 
@@ -165,15 +176,12 @@ function emptySatellite(colorRgba: Rgba): SatelliteState {
     buffers: null,
     pastCount: 0,
     futureCount: 0,
-    futureIsStrip: false,
+    futureDashed: false,
     hasPoint: false,
     pendingLines: null,
     lastLines: null,
     pendingPoint: null,
     livePoint: null,
-    dashLengthMeters: null,
-    gapLengthMeters: null,
-    lastDashZoomBuild: null,
   }
 }
 
@@ -200,6 +208,9 @@ export function createAltitudeLayer(options: {
   let attached = false
   let projectionData: ProjectionData | null = null
   let variantName: string | null = null
+  let widthMultiplier = 1
+  let opacityMultiplier = 1
+  let markerSizePx = 6
 
   /** Max one message per second per stage, so follow mode cannot flood the box. */
   function logDebugStage(stageKey: string, message: string): void {
@@ -210,26 +221,37 @@ export function createAltitudeLayer(options: {
     onError(`[altitude:${stageKey}]`, message)
   }
 
-  function refreshDashLength(sat: SatelliteState, force: boolean): void {
-    const currentZoom = map.getZoom()
-    if (!shouldRebuildDashLength(currentZoom, sat.lastDashZoomBuild, DASH_REBUILD_ZOOM_HYSTERESIS, force)) {
-      return
+  function connectedPairs(
+    points: GlobeTrackPoint[],
+    windowStart: Date,
+    windowEnd: Date,
+    useMercatorElevationUnits: boolean,
+  ): number[][] {
+    const out: number[][] = []
+    let dist = 0
+    for (let i = 0; i < points.length - 1; i++) {
+      const a = points[i]
+      const b = points[i + 1]
+      const emit = (from: GlobeTrackPoint, to: GlobeTrackPoint) => {
+        const va = toVertex(from, fadeAlphaAt(from.date, windowStart, windowEnd), useMercatorElevationUnits)
+        const vb = toVertex(to, fadeAlphaAt(to.date, windowStart, windowEnd), useMercatorElevationUnits)
+        out.push([...va, dist])
+        dist += chordMeters(from, to)
+        out.push([...vb, dist])
+      }
+      if (isPolarWrap(a, b)) {
+        let prev = a
+        for (let s = 1; s <= 16; s++) {
+          const next = s === 16 ? b : slerpTrackPoint(a, b, s / 16)
+          emit(prev, next)
+          prev = next
+        }
+        continue
+      }
+      if (!trailSegmentConnects(a, b)) continue
+      emit(a, b)
     }
-    const lat = sat.livePoint?.lat ?? sat.pendingLines?.future[0]?.lat ?? 0
-    const metersPerPixel = groundResolutionMetersPerPixel(currentZoom, lat)
-    sat.dashLengthMeters = DASH_SCREEN_TARGET_PX * metersPerPixel
-    sat.gapLengthMeters = GAP_SCREEN_TARGET_PX * metersPerPixel
-    sat.lastDashZoomBuild = currentZoom
-    /* A new meters-per-dash figure is inert until the geometry is walked again
-       with it. Re-arming the last trail here is what makes the dash length a
-       SCREEN length: without it the pattern keeps the previous zoom's meters
-       until the caller's next data update, stretching or shrinking on screen
-       in the meantime. */
-    if (sat.lastLines) sat.pendingLines = sat.lastLines
-    logDebugStage(
-      'dash-length',
-      `rebuilt zoom=${currentZoom.toFixed(2)} lat=${lat.toFixed(2)} dashM=${sat.dashLengthMeters.toFixed(0)} gapM=${sat.gapLengthMeters.toFixed(0)}`,
-    )
+    return out
   }
 
   function getShader(gl: GlContext, shaderDescription: CustomRenderMethodInput['shaderData']): ShaderEntry {
@@ -248,7 +270,10 @@ export function createAltitudeLayer(options: {
     in vec2 a_pos;
     in float a_elevation;
     in float a_alpha;
+    in float a_dist;
+    uniform float u_marker_size;
     out float v_alpha;
+    out float v_dist;
 
     void main() {
         gl_Position = projectTileFor3D(a_pos, a_elevation);
@@ -259,8 +284,9 @@ export function createAltitudeLayer(options: {
         gl_Position.w;`
             : ''
         }
-        gl_PointSize = 6.0;
+        gl_PointSize = u_marker_size;
         v_alpha = a_alpha;
+        v_dist = a_dist;
     }`
 
     /*
@@ -277,11 +303,21 @@ export function createAltitudeLayer(options: {
     const fragmentSource = `#version 300 es
     precision mediump float;
     in float v_alpha;
+    in float v_dist;
     uniform float u_is_point;
     uniform vec4 u_color;
+    uniform float u_dashed;
+    uniform float u_dash_px;
+    uniform float u_gap_px;
+    uniform float u_mpp;
     out highp vec4 fragColor;
     void main() {
         if (u_is_point > 0.5 && length(gl_PointCoord - vec2(0.5)) > 0.5) discard;
+        if (u_dashed > 0.5) {
+            float mpp = max(u_mpp, 1.0);
+            float period = (u_dash_px + u_gap_px) * mpp;
+            if (period > 0.0 && mod(v_dist, period) > u_dash_px * mpp) discard;
+        }
         fragColor = vec4(u_color.rgb, u_color.a * v_alpha);
     }`
 
@@ -315,6 +351,7 @@ export function createAltitudeLayer(options: {
       aPos: gl.getAttribLocation(program, 'a_pos'),
       aElevation: gl.getAttribLocation(program, 'a_elevation'),
       aAlpha: gl.getAttribLocation(program, 'a_alpha'),
+      aDist: gl.getAttribLocation(program, 'a_dist'),
     }
     /* -1 on any of these is the smoking gun for a compile/link failure (or a
        name mismatch) even if compile/link somehow reported OK. */
@@ -335,45 +372,18 @@ export function createAltitudeLayer(options: {
     if (sat.pendingLines) {
       const { past, future, windowStart, windowEnd, dashed } = sat.pendingLines
       sat.pendingLines = null
-      sat.futureIsStrip = !dashed
+      sat.futureDashed = dashed
 
-      const pastVerts = past.map((p) =>
-        toVertex(p, fadeAlphaAt(p.date, windowStart, windowEnd), useMercatorElevationUnits),
-      )
-
-      /* Dash length in meters comes from the hysteresis-throttled cache, not
-         recomputed on every update: the geometry walk below still runs every
-         time so the pattern tracks the moving solid/dashed split point, it
-         just uses whatever length is currently valid. */
-      if (sat.dashLengthMeters === null) refreshDashLength(sat, true)
-      const futureSegmentVerts: [number, number, number, number][] = []
-      if (dashed) {
-        const dashSegments = buildDashedLineSegments(
-          future,
-          sat.dashLengthMeters ?? 0,
-          sat.gapLengthMeters ?? 0,
-        )
-        for (const [a, b] of dashSegments) {
-          futureSegmentVerts.push(
-            toVertex(a, fadeAlphaAt(a.date, windowStart, windowEnd), useMercatorElevationUnits),
-            toVertex(b, fadeAlphaAt(b.date, windowStart, windowEnd), useMercatorElevationUnits),
-          )
-        }
-      } else {
-        for (const point of future) {
-          futureSegmentVerts.push(
-            toVertex(point, fadeAlphaAt(point.date, windowStart, windowEnd), useMercatorElevationUnits),
-          )
-        }
-      }
+      const pastVerts = connectedPairs(past, windowStart, windowEnd, useMercatorElevationUnits)
+      const futureVerts = connectedPairs(future, windowStart, windowEnd, useMercatorElevationUnits)
 
       gl.bindBuffer(gl.ARRAY_BUFFER, sat.buffers.past)
       gl.bufferData(gl.ARRAY_BUFFER, flattenVerts(pastVerts), gl.DYNAMIC_DRAW)
       sat.pastCount = pastVerts.length
 
       gl.bindBuffer(gl.ARRAY_BUFFER, sat.buffers.future)
-      gl.bufferData(gl.ARRAY_BUFFER, flattenVerts(futureSegmentVerts), gl.DYNAMIC_DRAW)
-      sat.futureCount = futureSegmentVerts.length
+      gl.bufferData(gl.ARRAY_BUFFER, flattenVerts(futureVerts), gl.DYNAMIC_DRAW)
+      sat.futureCount = futureVerts.length
 
       logDebugStage(
         'uploadLines',
@@ -387,7 +397,7 @@ export function createAltitudeLayer(options: {
       gl.bindBuffer(gl.ARRAY_BUFFER, sat.buffers.point)
       gl.bufferData(
         gl.ARRAY_BUFFER,
-        flattenVerts([toVertex(point, 1, useMercatorElevationUnits)]),
+        flattenVerts([[...toVertex(point, 1, useMercatorElevationUnits), 0]]),
         gl.DYNAMIC_DRAW,
       )
       sat.hasPoint = true
@@ -409,7 +419,6 @@ export function createAltitudeLayer(options: {
         sat.pastCount = 0
         sat.futureCount = 0
         sat.hasPoint = false
-        refreshDashLength(sat, true)
       }
       shaderMap.clear()
       map.triggerRepaint()
@@ -485,8 +494,7 @@ export function createAltitudeLayer(options: {
       map.triggerRepaint()
     },
 
-    refreshDashLengths(force) {
-      for (const sat of satellites.values()) refreshDashLength(sat, force)
+    refreshDashLengths(_force) {
       map.triggerRepaint()
     },
 
@@ -504,6 +512,19 @@ export function createAltitudeLayer(options: {
 
     lastVariantName() {
       return variantName
+    },
+
+    setAppearance(width, opacity) {
+      if (widthMultiplier === width && opacityMultiplier === opacity) return
+      widthMultiplier = width
+      opacityMultiplier = opacity
+      map.triggerRepaint()
+    },
+
+    setMarkerSize(px) {
+      if (markerSizePx === px) return
+      markerSizePx = px
+      map.triggerRepaint()
     },
 
     render(gl, args) {
@@ -549,15 +570,27 @@ export function createAltitudeLayer(options: {
         )
         const uIsPoint = gl.getUniformLocation(shader.program, 'u_is_point')
         const uColor = gl.getUniformLocation(shader.program, 'u_color')
+        const lat = [...satellites.values()][0]?.livePoint?.lat ?? 0
+        gl.uniform1f(
+          gl.getUniformLocation(shader.program, 'u_mpp'),
+          groundResolutionMetersPerPixel(map.getZoom(), lat),
+        )
+        gl.uniform1f(gl.getUniformLocation(shader.program, 'u_dash_px'), DASH_SCREEN_TARGET_PX)
+        gl.uniform1f(gl.getUniformLocation(shader.program, 'u_gap_px'), GAP_SCREEN_TARGET_PX)
 
+        const stride = VERT_FLOATS * 4
         const bindAttribs = (buffer: WebGLBuffer) => {
           gl.bindBuffer(gl.ARRAY_BUFFER, buffer)
           gl.enableVertexAttribArray(shader.aPos)
-          gl.vertexAttribPointer(shader.aPos, 2, gl.FLOAT, false, 16, 0)
+          gl.vertexAttribPointer(shader.aPos, 2, gl.FLOAT, false, stride, 0)
           gl.enableVertexAttribArray(shader.aElevation)
-          gl.vertexAttribPointer(shader.aElevation, 1, gl.FLOAT, false, 16, 8)
+          gl.vertexAttribPointer(shader.aElevation, 1, gl.FLOAT, false, stride, 8)
           gl.enableVertexAttribArray(shader.aAlpha)
-          gl.vertexAttribPointer(shader.aAlpha, 1, gl.FLOAT, false, 16, 12)
+          gl.vertexAttribPointer(shader.aAlpha, 1, gl.FLOAT, false, stride, 12)
+          if (shader.aDist >= 0) {
+            gl.enableVertexAttribArray(shader.aDist)
+            gl.vertexAttribPointer(shader.aDist, 1, gl.FLOAT, false, stride, 16)
+          }
         }
 
         gl.enable(gl.BLEND)
@@ -566,23 +599,34 @@ export function createAltitudeLayer(options: {
         for (const sat of satellites.values()) {
           uploadPending(gl, sat, useMercatorElevationUnits)
           if (!sat.buffers) continue
-          gl.uniform4f(uColor, ...sat.colorRgba)
+          const [r, g, b, a] = sat.colorRgba
+          const trailAlpha =
+            a * Math.min(1, opacityMultiplier * Math.min(1, widthMultiplier))
+          gl.uniform4f(uColor, r, g, b, trailAlpha)
 
           if (sat.pastCount > 0) {
             bindAttribs(sat.buffers.past)
             gl.uniform1f(uIsPoint, 0)
-            gl.drawArrays(gl.LINE_STRIP, 0, sat.pastCount)
+            gl.uniform1f(gl.getUniformLocation(shader.program, 'u_dashed'), 0)
+            gl.drawArrays(gl.LINES, 0, sat.pastCount)
           }
 
           if (sat.futureCount > 0) {
             bindAttribs(sat.buffers.future)
             gl.uniform1f(uIsPoint, 0)
-            gl.drawArrays(sat.futureIsStrip ? gl.LINE_STRIP : gl.LINES, 0, sat.futureCount)
+            gl.uniform1f(
+              gl.getUniformLocation(shader.program, 'u_dashed'),
+              sat.futureDashed ? 1 : 0,
+            )
+            gl.drawArrays(gl.LINES, 0, sat.futureCount)
           }
 
           if (sat.hasPoint) {
+            gl.uniform4f(uColor, r, g, b, a)
             bindAttribs(sat.buffers.point)
             gl.uniform1f(uIsPoint, 1)
+            gl.uniform1f(gl.getUniformLocation(shader.program, 'u_dashed'), 0)
+            gl.uniform1f(gl.getUniformLocation(shader.program, 'u_marker_size'), markerSizePx)
             gl.drawArrays(gl.POINTS, 0, 1)
           }
 
@@ -599,6 +643,7 @@ export function createAltitudeLayer(options: {
         gl.disableVertexAttribArray(shader.aPos)
         gl.disableVertexAttribArray(shader.aElevation)
         gl.disableVertexAttribArray(shader.aAlpha)
+        if (shader.aDist >= 0) gl.disableVertexAttribArray(shader.aDist)
 
         /* Reposition the HTML labels on every repaint (drag/rotate/zoom
            included) and not only at the caller's data cadence, otherwise the

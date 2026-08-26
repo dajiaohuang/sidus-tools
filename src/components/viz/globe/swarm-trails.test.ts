@@ -118,6 +118,16 @@ describe('packSwarmTrail', () => {
     }
   })
 
+  it('breaks a skipped-perigee chord of a deep ellipse, not a date-line step', () => {
+    const points = Array.from({ length: SWARM_TRAIL_POINTS }, () => point(0.5, 0.5))
+    points[0] = point(0.5, 0.5)
+    points[1] = point(0.5 + 80 / 360, 0.5)
+    const buffer = new Float32Array(SWARM_TRAIL_FLOATS_PER_SATELLITE)
+    packSwarmTrail(buffer, 0, points)
+    const skipped = segment(buffer, 0, 0)
+    expect(skipped.from).toEqual(skipped.to)
+  })
+
   it('breaks the trail where the propagator produced nothing', () => {
     const points: (SwarmTrailPoint | null)[] = straightTrail()
     points[20] = null

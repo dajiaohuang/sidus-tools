@@ -1,6 +1,18 @@
 import { describe, expect, it } from 'vitest'
 import { MercatorCoordinate } from 'maplibre-gl'
-import { AU_M, formatAu, formatKm, metresPerPixel, scaleBarFor, viewScale } from './scale'
+import {
+  AU_M,
+  equatorMeterInMercatorUnits,
+  formatAu,
+  formatKm,
+  GLOBE_FLOOR_ZOOM,
+  mercatorZoomFromMetresPerPixel,
+  metresPerPixel,
+  pxPerMeterAtEquatorZoom,
+  scaleBarFor,
+  viewScale,
+  viewScaleFromPxPerMeter,
+} from './scale'
 
 /** What MercatorCoordinate reports at a latitude; the caller's own input. */
 const merc = (latDeg: number) =>
@@ -67,6 +79,38 @@ describe('formatting', () => {
   it('says so rather than printing NaN', () => {
     expect(formatKm(Number.NaN)).toBe('—')
     expect(formatAu(Number.NaN)).toBe('—')
+  })
+})
+
+describe('mercatorZoomFromMetresPerPixel', () => {
+  it('inverts metresPerPixel at the equator, so both scenes share a zoom number', () => {
+    expect(mercatorZoomFromMetresPerPixel(metresPerPixel(0, merc(0)))).toBeCloseTo(0, 9)
+    expect(mercatorZoomFromMetresPerPixel(metresPerPixel(1.5, merc(0)))).toBeCloseTo(1.5, 9)
+    expect(mercatorZoomFromMetresPerPixel(metresPerPixel(-2, merc(0)))).toBeCloseTo(-2, 9)
+  })
+
+  it('agrees with MapLibre own meter-in-mercator at lat 0', () => {
+    expect(equatorMeterInMercatorUnits()).toBeCloseTo(merc(0), 12)
+  })
+})
+
+describe('pxPerMeterAtEquatorZoom', () => {
+  it('is the reciprocal of metresPerPixel, including at the globe floor', () => {
+    expect(pxPerMeterAtEquatorZoom(0)).toBeCloseTo(1 / metresPerPixel(0, merc(0)), 12)
+    expect(pxPerMeterAtEquatorZoom(GLOBE_FLOOR_ZOOM)).toBeCloseTo(
+      1 / metresPerPixel(GLOBE_FLOOR_ZOOM, merc(0)),
+      12,
+    )
+  })
+})
+
+describe('viewScaleFromPxPerMeter', () => {
+  it('is the reciprocal of the camera scale, across the canvas', () => {
+    const pxPerM = 2e-9
+    const scale = viewScaleFromPxPerMeter(pxPerM, 800)
+    expect(scale.metresPerPixel).toBeCloseTo(1 / pxPerM, 12)
+    expect(scale.viewWidthM).toBeCloseTo(800 / pxPerM, 3)
+    expect(scale.viewWidthAu).toBeCloseTo(scale.viewWidthM / AU_M, 12)
   })
 })
 

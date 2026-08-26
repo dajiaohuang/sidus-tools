@@ -31,7 +31,7 @@
  * fresh keyframe at the current instant rather than continuing from a stale one.
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   SWARM_KEYFRAME_MS,
   type SwarmRequest,
@@ -57,7 +57,7 @@ export type SwarmKeyframe = {
   count: number
   epochMs: number
   spanMs: number
-  /** Packed slot to satrec index, since skipped satellites compact the buffer. */
+  /** Packed slot to satrec index. Slot k is satrec k. */
   indices: Uint32Array
 }
 
@@ -123,6 +123,28 @@ export function useSatelliteSwarm(
    * picks up from where it stood on the next keyframe after it turns true.
    */
   produceTrails: boolean = true,
+  /**
+   * Re-produce the population's trails after the first pass. Earth-fixed
+   * tracks age, so the orbital-view crowd keeps looping. The home demo does
+   * not: rewriting every trail every couple of seconds is a visible pop
+   * against a slowly turning globe, and a 30-second watch does not notice
+   * the kilometres of drift.
+   */
+  loopTrails: boolean = true,
+  /**
+   * True freezes Greenwich angle at the trail epoch so each trail is the
+   * inertial ellipse (elevated globe). False is Earth-fixed, for ground tracks.
+   */
+  inertialTrails: boolean = false,
+  /**
+   * Greenwich freeze shared with the identified full-treatment track.
+   *
+   * The worker latches the first keyframe epoch when this is null. The
+   * orbital view must pass the same latch it uses for `trackPointAt` and
+   * `sampleInertialGeodeticTrack`, or hover promotes a Starlink off its
+   * swarm path onto a trail converted at a different Earth orientation.
+   */
+  inertialFreezeMs: number | null = null,
 ): {
   keyframe: SwarmKeyframe | null
   status: SwarmStatus
@@ -130,7 +152,6 @@ export function useSatelliteSwarm(
   /** Satellites whose trail has been produced at least once. */
   trailsDone: number
 } {
-  const [keyframe, setKeyframe] = useState<SwarmKeyframe | null>(null)
   const [status, setStatus] = useState<SwarmStatus>({
     loading: false,
     count: 0,
@@ -139,7 +160,11 @@ export function useSatelliteSwarm(
     ids: [],
     error: '',
   })
-  const [trailBatch, setTrailBatch] = useState<SwarmTrailBatch | null>(null)
+  /** Packed keyframes and trail batches stay in refs, not React state. */
+  const keyframeRef = useRef<SwarmKeyframe | null>(null)
+  const trailBatchRef = useRef<SwarmTrailBatch | null>(null)
+  const [, setBinaryTick] = useState(0)
+  const bumpBinary = () => setBinaryTick((n) => n + 1)
   /** Mirrors the cursor into React, for the panel's progress indicator. */
   const [trailsDone, setTrailsDone] = useState(0)
   /* Read through a ref so moving the pointer over the crowd cannot restart the
@@ -150,6 +175,8 @@ export function useSatelliteSwarm(
      switch must not restart the worker. */
   const produceTrailsRef = useRef(produceTrails)
   produceTrailsRef.current = produceTrails
+  const loopTrailsRef = useRef(loopTrails)
+  loopTrailsRef.current = loopTrails
   /** Catalogue number to worker index, so the refresh costs a lookup, not a scan. */
   const orderRef = useRef(new Map<string, number>())
   const workerRef = useRef<Worker | null>(null)
@@ -169,9 +196,22 @@ export function useSatelliteSwarm(
      mid-flight; the signature below decides when a reload is actually due. */
   const revolutionsRef = useRef(trailRevolutions)
   revolutionsRef.current = trailRevolutions
+  const inertialTrailsRef = useRef(inertialTrails)
+  inertialTrailsRef.current = inertialTrails
+  const inertialFreezeMsRef = useRef(inertialFreezeMs)
+  inertialFreezeMsRef.current = inertialFreezeMs
 
   const request = useCallback((message: SwarmRequest) => {
     workerRef.current?.postMessage(message)
+  }, [])
+
+  const inertialFieldsOf = useCallback((): { inertial?: boolean; freezeMs?: number } => {
+    const inertial = inertialTrailsRef.current
+    if (!inertial) return { inertial: false }
+    return {
+      inertial: true,
+      freezeMs: inertialFreezeMsRef.current ?? undefined,
+    }
   }, [])
 
   const scheduleNext = useCallback(
@@ -179,10 +219,15 @@ export function useSatelliteSwarm(
       if (timerRef.current !== null) window.clearTimeout(timerRef.current)
       timerRef.current = window.setTimeout(() => {
         if (document.visibilityState === 'hidden') return
-        request({ type: 'produce', epochMs: nextEpochRef.current, spanMs: SWARM_KEYFRAME_MS })
+        request({
+          type: 'produce',
+          epochMs: nextEpochRef.current,
+          spanMs: SWARM_KEYFRAME_MS,
+          ...inertialFieldsOf(),
+        })
       }, Math.max(0, fromMs))
     },
-    [request],
+    [request, inertialFieldsOf],
   )
 
   /* The identity of the population, not its array: re-running on every render
@@ -190,15 +235,16 @@ export function useSatelliteSwarm(
   /* The identity of the population AND of how it is to be drawn: a changed
      trail length or a recoloured list has to reach the worker, and both are
      decided by the count, so they belong in the same key. */
-  const signature =
-    tles === null
-      ? null
-      : `${tles.length}:${trailRevolutions}:${tles.map((t) => `${t.catnr}@${t.rgb.join('/')}`).join(',')}`
+  const signature = useMemo(() => {
+    if (tles === null) return null
+    return `${tles.length}:${trailRevolutions}:${inertialTrails ? 1 : 0}:${tles.map((t) => `${t.catnr}@${t.rgb.join('/')}`).join(',')}`
+  }, [tles, trailRevolutions, inertialTrails])
 
   useEffect(() => {
     if (tles === null || tles.length === 0) {
-      setKeyframe(null)
-      setTrailBatch(null)
+      keyframeRef.current = null
+      trailBatchRef.current = null
+      bumpBinary()
       setTrailsDone(0)
       setStatus({ loading: false, count: 0, rejected: 0, skipped: 0, ids: [], error: '' })
       return
@@ -229,18 +275,24 @@ export function useSatelliteSwarm(
         orderRef.current = new Map(message.accepted.map((catnr, at) => [catnr, at]))
         if (message.count === 0) return
         nextEpochRef.current = Date.now()
-        request({ type: 'produce', epochMs: nextEpochRef.current, spanMs: SWARM_KEYFRAME_MS })
+        request({
+          type: 'produce',
+          epochMs: nextEpochRef.current,
+          spanMs: SWARM_KEYFRAME_MS,
+          ...inertialFieldsOf(),
+        })
         return
       }
       if (message.type === 'trailBatch') {
         trailVersionRef.current += 1
-        setTrailBatch({
+        trailBatchRef.current = {
           packed: message.packed,
           startIndex: message.startIndex,
           count: message.count,
           refresh: message.refresh === true,
           version: trailVersionRef.current,
-        })
+        }
+        bumpBinary()
         /* Progress is MONOTONE: the looping cursor wraps to zero every cycle,
            and letting it drag the counter back down would re-show the loading
            hairline forever on a population that finished loading long ago. */
@@ -267,11 +319,13 @@ export function useSatelliteSwarm(
       const untilEpochMs = message.epochMs - Date.now()
       if (untilEpochMs <= 0) {
         promoteRef.current = null
-        setKeyframe(arrived)
+        keyframeRef.current = arrived
+        bumpBinary()
       } else {
         promoteRef.current = window.setTimeout(() => {
           promoteRef.current = null
-          setKeyframe(arrived)
+          keyframeRef.current = arrived
+          bumpBinary()
         }, untilEpochMs)
       }
       nextEpochRef.current = message.epochMs + message.spanMs
@@ -285,27 +339,46 @@ export function useSatelliteSwarm(
          can never delay a keyframe: the keyframe request is already scheduled
          above and the worker takes it next. */
       if (produceTrailsRef.current && loadedCountRef.current > 0) {
-        /* The cursor LOOPS. Trails are Earth-fixed ground tracks now, and a
-           ground track ages as its satellite flies on, so a produced-once
-           population would drift off its dots within an orbit. Wrapping the
-           same cursor re-produces every trail from the live clock about once
-           a minute, which keeps the whole population within a fraction of a
-           degree of the truth for exactly the cost the first convergence
-           already paid. */
-        if (trailCursorRef.current >= loadedCountRef.current) trailCursorRef.current = 0
-        const startIndex = trailCursorRef.current
-        const count = Math.min(SWARM_TRAIL_BATCH, loadedCountRef.current - startIndex)
-        trailCursorRef.current = startIndex + count
-        request({ type: 'trails', startIndex, count, atMs: message.epochMs })
+        /* Trails are Earth-fixed ground tracks: a produced-once cache ages as
+           the satellite flies on. The orbital-view crowd wraps the cursor so
+           every trail is re-made about once a minute. The home demo does not
+           wrap: a full rewrite every keyframe is a pop, and a short watch
+           does not see the drift. */
+        let cursor = trailCursorRef.current
+        if (cursor >= loadedCountRef.current) {
+          if (!loopTrailsRef.current) cursor = loadedCountRef.current
+          else cursor = 0
+        }
+        if (cursor < loadedCountRef.current) {
+          const count = Math.min(SWARM_TRAIL_BATCH, loadedCountRef.current - cursor)
+          trailCursorRef.current = cursor + count
+          request({
+            type: 'trails',
+            startIndex: cursor,
+            count,
+            atMs: message.epochMs,
+            ...inertialFieldsOf(),
+          })
+        }
       }
 
       /* And the one satellite being attended to, re-produced at THIS keyframe's
          epoch so its line is never stale enough to leave its own marker. One
          satellite against the batch's three hundred and sixty, so it rides
          along without competing with the population's convergence. */
-      const fresh = refreshRef.current === null ? undefined : orderRef.current.get(refreshRef.current)
+      const fresh =
+        produceTrailsRef.current && refreshRef.current !== null
+          ? orderRef.current.get(refreshRef.current)
+          : undefined
       if (fresh !== undefined && fresh < loadedCountRef.current) {
-        request({ type: 'trails', startIndex: fresh, count: 1, atMs: message.epochMs, refresh: true })
+        request({
+          type: 'trails',
+          startIndex: fresh,
+          count: 1,
+          atMs: message.epochMs,
+          refresh: true,
+          ...inertialFieldsOf(),
+        })
       }
     }
 
@@ -321,7 +394,12 @@ export function useSatelliteSwarm(
       }
       // Back in view: start again from now, not from wherever the clock left off.
       nextEpochRef.current = Date.now()
-      request({ type: 'produce', epochMs: nextEpochRef.current, spanMs: SWARM_KEYFRAME_MS })
+      request({
+        type: 'produce',
+        epochMs: nextEpochRef.current,
+        spanMs: SWARM_KEYFRAME_MS,
+        ...inertialFieldsOf(),
+      })
     }
     document.addEventListener('visibilitychange', onVisibility)
 
@@ -337,12 +415,33 @@ export function useSatelliteSwarm(
       workerRef.current = null
       trailCursorRef.current = 0
       loadedCountRef.current = 0
-      setKeyframe(null)
-      setTrailBatch(null)
+      keyframeRef.current = null
+      trailBatchRef.current = null
+      bumpBinary()
       setTrailsDone(0)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- signature IS the identity of tles
   }, [signature, request, scheduleNext])
 
-  return { keyframe, status, trailBatch, trailsDone }
+  /* Identified trail refresh. Skipped when population trails are off. */
+  useEffect(() => {
+    if (!produceTrails || refreshCatnr == null) return
+    const at = orderRef.current.get(refreshCatnr)
+    if (at === undefined || at >= loadedCountRef.current) return
+    request({
+      type: 'trails',
+      startIndex: at,
+      count: 1,
+      atMs: Date.now(),
+      refresh: true,
+      ...inertialFieldsOf(),
+    })
+  }, [produceTrails, refreshCatnr, request, inertialFieldsOf])
+
+  return {
+    keyframe: keyframeRef.current,
+    status,
+    trailBatch: trailBatchRef.current,
+    trailsDone,
+  }
 }

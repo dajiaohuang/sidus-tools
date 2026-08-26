@@ -44,23 +44,23 @@
  * argued at SWARM_TRAIL_POINTS below.
  */
 
+import { isPolarWrap, trailSegmentConnects } from './track'
+
 /**
  * Samples per trail: one full revolution.
  *
  * Set by what the drawn chord costs against the true arc. Measured worst-case
  * sagitta over the shells, converted through the globe's scale at view centre:
  *
- *   64 samples -> 8.64 km, 0.88 px at a continental view, 3.53 px close in
- *   96 samples -> 3.80 km, 0.39 px                        1.55 px
- *  128 samples -> 2.13 km, 0.22 px                        0.87 px
+ *   64 samples  -> 8.64 km, 0.88 px at a continental view, 3.53 px close in
+ *   96 samples  -> 3.80 km, 0.39 px                        1.55 px
+ *  128 samples  -> 2.13 km, 0.22 px                        0.87 px
+ *  192 samples  -> 0.95 km, 0.10 px                        0.39 px
  *
- * 96 is the count that brings the close-up inside two pixels, for about 31 MB
- * across ten thousand satellites. It does NOT clear two pixels at extreme zoom,
- * where the residual is 6.2 px; that case is served by the full-treatment path
- * instead, which gives a hovered, pinned or individually added satellite its
- * own precisely refined trail. Buying extreme zoom for the whole population
- * would cost 192 samples and about 62 MB to serve a view nobody reaches with
- * the swarm still on.
+ * 96 is the crowd budget: about 53 MB of GPU trail buffer across ten
+ * thousand Starlink, plus the same again on the CPU pick index. Close-up
+ * quality for one identified satellite is the full-treatment track.
+ * Deep ellipses in the crowd skip piercing chords at pack time.
  */
 export const SWARM_TRAIL_POINTS = 96
 
@@ -101,6 +101,12 @@ export type SwarmTrailPoint = {
   elevationM: number
 }
 
+function geodeticOf(p: SwarmTrailPoint): { lon: number; lat: number; altKm: number } {
+  const lon = (p.mercatorX - 0.5) * 360
+  const lat = (Math.atan(Math.sinh(Math.PI * (1 - 2 * p.mercatorY))) * 180) / Math.PI
+  return { lon, lat, altKm: p.elevationM / 1000 }
+}
+
 /**
  * Expands one satellite's sampled revolution into line-segment endpoints at
  * `index` in the shared buffer.
@@ -119,12 +125,17 @@ export function packSwarmTrail(
   for (let i = 0; i < SWARM_TRAIL_POINTS - 1; i++) {
     const a = points[i]
     const b = points[i + 1]
-    /* Only a MISSING sample breaks the trail. The antimeridian does not: the
-       shader puts both ends of a segment in the same copy of the world from
-       the partner x below, so a step across the seam is drawn the short way
-       round rather than back across every meridian. */
+    /* A missing sample breaks the trail. The antimeridian does not: the
+       shader puts both ends in the same copy of the world. A skipped
+       perigee of a deep ellipse DOES: connecting those two apogee-side
+       samples draws a chord through the planet (SCIENCE CLUSTER / Chandra). */
     const from = a ?? { mercatorX: 0, mercatorY: 0, elevationM: 0 }
-    const to = a && b ? b : from
+    const geoA = a ? geodeticOf(a) : null
+    const geoB = b ? geodeticOf(b) : null
+    const to =
+      a && b && geoA && geoB && trailSegmentConnects(geoA, geoB, true) && !isPolarWrap(geoA, geoB)
+        ? b
+        : from
     target[at] = from.mercatorX
     target[at + 1] = from.mercatorY
     target[at + 2] = from.elevationM
@@ -151,6 +162,12 @@ export type SwarmTrailRequest = {
   count: number
   /** Instant the revolution starts at. */
   atMs: number
+  /** True: freeze Greenwich angle so the trail is the inertial ellipse. */
+  inertial?: boolean
+  /** Greenwich freeze; the worker latches the first inertial epoch if omitted. */
+  freezeMs?: number
+  /** Satrec index the full-treatment path already draws; packed as a degenerate trail. */
+  skipIndex?: number
   /**
    * True when this re-produces a trail that has already been drawn once.
    *

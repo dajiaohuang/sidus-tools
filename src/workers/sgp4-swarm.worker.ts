@@ -47,10 +47,36 @@ let colors: [number, number, number][] = []
 let trailRevolutions = 0.5
 /** Reused across keyframes: allocating 10k * 6 floats every two seconds would churn. */
 let packed = new Float32Array(0)
-/** Packed slot to satrec index, so a skipped satellite cannot shift the rest. */
+/** Packed slot to satrec index. Slot k is satrec k. */
 let indices = new Uint32Array(0)
+/** True after the first keyframe, so a missed sample can hold last position. */
+let hasPacked = false
 /** Reused across trail batches, sized for the largest batch asked for so far. */
 let trailPacked = new Float32Array(0)
+/**
+ * Greenwich freeze for inertial dots and trails. The orbital view passes
+ * the same latch it uses for the identified track; otherwise the first
+ * inertial epoch of the load is kept so every keyframe and every trail
+ * share one Earth orientation.
+ */
+let inertialFreezeMs: number | null = null
+
+function freezeMsOf(
+  inertial: boolean,
+  candidateMs: number,
+  explicit?: number,
+): number | undefined {
+  if (!inertial) {
+    inertialFreezeMs = null
+    return undefined
+  }
+  if (explicit != null && Number.isFinite(explicit)) {
+    inertialFreezeMs = explicit
+    return explicit
+  }
+  if (inertialFreezeMs === null) inertialFreezeMs = candidateMs
+  return inertialFreezeMs
+}
 
 function post(message: SwarmResponse, transfer?: Transferable[]): void {
   ;(self as unknown as Worker).postMessage(message, transfer ?? [])
@@ -62,6 +88,8 @@ function handle(request: SwarmRequest): void {
     satrecs = result.satrecs
     colors = result.colors
     trailRevolutions = request.trailRevolutions
+    inertialFreezeMs = null
+    hasPacked = false
     const needed = satrecs.length * SWARM_FLOATS_PER_SATELLITE
     if (packed.length < needed) packed = new Float32Array(needed)
     if (indices.length < satrecs.length) indices = new Uint32Array(satrecs.length)
@@ -80,6 +108,8 @@ function handle(request: SwarmRequest): void {
     packed = new Float32Array(0)
     indices = new Uint32Array(0)
     trailPacked = new Float32Array(0)
+    inertialFreezeMs = null
+    hasPacked = false
     return
   }
 
@@ -89,6 +119,7 @@ function handle(request: SwarmRequest): void {
     const needed = count * SWARM_TRAIL_FLOATS_PER_SATELLITE
     if (trailPacked.length < needed) trailPacked = new Float32Array(needed)
     trailPacked.fill(0, 0, needed)
+    const inertial = request.inertial === true
     const { skipped } = produceTrailBatch(
       satrecs,
       colors,
@@ -97,6 +128,9 @@ function handle(request: SwarmRequest): void {
       request.atMs,
       trailRevolutions,
       trailPacked,
+      inertial,
+      freezeMsOf(inertial, request.atMs, request.freezeMs),
+      request.skipIndex,
     )
     const slice = trailPacked.slice(0, needed)
     post(
@@ -107,6 +141,9 @@ function handle(request: SwarmRequest): void {
   }
 
   if (request.type === 'produce') {
+    const inertial = request.inertial === true
+    const needed = satrecs.length * SWARM_FLOATS_PER_SATELLITE
+    const previous = hasPacked ? packed.slice(0, needed) : undefined
     const result = produceKeyframe(
       satrecs,
       colors,
@@ -114,7 +151,12 @@ function handle(request: SwarmRequest): void {
       request.spanMs,
       packed,
       indices,
+      inertial,
+      freezeMsOf(inertial, request.epochMs, request.freezeMs),
+      request.skipIndex,
+      previous,
     )
+    hasPacked = true
     const slice = packed.slice(0, result.count * SWARM_FLOATS_PER_SATELLITE)
     const slots = indices.slice(0, result.count)
     post(

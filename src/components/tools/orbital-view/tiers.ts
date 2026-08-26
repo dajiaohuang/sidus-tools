@@ -46,3 +46,15 @@ export function swarmScaleTier(total: number): SwarmScaleTier {
 export function globeDrawPath(total: number): 'full' | 'swarm' {
   return swarmScaleTier(total) === 'named' ? 'full' : 'swarm'
 }
+
+/**
+ * Whether this device can pack every satellite's inertial trail.
+ *
+ * The GPU buffer plus the CPU pick index are ~0.5 kB per satellite at
+ * SWARM_TRAIL_POINTS. Two hundred is the last count the trails tier was
+ * designed for. Past that, compact chrome (phones) OOMs; desktop keeps All.
+ */
+export function canDrawPopulationTrails(count: number, compact: boolean): boolean {
+  if (count <= TIER_TRAILS_MAX) return true
+  return !compact
+}

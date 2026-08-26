@@ -50,8 +50,8 @@ export const RESOURCES: Resource[] = [
     tags: ['SPICE'],
   },
   {
-    name: 'CelesTrak',
-    org: 'CelesTrak',
+    name: 'CelesTrak™',
+    org: 'CelesTrak™',
     url: 'https://celestrak.org/',
     description: 'TLE sets and satellite catalog utilities.',
     tags: ['TLE', 'catalog'],
@@ -65,7 +65,7 @@ export const RESOURCES: Resource[] = [
   },
   {
     name: 'Vallado software',
-    org: 'David A. Vallado / CelesTrak',
+    org: 'David A. Vallado / CelesTrak™',
     url: 'https://celestrak.org/software/vallado-sw.php',
     description: 'Companion code and papers for Fundamentals of Astrodynamics.',
     tags: ['algorithms'],

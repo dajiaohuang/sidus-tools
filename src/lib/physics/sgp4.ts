@@ -53,8 +53,8 @@ export type LookAnglesSi = {
  * SGP4 output is TEME-class; ECEF/look-angle conversion is an engineering approximation.
  */
 export const SAMPLE_ISS_TLE = `ISS (ZARYA)
-1 25544U 98067A   25220.50000000  .00014500  00000-0  26520-3 0  9992
-2 25544  51.6400  80.1234 0004123  95.4321  12.3456 15.50200000250000`
+1 25544U 98067A   26236.43525466  .00008197  00000+0  15348-3 0  9992
+2 25544  51.6332 322.3014 0007699  78.6726 281.5127 15.49604681582335`
 
 /** Parse 2- or 3-line TLE text (optional name line). */
 export function parseTle(text: string): TleParseResult {

@@ -70,7 +70,7 @@ describe('trailWeightFor', () => {
        rules may claim otherwise. */
     expect(Object.keys(appearanceFor(1))).toEqual(Object.keys(appearanceFor(10_700)))
     expect('trailSamples' in appearanceFor(1)).toBe(false)
-    // Enough resolution for a chord to stay under a pixel or two at any count.
+    // Crowd budget: ten thousand Starlink stay inside a few tens of MB.
     expect(SWARM_TRAIL_POINTS).toBe(96)
   })
 

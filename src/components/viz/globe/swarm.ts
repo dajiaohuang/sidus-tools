@@ -62,7 +62,20 @@ export type SwarmTle = {
 /** Messages the main thread sends the worker. */
 export type SwarmRequest =
   | { type: 'load'; tles: SwarmTle[]; trailRevolutions: number }
-  | { type: 'produce'; epochMs: number; spanMs: number }
+  | {
+      type: 'produce'
+      epochMs: number
+      spanMs: number
+      inertial?: boolean
+      /**
+       * Greenwich freeze for inertial conversion. The orbital view latches one
+       * value for dots, trails and the identified full-treatment track; omit
+       * it and the worker latches the first epoch of the load.
+       */
+      freezeMs?: number
+      /** Satrec index the full-treatment path already draws; packed as an empty slot. */
+      skipIndex?: number
+    }
   | SwarmTrailRequest
   | { type: 'stop' }
 
@@ -74,17 +87,13 @@ export type SwarmResponse =
       epochMs: number
       /** Instant the start-plus-delta positions are valid at. */
       spanMs: number
-      /** Satellites actually packed; fewer than loaded when some fail to propagate. */
+      /** Packed slots, one per loaded satrec. Empty slots are NaN, not omitted. */
       count: number
       /** Satellites that could not be propagated at both instants this time. */
       skipped: number
       /** SWARM_FLOATS_PER_SATELLITE per satellite, transferred rather than copied. */
       packed: Float32Array
-      /**
-       * Packed slot to satrec index. Skipping compacts the buffer, so without
-       * this every name, trail and pick past the first failure would be off by
-       * the number of failures before it.
-       */
+      /** Packed slot to satrec index. Slot k is satrec k; empty slots stay empty. */
       indices: Uint32Array
       /** Set only when the batch could not be produced at all. */
       error?: string
@@ -132,6 +141,20 @@ export function packSwarmSample(
   target[at + 6] = rgb[0]
   target[at + 7] = rgb[1]
   target[at + 8] = rgb[2]
+}
+
+/** Empty slot: NaN position so the GPU discards it and neighbours keep their index. */
+export function packEmptySwarmSample(target: Float32Array, index: number): void {
+  const at = index * SWARM_FLOATS_PER_SATELLITE
+  target[at] = Number.NaN
+  target[at + 1] = Number.NaN
+  target[at + 2] = Number.NaN
+  target[at + 3] = 0
+  target[at + 4] = 0
+  target[at + 5] = 0
+  target[at + 6] = 0
+  target[at + 7] = 0
+  target[at + 8] = 0
 }
 
 /**

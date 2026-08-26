@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   keyframeProgress,
+  packEmptySwarmSample,
   packSwarmSample,
   SWARM_FLOATS_PER_SATELLITE,
   wrapMercatorDelta,
@@ -69,6 +70,16 @@ describe('packSwarmSample', () => {
     // The shader adds and wraps: 0.99 + 0.02 = 1.01 -> 0.01.
     const landed = (target[0] + target[3] + 1) % 1
     expect(landed).toBeCloseTo(0.01, 5)
+  })
+})
+
+describe('packEmptySwarmSample', () => {
+  it('writes NaN in the start position so the slot draws nothing', () => {
+    const target = new Float32Array(SWARM_FLOATS_PER_SATELLITE)
+    packEmptySwarmSample(target, 0)
+    expect(Number.isNaN(target[0])).toBe(true)
+    expect(Number.isNaN(target[1])).toBe(true)
+    expect(target[3]).toBe(0)
   })
 })
 

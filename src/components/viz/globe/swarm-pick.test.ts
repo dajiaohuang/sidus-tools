@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest'
 import {
   altitudeMarginWorld,
   createSwarmPickIndex,
+  nearestCandidateSegment,
   SWARM_PICK_GRID,
   SWARM_TRAIL_SEGMENTS,
+  type SwarmProjector,
 } from './swarm-pick'
 import {
   packSwarmTrail,
@@ -109,6 +111,69 @@ describe('swarm pick index', () => {
     // The shells this view draws top out near 600 km.
     expect(altitudeMarginWorld(600)).toBeLessThan(cell)
     expect(altitudeMarginWorld(600)).toBeCloseTo(0.015, 3)
+  })
+
+  it('does not grow when one satellite is re-produced without a full cycle', () => {
+    const index = createSwarmPickIndex()
+    index.reset(10_000)
+    const packed = batchOf([eastward(0.4)])
+    index.addBatch(packed, 42, 1)
+    const once = index.occupancy().entries
+    expect(once).toBeGreaterThan(0)
+    for (let i = 0; i < 80; i++) index.addBatch(packed, 42, 1)
+    expect(index.occupancy().entries).toBe(once)
+  })
+
+  it('bounds memory to at most two cycles of entries across many re-productions', () => {
+    const index = createSwarmPickIndex()
+    const populationSize = 8
+    index.reset(populationSize)
+
+    /* One full population delivered as several small batches, the way the
+       real looping producer delivers a population larger than one batch. */
+    const deliverCycle = (cycle: number) => {
+      const trails = Array.from({ length: populationSize }, (_, i) =>
+        eastward(0.1 + i * 0.1, 0.1 + cycle * 0.0003),
+      )
+      const chunk = 3
+      for (let start = 0; start < populationSize; start += chunk) {
+        const count = Math.min(chunk, populationSize - start)
+        index.addBatch(batchOf(trails.slice(start, start + count)), start, count)
+      }
+    }
+
+    deliverCycle(0)
+    const afterFirstCycle = index.occupancy().entries
+
+    for (let cycle = 1; cycle <= 10; cycle++) deliverCycle(cycle)
+    const afterEleventhCycle = index.occupancy().entries
+
+    expect(afterEleventhCycle).toBeLessThanOrEqual(afterFirstCycle * 2)
+  })
+
+  it('finds a drifting trail at its current cells after several full cycles', () => {
+    const index = createSwarmPickIndex()
+    index.reset(2)
+    const other = eastward(0.7)
+    /* A flat, order-preserving projector: enough for the exact stage to rank
+       segments by screen distance without a real camera. */
+    const flatProject: SwarmProjector = (mercatorX, mercatorY) => ({
+      x: mercatorX * 10_000,
+      y: mercatorY * 10_000,
+    })
+
+    let current = eastward(0.3)
+    for (let cycle = 0; cycle < 8; cycle++) {
+      // Each cycle drifts less than half a cell, the way a real ground track creeps.
+      current = eastward(0.3, 0.1 + cycle * 0.003)
+      index.addBatch(batchOf([current, other]), 0, 2)
+    }
+
+    const p = current[0]
+    const candidates = index.candidatesAt(p.mercatorX, p.mercatorY)
+    const screen = flatProject(p.mercatorX, p.mercatorY, p.elevationM)!
+    const found = nearestCandidateSegment(index, candidates, screen.x, screen.y, flatProject)
+    expect(found?.satellite).toBe(0)
   })
 })
 

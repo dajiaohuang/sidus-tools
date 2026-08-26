@@ -31,6 +31,17 @@ import { Minus, Plus, RotateCcw } from 'lucide-react'
 import { tooltipProps } from '@/components/shared/tooltip'
 import { parseCssRgba } from '@/components/viz/globe/color'
 import { cn } from '@/lib/utils'
+import { ChromeSheet } from '@/components/viz/globe/chrome-overlay'
+import {
+  CTRL_PANEL_CLASS,
+  GlobeScaleReadout,
+} from '@/components/viz/globe/controls-ui'
+import {
+  GLOBE_FLOOR_ZOOM,
+  mercatorZoomFromMetresPerPixel,
+  pxPerMeterAtEquatorZoom,
+  viewScaleFromPxPerMeter,
+} from '@/components/viz/globe/scale'
 import {
   AU,
   BODY_IDS,
@@ -53,6 +64,7 @@ import {
   poleDirectionEcliptic,
   primeMeridianDirectionEcliptic,
   projectPoint,
+  reachableReturnScale,
   sampleOrbitEllipse,
   sunDirectionInView,
   type CameraBasis,
@@ -228,6 +240,9 @@ export type SolarSceneHandoff = {
 
 /** How far the handoff body may drift from the centre and still count as centred. */
 const HANDOFF_CENTERED_FRACTION = 0.25
+/** Same 10% past the floor the globe records on the way out. */
+const DEFAULT_RETURN_HYSTERESIS = 1.1
+const GLOBE_FLOOR_PX_PER_M = pxPerMeterAtEquatorZoom(GLOBE_FLOOR_ZOOM)
 
 export type SolarSystemSceneProps = {
   className?: string
@@ -235,10 +250,18 @@ export type SolarSystemSceneProps = {
   height?: number
   /** Set only when a closer scene handed the view over; absent means a normal open. */
   handoff?: SolarSceneHandoff
+  /**
+   * How to leave for the globe. Used even when `handoff` is missing, so a
+   * link that opened this scene can still zoom in on Earth and arrive.
+   */
+  onReturnToGlobe?: () => void
   /** The caller's live satellites. Each is hidden until its ring is resolvable. */
   satellites?: SolarSatellite[]
   /** Bumping this flies in to the handoff scale and hands the view back. */
   flyToReturnNonce?: number
+  compactChrome?: boolean
+  bodiesSheetOpen?: boolean
+  onBodiesSheetClose?: () => void
 }
 
 /** Live orrery: true ellipses, true distances, real sun-phase shading. */
@@ -246,8 +269,12 @@ export function SolarSystemScene({
   className,
   height,
   handoff,
+  onReturnToGlobe,
   satellites,
   flyToReturnNonce,
+  compactChrome = false,
+  bodiesSheetOpen = false,
+  onBodiesSheetClose,
 }: SolarSystemSceneProps) {
   const { t } = useTranslation()
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -262,12 +289,34 @@ export function SolarSystemScene({
     return all
   })
 
+  const [frameSize, setFrameSize] = useState({ w: 0, h: 0 })
   const [instantMs, setInstantMs] = useState(() => Date.now())
   useEffect(() => {
     const id = setInterval(() => setInstantMs(Date.now()), RECOMPUTE_MS)
     return () => clearInterval(id)
   }, [])
   const date = useMemo(() => new Date(instantMs), [instantMs])
+
+  useEffect(() => {
+    const el = canvasRef.current
+    if (!el) return
+    const sync = () => setFrameSize({ w: el.clientWidth, h: el.clientHeight })
+    sync()
+    const observer = new ResizeObserver(sync)
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [])
+
+  const cameraScale = useMemo(() => {
+    if (frameSize.w < 2 || frameSize.h < 2) return null
+    const scale = viewScaleFromPxPerMeter(
+      baseScalePxPerM(frameSize.w, frameSize.h) * view.zoom,
+      frameSize.w,
+    )
+    const zoom = mercatorZoomFromMetresPerPixel(scale.metresPerPixel)
+    if (!Number.isFinite(zoom)) return null
+    return { zoom, scale }
+  }, [frameSize, view.zoom])
 
   const scene = useMemo(() => {
     const orbits = PLANET_IDS.map((id) => ({
@@ -335,6 +384,8 @@ export function SolarSystemScene({
 
   const handoffRef = useRef(handoff)
   handoffRef.current = handoff
+  const onReturnToGlobeRef = useRef(onReturnToGlobe)
+  onReturnToGlobeRef.current = onReturnToGlobe
   const sceneRef = useRef(scene)
   sceneRef.current = scene
 
@@ -514,14 +565,26 @@ export function SolarSystemScene({
    */
   const tryHandoffBack = useCallback((w: number, h: number, factor: number): boolean => {
     const back = handoffRef.current
-    if (!back || !(factor > 1)) return false
+    const onReturn = onReturnToGlobeRef.current ?? back?.onReturn
+    if (!onReturn || !(factor > 1)) return false
     const view = viewRef.current
-    /* Only the body the closer scene owns can lead back to it. */
-    if (view.focusId !== back.bodyId) return false
+    /* Only Earth leads back to the globe, unless a recorded handoff named
+       another body (it does not, today). A link that opened this scene has
+       no record, so Earth is the default. */
+    const bodyId = back?.bodyId ?? 'earth'
+    if (view.focusId !== bodyId) return false
     const base = baseScalePxPerM(w, h)
+    /* The return scale is a RECORDED fact about the globe frame when the
+       globe handed over. Arrive from a URL and there is no record: use the
+       globe's own floor instead, so zooming in on Earth is not a dead end
+       at ZOOM_MAX. When even that floor lies beyond the clamped range, the
+       reachable ceiling is the boundary. */
+    const wanted =
+      back?.returnPxPerMeter ?? GLOBE_FLOOR_PX_PER_M * DEFAULT_RETURN_HYSTERESIS
+    const threshold = reachableReturnScale(wanted, base, ZOOM_MAX)
     const after = base * clampZoom(view.zoom * factor)
-    if (!(after >= back.returnPxPerMeter)) return false
-    const body = sceneRef.current.bodies.find((candidate) => candidate.id === back.bodyId)
+    if (!(after >= threshold)) return false
+    const body = sceneRef.current.bodies.find((candidate) => candidate.id === bodyId)
     if (!body) return false
     const screen = projectPoint(
       body.posM,
@@ -532,13 +595,18 @@ export function SolarSystemScene({
     )
     const offsetPx = Math.hypot(screen.x - w / 2, screen.y - h / 2)
     if (offsetPx >= Math.min(w, h) * HANDOFF_CENTERED_FRACTION) return false
-    back.onReturn()
+    onReturn()
     return true
   }, [])
 
-  const zoomBy = useCallback((factor: number) => {
-    setView((prev) => ({ ...prev, zoom: clampZoom(prev.zoom * factor) }))
-  }, [])
+  const zoomBy = useCallback(
+    (factor: number) => {
+      const el = canvasRef.current
+      if (el && tryHandoffBack(el.clientWidth, el.clientHeight, factor)) return
+      setView((prev) => ({ ...prev, zoom: clampZoom(prev.zoom * factor) }))
+    },
+    [tryHandoffBack],
+  )
 
   /**
    * The info panel's contents, every figure derived from the shipped physics at
@@ -991,22 +1059,29 @@ export function SolarSystemScene({
         aria-label={t('fields.scene_solar')}
         className="absolute inset-0 h-full w-full cursor-grab touch-none active:cursor-grabbing"
         onPointerDown={(e) => {
-          ;(e.target as HTMLCanvasElement).setPointerCapture(e.pointerId)
+          try {
+            ;(e.target as HTMLCanvasElement).setPointerCapture(e.pointerId)
+          } catch {
+            /* Capture can throw if the pointer already left the canvas. */
+          }
           const v = viewRef.current
           drag.current = { x: e.clientX, y: e.clientY, bearing: v.bearingRad, tilt: v.tiltRad }
         }}
         onPointerMove={(e) => {
-          if (!drag.current) return
-          const dx = e.clientX - drag.current.x
-          const dy = e.clientY - drag.current.y
+          const start = drag.current
+          if (!start) return
+          const dx = e.clientX - start.x
+          const dy = e.clientY - start.y
           /* Orbiting the focus, not panning: the focus stays at the centre and
              the camera swings around it, so there is no way to lose the body
              you are looking at. */
           if (Math.hypot(dx, dy) <= CLICK_SLOP_PX) return
+          const bearing0 = start.bearing
+          const tilt0 = start.tilt
           setView((prev) => ({
             ...prev,
-            bearingRad: drag.current!.bearing + dx * 0.01,
-            tiltRad: Math.min(1.55, Math.max(0.02, drag.current!.tilt + dy * 0.01)),
+            bearingRad: bearing0 + dx * 0.01,
+            tiltRad: Math.min(1.55, Math.max(0.02, tilt0 + dy * 0.01)),
           }))
         }}
         onPointerUp={(e) => {
@@ -1029,30 +1104,57 @@ export function SolarSystemScene({
         onDoubleClick={resetView}
       />
 
-      <div className="absolute left-4 top-16 z-10 flex flex-col gap-1 border border-border bg-bg/80 px-2 py-1.5 backdrop-blur-sm">
-        <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted">
-          {t('fields.solar_bodies')}
-        </p>
-        {BODY_IDS.map((id) => (
-          <label
-            key={id}
-            className="flex cursor-pointer items-center gap-1.5 font-mono text-[10px] text-subtle transition-colors hover:text-fg"
-          >
-            <input
-              type="checkbox"
-              checked={visible[id]}
-              onChange={(e) =>
-                setVisible((prev) => ({ ...prev, [id]: e.target.checked }))
-              }
-              className="cursor-pointer accent-warn"
-            />
-            {t(`fields.body_${id}`)}
-          </label>
-        ))}
-      </div>
+      {compactChrome ? (
+        <ChromeSheet
+          open={bodiesSheetOpen}
+          title={t('fields.solar_bodies')}
+          onClose={() => onBodiesSheetClose?.()}
+        >
+          <div className="flex flex-col gap-1">
+            {BODY_IDS.map((id) => (
+              <label
+                key={id}
+                className="flex min-h-10 cursor-pointer items-center gap-2 font-mono text-[11px] text-subtle transition-colors hover:text-fg"
+              >
+                <input
+                  type="checkbox"
+                  checked={visible[id]}
+                  onChange={(e) =>
+                    setVisible((prev) => ({ ...prev, [id]: e.target.checked }))
+                  }
+                  className="cursor-pointer accent-warn"
+                />
+                {t(`fields.body_${id}`)}
+              </label>
+            ))}
+          </div>
+        </ChromeSheet>
+      ) : (
+        <div className="absolute left-4 top-16 z-10 flex flex-col gap-1 border border-border bg-bg/80 px-2 py-1.5 backdrop-blur-sm">
+          <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted">
+            {t('fields.solar_bodies')}
+          </p>
+          {BODY_IDS.map((id) => (
+            <label
+              key={id}
+              className="flex cursor-pointer items-center gap-1.5 font-mono text-[10px] text-subtle transition-colors hover:text-fg"
+            >
+              <input
+                type="checkbox"
+                checked={visible[id]}
+                onChange={(e) =>
+                  setVisible((prev) => ({ ...prev, [id]: e.target.checked }))
+                }
+                className="cursor-pointer accent-warn"
+              />
+              {t(`fields.body_${id}`)}
+            </label>
+          ))}
+        </div>
+      )}
 
       {infoRows ? (
-        <div className="pointer-events-none absolute bottom-4 left-4 z-20 mb-[6.5rem] w-fit min-w-[13rem] max-w-[min(22rem,calc(100%-11rem))] border border-border bg-bg/90 px-2.5 py-2 backdrop-blur-sm">
+        <div className="pointer-events-none absolute bottom-4 left-4 z-20 mb-[6.5rem] w-fit min-w-[13rem] max-w-[min(22rem,calc(100%-2rem))] border border-border bg-bg/90 px-2.5 py-2 backdrop-blur-sm max-lg:bottom-20 max-lg:mb-0">
           <p className="mb-1 font-mono text-[10px] uppercase tracking-[0.12em] text-fg">
             {infoRows.title}
           </p>
@@ -1065,7 +1167,7 @@ export function SolarSystemScene({
         </div>
       ) : null}
 
-      <div className="pointer-events-none absolute bottom-4 left-4 z-10 flex max-w-[min(38rem,calc(100%-11rem))] flex-col gap-1">
+      <div className="pointer-events-none absolute bottom-4 left-4 z-10 hidden max-w-[min(38rem,calc(100%-11rem))] flex-col gap-1 lg:flex">
         <p className="font-mono text-[10px] tabular text-muted">{utcStamp(date)}</p>
         <p className="font-mono text-[10px] leading-relaxed text-subtle">{t('fields.solar_hint')}</p>
         <p className="font-mono text-[10px] leading-relaxed text-subtle">
@@ -1076,11 +1178,18 @@ export function SolarSystemScene({
         </p>
       </div>
 
-      <div className="absolute bottom-4 right-4 z-10 flex items-center gap-1">
-        <span className="rounded border border-border/80 bg-bg/80 px-1.5 py-0.5 font-mono text-[10px] tabular text-muted backdrop-blur-sm">
-          {view.zoom >= 10 ? Math.round(view.zoom) : view.zoom.toFixed(2)}x
-        </span>
-        <div className="flex items-center gap-0.5 rounded border border-border/80 bg-bg/85 p-0.5 shadow-sm backdrop-blur-sm">
+      <div
+        className={cn(
+          'absolute right-4 z-10 flex flex-col items-end gap-2',
+          compactChrome ? 'bottom-20' : 'bottom-4',
+        )}
+      >
+        {cameraScale ? (
+          <div className={CTRL_PANEL_CLASS}>
+            <GlobeScaleReadout zoom={cameraScale.zoom} scale={cameraScale.scale} />
+          </div>
+        ) : null}
+        <div className="flex items-center gap-0.5 rounded-md border border-border bg-surface/80 p-0.5">
           <button
             type="button"
             aria-label={t('common.zoom_in')}

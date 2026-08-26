@@ -14,18 +14,24 @@
  * A satellite that fails is SKIPPED, never drawn, and counted; the batch always
  * completes and the caller always gets an answer.
  *
- * ## Identity survives the skipping
+ * ## Identity is the slot
  *
- * Because failures are skipped, packed slot k is NOT satellite k. The keyframe
- * therefore carries `indices`, mapping each packed slot back to the satellite
- * that filled it, and loading reports the ACCEPTED catalogue numbers in order.
- * Without those two, a catalogue containing a single unparsable element set
- * would silently shift every name, every trail and every pick by one.
+ * Packed slot k is satrec k. A satellite that fails to propagate, or that the
+ * full-treatment path already draws, leaves that slot empty (NaN). Compacting
+ * the survivors would make every later Starlink inherit its neighbour's pixel
+ * the next time a different object failed, which is the flicker of dots
+ * appearing and vanishing at random.
  */
 
 import { eciSiToGeodetic, parseTle, propagateEci } from '@/lib/physics'
+import { lonLatToMercator } from '@/components/viz/globe/track'
 import type { SatRec } from 'satellite.js'
-import { packSwarmSample, SWARM_FLOATS_PER_SATELLITE, type SwarmTle } from '@/components/viz/globe/swarm'
+import {
+  packEmptySwarmSample,
+  packSwarmSample,
+  SWARM_FLOATS_PER_SATELLITE,
+  type SwarmTle,
+} from '@/components/viz/globe/swarm'
 import {
   packSwarmTrail,
   SWARM_TRAIL_FLOATS_PER_SATELLITE,
@@ -33,28 +39,21 @@ import {
   type SwarmTrailPoint,
 } from '@/components/viz/globe/swarm-trails'
 
-const DEG_TO_MERCATOR_X = 1 / 360
-const RAD = Math.PI / 180
-
 /**
- * Mercator coordinates of a lon/lat, matching MapLibre's own convention: x and
- * y both run 0..1 over the world, y measured from the north edge.
+ * Mercator of a lon/lat. Globe trails are allowed past web-mercator ±85° so
+ * polar orbits can reach the pole instead of sliding on that parallel.
  */
 export function toMercator(lonDeg: number, latDeg: number): { mercatorX: number; mercatorY: number } {
-  const clampedLat = Math.max(-85.051129, Math.min(85.051129, latDeg))
-  const sin = Math.sin(clampedLat * RAD)
-  return {
-    mercatorX: lonDeg * DEG_TO_MERCATOR_X + 0.5,
-    mercatorY: 0.5 - Math.log((1 + sin) / (1 - sin)) / (4 * Math.PI),
-  }
+  const { x, y } = lonLatToMercator(lonDeg, latDeg)
+  return { mercatorX: x, mercatorY: y }
 }
 
-/** Earth-fixed sample, for the live keyframe positions. */
-function sampleAt(satrec: SatRec, date: Date): SwarmTrailPoint | null {
+/** Sample at `propagateAt`, converted with Greenwich angle of `frameAt`. */
+function sampleAt(satrec: SatRec, propagateAt: Date, frameAt: Date = propagateAt): SwarmTrailPoint | null {
   try {
-    const state = propagateEci(satrec, date)
+    const state = propagateEci(satrec, propagateAt)
     if (!state) return null
-    const geo = eciSiToGeodetic(state.r, date)
+    const geo = eciSiToGeodetic(state.r, frameAt)
     if (!geo) return null
     return { ...toMercator(geo.lonDeg, geo.latDeg), elevationM: geo.heightM }
   } catch {
@@ -97,15 +96,34 @@ export function loadSwarmSatrecs(tles: readonly SwarmTle[]): SwarmLoadResult {
 
 export type KeyframeProduct = {
   count: number
-  /** Packed slot k holds the satellite at satrec index `indices[k]`. */
+  /** Packed slot k is satrec k. */
   indices: Uint32Array
   skipped: number
 }
 
+function holdOrEmpty(packed: Float32Array, index: number, previous?: Float32Array): void {
+  const at = index * SWARM_FLOATS_PER_SATELLITE
+  if (previous && Number.isFinite(previous[at])) {
+    packed[at] = previous[at] + previous[at + 3]
+    packed[at + 1] = previous[at + 1] + previous[at + 4]
+    packed[at + 2] = previous[at + 2] + previous[at + 5]
+    packed[at + 3] = 0
+    packed[at + 4] = 0
+    packed[at + 5] = 0
+    packed[at + 6] = previous[at + 6]
+    packed[at + 7] = previous[at + 7]
+    packed[at + 8] = previous[at + 8]
+    return
+  }
+  packEmptySwarmSample(packed, index)
+}
+
 /**
- * Fills `packed` with the start/delta pair for every satellite that propagates
- * at BOTH instants. One that does not is skipped rather than guessed at, and
- * the count says how many.
+ * Fills `packed` with one slot per satrec. Failures and `skipIndex` leave that
+ * slot empty (or held from `previous`) so later satellites keep their index.
+ *
+ * `inertial` converts both ends with the Greenwich angle of `freezeMs` (or
+ * the start epoch) so GPU interpolation stays on the frozen ellipse.
  */
 export function produceKeyframe(
   satrecs: readonly SatRec[],
@@ -114,20 +132,32 @@ export function produceKeyframe(
   spanMs: number,
   packed: Float32Array,
   indices: Uint32Array,
+  inertial = false,
+  freezeMs?: number,
+  skipIndex?: number,
+  previous?: Float32Array,
 ): KeyframeProduct {
   const start = new Date(epochMs)
   const end = new Date(epochMs + spanMs)
-  let count = 0
+  const frame = inertial ? new Date(freezeMs ?? epochMs) : null
+  let skipped = 0
   for (let i = 0; i < satrecs.length; i++) {
-    const a = sampleAt(satrecs[i], start)
-    if (!a) continue
-    const b = sampleAt(satrecs[i], end)
-    if (!b) continue
-    packSwarmSample(packed, count, a, b, colors[i] ?? [1, 1, 1])
-    indices[count] = i
-    count += 1
+    indices[i] = i
+    if (i === skipIndex) {
+      packEmptySwarmSample(packed, i)
+      skipped++
+      continue
+    }
+    const a = sampleAt(satrecs[i], start, frame ?? start)
+    const b = a ? sampleAt(satrecs[i], end, frame ?? end) : null
+    if (!a || !b) {
+      holdOrEmpty(packed, i, previous)
+      skipped++
+      continue
+    }
+    packSwarmSample(packed, i, a, b, colors[i] ?? [1, 1, 1])
   }
-  return { count, indices, skipped: satrecs.length - count }
+  return { count: satrecs.length, indices, skipped }
 }
 
 /**
@@ -141,6 +171,7 @@ function trailOf(
   satrec: SatRec,
   atMs: number,
   revolutions: number,
+  freezeMs: number | null,
 ): (SwarmTrailPoint | null)[] {
   const points: (SwarmTrailPoint | null)[] = []
   /* A satellite whose mean motion is not a usable number has no period to
@@ -148,9 +179,11 @@ function trailOf(
   const periodMs = ((2 * Math.PI) / satrec.no) * 60_000
   if (!Number.isFinite(periodMs) || periodMs <= 0) return points
   const spanMs = periodMs * revolutions * 2
+  const frameAt = freezeMs != null ? new Date(freezeMs) : null
   for (let i = 0; i < SWARM_TRAIL_POINTS; i++) {
     const offset = -spanMs / 2 + (spanMs * i) / (SWARM_TRAIL_POINTS - 1)
-    points.push(sampleAt(satrec, new Date(atMs + offset)))
+    const at = new Date(atMs + offset)
+    points.push(sampleAt(satrec, at, frameAt ?? at))
   }
   return points
 }
@@ -168,12 +201,21 @@ export function produceTrailBatch(
   atMs: number,
   revolutions: number,
   packed: Float32Array,
+  inertial = false,
+  freezeMs?: number,
+  skipIndex?: number,
 ): { skipped: number } {
   let skipped = 0
+  const freeze = inertial ? (freezeMs ?? atMs) : null
+  const empty: (SwarmTrailPoint | null)[] = []
   for (let i = 0; i < count; i++) {
-    const points = trailOf(satrecs[startIndex + i], atMs, revolutions)
+    const satrecIndex = startIndex + i
+    const points =
+      satrecIndex === skipIndex
+        ? empty
+        : trailOf(satrecs[satrecIndex], atMs, revolutions, freeze)
     if (points.length === 0 || points.every((point) => point === null)) skipped++
-    packSwarmTrail(packed, i, points, colors[startIndex + i] ?? [1, 1, 1])
+    packSwarmTrail(packed, i, points, colors[satrecIndex] ?? [1, 1, 1])
   }
   return { skipped }
 }

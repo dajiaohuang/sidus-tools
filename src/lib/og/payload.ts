@@ -77,7 +77,7 @@ export function resolveOgPayloadStatic(
       kind: 'resources',
       title: 'Resources',
       subtitle: 'Textbooks, TLE catalogs, open data',
-      formula: 'Vallado · Curtis · NASA GRC · CelesTrak',
+      formula: 'Vallado · Curtis · NASA GRC · CelesTrak™',
       brand: 'SIDUS',
       urlHint: 'sidus.tools/resources',
     }

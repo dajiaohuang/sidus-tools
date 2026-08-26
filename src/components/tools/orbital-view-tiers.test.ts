@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { globeDrawPath, swarmScaleTier } from './orbital-view/tiers'
+import { canDrawPopulationTrails, globeDrawPath, swarmScaleTier } from './orbital-view/tiers'
 
 describe('swarmScaleTier', () => {
   it('names and trails everything while the crowd is small', () => {
@@ -40,5 +40,18 @@ describe('globeDrawPath', () => {
 
   it('flips owner exactly where the named tier ends', () => {
     expect(globeDrawPath(30)).not.toBe(globeDrawPath(31))
+  })
+})
+
+describe('canDrawPopulationTrails', () => {
+  it('always allows the trails-tier counts', () => {
+    expect(canDrawPopulationTrails(200, true)).toBe(true)
+    expect(canDrawPopulationTrails(200, false)).toBe(true)
+  })
+
+  it('refuses the dots-tier crowd on compact chrome only', () => {
+    expect(canDrawPopulationTrails(201, true)).toBe(false)
+    expect(canDrawPopulationTrails(10_736, true)).toBe(false)
+    expect(canDrawPopulationTrails(10_736, false)).toBe(true)
   })
 })

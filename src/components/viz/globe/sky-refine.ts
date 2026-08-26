@@ -67,8 +67,8 @@ export function refineSkyPath(
  * in turn, so the cost of refining is bounded by the budget and not by the size
  * of the population: 200 trails converge progressively instead of all at once.
  */
-export const TRAIL_MAX_CHORD_PX = 12
-export const TRAIL_REFINE_BUDGET = 24
+export const TRAIL_MAX_CHORD_PX = 4
+export const TRAIL_REFINE_BUDGET = 48
 /** Ceiling on one refined half, so a pathological orbit cannot grow without end. */
 export const TRAIL_MAX_REFINED_SAMPLES = 900
 
@@ -111,6 +111,8 @@ export function refineTrailHalf(
   let used = 0
   for (const { index } of taking) {
     const midMs = (points[index - 1].date.getTime() + points[index].date.getTime()) / 2
+    /* Must return a point in the SAME frame as `points`. Mixing Earth-fixed
+       midpoints into an inertial trail is the zigzag along the ISS. */
     const mid = positionAt(new Date(midMs))
     if (!mid) continue
     points.splice(index, 0, mid)

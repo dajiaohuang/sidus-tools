@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { SATELLITE_PALETTE, satelliteColorAt, trailIsDashed, trailWeightFor } from './style'
+import {
+  SATELLITE_PALETTE,
+  satelliteColorAt,
+  paintedTrailWeight,
+  trailIsDashed,
+  trailWeightFor,
+} from './style'
 
 /** Channel-wise distance: what decides whether two thin lines read alike. */
 const channels = (hex: string) => [
@@ -89,5 +95,17 @@ describe('trailWeightFor', () => {
   it('never fades a trail to nothing', () => {
     expect(trailWeightFor(10_000).alpha).toBeGreaterThan(0.2)
     expect(trailWeightFor(10_000).widthPx).toBeGreaterThan(0.4)
+  })
+})
+
+describe('paintedTrailWeight', () => {
+  it('scales the tier baseline by the TRAJECTORIES multipliers', () => {
+    expect(paintedTrailWeight(1, 2, 0.5)).toEqual({ widthPx: 2.8, alpha: 0.5 })
+    expect(paintedTrailWeight(31, 2, 2)).toEqual({ widthPx: 1.2, alpha: 0.8 })
+  })
+
+  it('clamps alpha to 0..1 so a 4× opaque trail does not wrap', () => {
+    expect(paintedTrailWeight(1, 4, 4).alpha).toBe(1)
+    expect(paintedTrailWeight(1, 1, 0).alpha).toBe(0)
   })
 })

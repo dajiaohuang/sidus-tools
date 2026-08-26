@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next'
 import { cn } from '@/lib/utils'
+import { KeyTip } from '@/components/viz/globe/controls-ui'
 import { SKY_BODY_IDS, type SkyBodyId } from '@/components/viz/globe/celestial'
 
 /**
@@ -18,42 +19,61 @@ export function SkyPanel({
   onEnabledChange,
   onAim,
   highlighted,
+  framed = true,
 }: {
   enabled: SkyBodyId[]
   onEnabledChange: (next: SkyBodyId[]) => void
   onAim: (id: SkyBodyId) => void
   highlighted?: string | null
+  /** False inside a chrome sheet: the sheet already titles the panel. */
+  framed?: boolean
 }) {
   const { t } = useTranslation()
+  const bulk =
+    enabled.length === 0 ? (
+      <button
+        type="button"
+        onClick={() => onEnabledChange([...SKY_BODY_IDS])}
+        className="font-mono text-[10px] uppercase tracking-wider text-muted transition-colors hover:text-fg"
+      >
+        {t('fields.globe_sky_show_all')}
+      </button>
+    ) : (
+      <button
+        type="button"
+        onClick={() => onEnabledChange([])}
+        className="font-mono text-[10px] uppercase tracking-wider text-muted transition-colors hover:text-warn"
+      >
+        {t('fields.sat_remove_all')}
+      </button>
+    )
   return (
-    <div className="flex flex-col gap-1 border border-border bg-bg/80 px-2 py-1.5 backdrop-blur-sm">
+    <div
+      className={cn(
+        'flex flex-col gap-1 overflow-x-hidden',
+        framed && 'border border-border bg-bg/80 px-2 py-1.5 backdrop-blur-sm',
+      )}
+    >
       {/* Same header shape as the satellite list: the title, then the two bulk
           actions. Nine checkboxes is exactly the count where clicking them one
           at a time starts to feel like work. */}
-      <div className="flex items-baseline justify-between gap-3">
-        <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted">
-          {t('fields.globe_sky_bodies')}
-        </p>
+      <div className={cn('flex items-baseline gap-3', framed ? 'justify-between' : 'justify-end')}>
+        {framed ? (
+          <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted">
+            {t('fields.globe_sky_bodies')}
+          </p>
+        ) : null}
         {/* ONE action, never two: with nothing ticked the only useful move is to
             show them, and with anything ticked it is to clear them. A pair of
             buttons where one is always dead is a pair that has to be read
-            before it can be used. */}
-        {enabled.length === 0 ? (
-          <button
-            type="button"
-            onClick={() => onEnabledChange([...SKY_BODY_IDS])}
-            className="font-mono text-[10px] uppercase tracking-wider text-muted transition-colors hover:text-fg"
-          >
-            {t('fields.globe_sky_show_all')}
-          </button>
+            before it can be used. The key tip stays off the sheet: its
+            nowrap card made the list scroll sideways on a phone. */}
+        {framed ? (
+          <KeyTip label={t('fields.kbd_planets')} keys={['P']}>
+            {bulk}
+          </KeyTip>
         ) : (
-          <button
-            type="button"
-            onClick={() => onEnabledChange([])}
-            className="font-mono text-[10px] uppercase tracking-wider text-muted transition-colors hover:text-warn"
-          >
-            {t('fields.sat_remove_all')}
-          </button>
+          bulk
         )}
       </div>
       {SKY_BODY_IDS.map((id) => (
@@ -61,7 +81,7 @@ export function SkyPanel({
           key={id}
           data-identified={id === highlighted ? '' : undefined}
           className={cn(
-            'flex items-center gap-1.5 px-1 font-mono text-[10px] transition-colors',
+            'flex items-center gap-1.5 px-1 py-0.5 font-mono text-[10px] transition-colors',
             id === highlighted && 'bg-warn/15',
           )}
         >

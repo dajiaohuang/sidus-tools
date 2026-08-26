@@ -117,4 +117,12 @@ describe('the drawn prefix', () => {
     layer.setBatch(batchFor(360), 0, 360)
     expect(layer.filled()).toBe(360)
   })
+
+  it('keeps an out-of-prefix refresh as uploaded so hover can light it', () => {
+    const { layer } = layerOf(10_000)
+    layer.setBatch(batchFor(1), 4321, 1)
+    expect(layer.filled()).toBe(0)
+    expect(layer.hasUploaded(4321)).toBe(true)
+    expect(layer.hasUploaded(0)).toBe(false)
+  })
 })

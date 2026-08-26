@@ -8,6 +8,7 @@ import { McpConnectCard } from '@/components/site/McpConnectCard'
 import { AsciiOrbitField } from '@/components/site/AsciiOrbitField'
 import { ToolExampleCarousel } from '@/components/site/ToolExampleCarousel'
 import { RevealOnScroll } from '@/components/site/home/RevealOnScroll'
+import { OrbitalDemoSection } from '@/components/site/home/OrbitalDemoSection'
 import {
   AgentsSvg,
   OrbitSvg,
@@ -88,7 +89,7 @@ export function HomePage() {
     <div className="sidus-enter">
       <SeoHead
         title="SIDUS: Space Engineering Tools"
-        description="Open-source pure-SI calculators for orbital mechanics, propulsion, SGP4, launch, RF link budgets, and crew ECLSS. No affiliation with NASA, ESA, or SpaceX."
+        description="Open-source SI-first calculators for orbital mechanics, propulsion, SGP4, launch, RF link budgets, and crew ECLSS. No affiliation with NASA, ESA, SpaceX, or CelesTrak™."
         path="/"
       />
 
@@ -159,6 +160,8 @@ export function HomePage() {
           </div>
         </div>
       </section>
+
+      <OrbitalDemoSection />
 
       {/* Mobile: live examples between hero and Capabilities */}
       <section className="border-b border-border page-shell py-8 lg:hidden">

@@ -78,7 +78,7 @@ export function useSatelliteSelection(options: {
   ])
   /** Groups whose whole membership is currently in the list. */
   const [activeGroups, setActiveGroups] = useState<CelestrakGroupId[]>([])
-  /** The group being downloaded, and how far in, so its chip can say so. */
+  /** The group being downloaded, and how far in, so the panel hairline can say so. */
   const [loadingGroup, setLoadingGroup] = useState<CelestrakGroupId | null>(null)
   const [groupProgress, setGroupProgress] = useState<number | null>(null)
   /** Filters the SELECTED list; nothing to do with the catalogue search. */
@@ -175,10 +175,7 @@ export function useSatelliteSelection(options: {
       setTleFetchError('')
       setTleNotice('')
       try {
-        const outcome = await fetchCelestrakGroup(group, {
-          onProgress: (received, total) =>
-            setGroupProgress(total === null ? null : received / total),
-        })
+        const outcome = await fetchCelestrakGroup(group)
         /* A group failure is its own thing. Telling someone who pressed
            STARLINK to paste a TLE by hand answers a question nobody asked. */
         if (!outcome.ok) {
@@ -196,7 +193,9 @@ export function useSatelliteSelection(options: {
           setTleFetchError(t('fields.sat_search_none'))
           return
         }
-        if (outcome.stale) setTleNotice(t('fields.sat_group_stale'))
+        if (outcome.from === 'snapshot') setTleNotice(t('fields.sat_group_snapshot'))
+        else if (outcome.stale) setTleNotice(t('fields.sat_group_stale'))
+        else if (outcome.from === 'cache') setTleNotice(t('fields.sat_group_cached'))
         setSelected((prev) => {
           const have = new Set(prev.map((entry) => entry.catnr))
           const added = outcome.records
@@ -235,8 +234,28 @@ export function useSatelliteSelection(options: {
     setTleFetchError('')
     try {
       const current = selectedRef.current
+      const groupIds = [
+        ...new Set(
+          current
+            .map((entry) => entry.group)
+            .filter((id): id is CelestrakGroupId => id != null && id in CELESTRAK_GROUPS),
+        ),
+      ]
+      const groupRecords = new Map<CelestrakGroupId, Map<string, TleRecord>>()
+      for (const group of groupIds) {
+        const outcome = await fetchCelestrakGroup(group)
+        if (!outcome.ok) continue
+        groupRecords.set(
+          group,
+          new Map(outcome.records.map((record) => [record.catnr, record])),
+        )
+      }
       const refreshed = await Promise.all(
         current.map(async (entry) => {
+          if (entry.group) {
+            const record = groupRecords.get(entry.group)?.get(entry.catnr)
+            return record ? { ...entry, name: record.name, tle: tleText(record) } : entry
+          }
           try {
             const [found] = await searchCelestrak(entry.catnr)
             return found ? { ...entry, name: found.name, tle: tleText(found) } : entry

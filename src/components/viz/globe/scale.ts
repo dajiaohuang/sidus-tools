@@ -55,6 +55,46 @@ export function viewScale(
 }
 
 /**
+ * Mean radius MapLibre's mercator is built on (`GLOBE_RADIUS_M`). Kept here
+ * so the solar scene can name the same zoom number without importing the
+ * globe's track math.
+ */
+const MEAN_RADIUS_M = 6_371_008.8
+
+export function equatorMeterInMercatorUnits(): number {
+  return 1 / (2 * Math.PI * MEAN_RADIUS_M)
+}
+
+/** Scale of an orthographic view given its px-per-metre camera. */
+export function viewScaleFromPxPerMeter(
+  pxPerMeter: number,
+  canvasCssWidth: number,
+): ViewScale {
+  const metresPerPixel = pxPerMeter > 0 ? 1 / pxPerMeter : Number.NaN
+  const width = metresPerPixel * canvasCssWidth
+  return { metresPerPixel, viewWidthM: width, viewWidthAu: width / AU_M }
+}
+
+/**
+ * MapLibre zoom at the equator that would show this many metres per pixel.
+ * Both scenes print that number, so a handoff does not change what Zoom means.
+ */
+export function mercatorZoomFromMetresPerPixel(metresPerPixel: number): number {
+  if (!(metresPerPixel > 0)) return Number.NaN
+  const worldPx = 1 / (equatorMeterInMercatorUnits() * metresPerPixel)
+  return Math.log2(worldPx / TILE_SIZE_PX)
+}
+
+/** Widest globe zoom: the globe hands the solar scene over here. */
+export const GLOBE_FLOOR_ZOOM = -4
+
+/** px per metre at the equator for a MapLibre zoom, inverse of metresPerPixel. */
+export function pxPerMeterAtEquatorZoom(zoom: number): number {
+  const metres = metresPerPixel(zoom, equatorMeterInMercatorUnits())
+  return metres > 0 ? 1 / metres : Number.NaN
+}
+
+/**
  * A length in kilometres, at a precision that matches how well it is known.
  *
  * Three significant figures throughout: the centre-latitude scale is already an

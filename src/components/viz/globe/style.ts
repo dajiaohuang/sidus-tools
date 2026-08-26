@@ -430,6 +430,26 @@ export function trailWeightFor(satelliteCount: number): { widthPx: number; alpha
 }
 
 /**
+ * Tier baseline after the TRAJECTORIES sliders.
+ *
+ * Width is a real pixel width for the GeoJSON track; alpha is clamped
+ * because a multiplier of 4 on an already-opaque trail cannot go past 1.
+ * Dash/solid still follows the unscaled baseline: thickening a dense-tier
+ * hairline must not suddenly invent a dash pattern.
+ */
+export function paintedTrailWeight(
+  satelliteCount: number,
+  widthMultiplier = 1,
+  opacityMultiplier = 1,
+): { widthPx: number; alpha: number } {
+  const base = trailWeightFor(satelliteCount)
+  return {
+    widthPx: Math.max(0, base.widthPx * widthMultiplier),
+    alpha: Math.min(1, Math.max(0, base.alpha * opacityMultiplier)),
+  }
+}
+
+/**
  * Whether a trail of this weight is drawn dashed. The dash marks the part of
  * the orbit not yet flown, which is worth saying while a trail is a subject
  * and not worth the noise once it is one line in a crowd.
@@ -480,8 +500,8 @@ export function trailFadeGradients(
  * elevated layer's metre-based dashes were: nothing here needs converting to
  * the ground-resolution mechanism.
  */
-function futureDash(weight: { widthPx: number }): { 'line-dasharray'?: [number, number] } {
-  return trailIsDashed(weight) ? { 'line-dasharray': [2, 2] } : {}
+function futureDash(dashed: boolean): { 'line-dasharray'?: [number, number] } {
+  return dashed ? { 'line-dasharray': [2, 2] } : {}
 }
 
 /** Trail layers for one satellite: solid past and dashed future, each split into body and fade. */
@@ -490,6 +510,7 @@ export function trailLayerSpecs(
   color: string,
   fadeFraction: number,
   weight = trailWeightFor(1),
+  dashed = trailIsDashed(weight),
 ): LayerSpecification[] {
   const sources = trailSourceIds(satelliteId)
   const [solidFade, solidBody, dashedBody, dashedFade] = trailLayerIds(satelliteId)
@@ -524,7 +545,7 @@ export function trailLayerSpecs(
       type: 'line',
       source: sources.body,
       filter: ['==', ['get', 'future'], true],
-      paint: { 'line-color': bodyColor, 'line-width': weight.widthPx, ...futureDash(weight) },
+      paint: { 'line-color': bodyColor, 'line-width': weight.widthPx, ...futureDash(dashed) },
     },
     {
       /* Furthest tip of the future trail: fades out to transparent. */
@@ -534,7 +555,7 @@ export function trailLayerSpecs(
       filter: ['==', ['get', 'future'], true],
       paint: {
         'line-width': weight.widthPx,
-        ...futureDash(weight),
+        ...futureDash(dashed),
         'line-gradient': gradients.dashed,
       },
     },

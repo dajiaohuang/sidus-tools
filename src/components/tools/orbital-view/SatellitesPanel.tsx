@@ -1,11 +1,16 @@
+import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   CELESTRAK_CATALOG_URL,
   CELESTRAK_GROUPS,
+  groupCacheIsFresh,
+  queryCacheIsFresh,
   type CelestrakGroupId,
   type TleRecord,
 } from '@/lib/celestrak'
 import { satelliteColorAt } from '@/components/viz/globe/style'
+import { HairlineProgress } from '@/components/shared/HairlineProgress'
+import { KeyTip } from '@/components/viz/globe/controls-ui'
 import { cn } from '@/lib/utils'
 import { TIER_FILTER_MIN, TIER_NAMED_MAX, TIER_TRAILS_MAX, type SwarmScaleTier } from './tiers'
 import type { SelectedSatellite } from './types'
@@ -16,6 +21,7 @@ import type { SelectedSatellite } from './types'
  * and everything here is either display or a callback back into it.
  */
 export function SatellitesPanel({
+  searchInputRef,
   query,
   onQueryChange,
   onSearch,
@@ -44,7 +50,12 @@ export function SatellitesPanel({
   groupProgress,
   toggleGroup,
   swarmStatus,
+  fetchError,
+  fetchNotice,
+  framed = true,
 }: {
+  /** The catalogue search input, focused and selected by the F shortcut. */
+  searchInputRef: React.RefObject<HTMLInputElement | null>
   query: string
   onQueryChange: (next: string) => void
   onSearch: () => void
@@ -75,59 +86,124 @@ export function SatellitesPanel({
   groupProgress: number | null
   toggleGroup: (group: CelestrakGroupId) => void
   swarmStatus: { loading: boolean; count: number; rejected: number; skipped: number }
+  fetchError?: string
+  fetchNotice?: string
+  /** False inside a chrome sheet: the sheet already titles the panel. */
+  framed?: boolean
 }) {
   const { t } = useTranslation()
+  const searchBoxRef = useRef<HTMLDivElement | null>(null)
+  const [resultsOpen, setResultsOpen] = useState(false)
+  useEffect(() => {
+    if (results && results.length > 0) setResultsOpen(true)
+  }, [results])
+  useEffect(() => {
+    if (!resultsOpen) return
+    const onPointerDown = (event: PointerEvent) => {
+      if (searchBoxRef.current?.contains(event.target as Node)) return
+      setResultsOpen(false)
+    }
+    window.addEventListener('pointerdown', onPointerDown)
+    return () => window.removeEventListener('pointerdown', onPointerDown)
+  }, [resultsOpen])
+  const cacheFresh =
+    selected.length > 0 &&
+    selected.every((entry) =>
+      entry.group ? groupCacheIsFresh(entry.group) : queryCacheIsFresh(entry.catnr),
+    )
   return (
-      <div className="flex min-h-0 w-64 flex-col gap-1.5 border border-border bg-bg/85 px-2 py-2 backdrop-blur-sm">
-        <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted">
-          {t('fields.sat_panel')}
-        </p>
-
-        <form
-          className="flex items-center gap-1"
-          onSubmit={(e) => {
-            e.preventDefault()
-            onSearch()
-          }}
-        >
-          <input
-            type="search"
-            value={query}
-            onChange={(e) => onQueryChange(e.target.value)}
-            placeholder={t('fields.sat_search_placeholder')}
-            aria-label={t('fields.sat_search_placeholder')}
-            className="h-7 min-w-0 flex-1 border border-border bg-surface/70 px-1.5 font-mono text-[10px] text-fg placeholder:text-muted focus:border-border-strong focus:outline-none"
-          />
-          <button
-            type="submit"
-            disabled={fetchingTle || query.trim() === ''}
-            className="inline-flex h-7 shrink-0 items-center border border-border-strong bg-surface/80 px-2 font-mono text-[10px] uppercase tracking-wider text-muted transition-colors hover:text-fg disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {fetchingTle ? t('fields.fetching') : t('fields.sat_search')}
-          </button>
-        </form>
-
-        {results && results.length > 0 ? (
-          <div className="max-h-40 overflow-y-auto border border-border/70">
-            {results.map((record) => {
-              const already = selected.some((entry) => entry.catnr === record.catnr)
-              return (
-                <button
-                  key={record.catnr}
-                  type="button"
-                  disabled={already}
-                  onClick={() => addSatellite(record)}
-                  className="flex w-full items-center justify-between gap-2 px-1.5 py-1 text-left font-mono text-[10px] text-subtle transition-colors hover:bg-surface/70 hover:text-fg disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  <span className="truncate">{record.name}</span>
-                  <span className="shrink-0 tabular text-muted">
-                    {already ? '·' : `+ ${record.catnr}`}
-                  </span>
-                </button>
-              )
-            })}
-          </div>
+      <div
+        className={cn(
+          'flex min-h-0 flex-col',
+          framed
+            ? 'w-64 gap-1.5 overflow-x-hidden border border-border bg-bg/85 px-2 py-2 backdrop-blur-sm'
+            : 'h-full min-h-0 w-full gap-3 overflow-x-hidden',
+        )}
+      >
+        {framed ? (
+          <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted">
+            {t('fields.sat_panel')}
+          </p>
         ) : null}
+
+        <div ref={searchBoxRef} className="relative">
+          <form
+            className={cn('flex items-center gap-1', !framed && 'gap-2')}
+            onSubmit={(e) => {
+              e.preventDefault()
+              onSearch()
+            }}
+          >
+            <input
+              ref={searchInputRef}
+              type="search"
+              value={query}
+              onChange={(e) => onQueryChange(e.target.value)}
+              onFocus={() => {
+                if (results && results.length > 0) setResultsOpen(true)
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Escape') {
+                  setResultsOpen(false)
+                  e.currentTarget.blur()
+                }
+              }}
+              placeholder={t('fields.sat_search_placeholder')}
+              aria-label={t('fields.sat_search_placeholder')}
+              aria-expanded={resultsOpen}
+              aria-controls="sat-search-results"
+              className={cn(
+                'h-7 min-w-0 flex-1 border border-border bg-surface/70 px-1.5 font-mono text-[10px] text-fg placeholder:text-muted focus:border-border-strong focus:outline-none',
+                !framed && 'h-10 px-2 text-[12px]',
+              )}
+            />
+            {/* The KeyTip lands on the submit button rather than the input: the
+                input needs its own flex-1 growth to fill the row, and KeyTip's
+                wrapper would shrink-wrap it down to nothing. */}
+            <KeyTip label={t('fields.kbd_search')} keys={['F']}>
+              <button
+                type="submit"
+                disabled={fetchingTle || query.trim() === ''}
+                className={cn(
+                  'inline-flex h-7 shrink-0 items-center border border-border-strong bg-surface/80 px-2 font-mono text-[10px] uppercase tracking-wider text-muted transition-colors hover:text-fg disabled:cursor-not-allowed disabled:opacity-50',
+                  !framed && 'h-10 px-3',
+                )}
+              >
+                {fetchingTle ? t('fields.fetching') : t('fields.sat_search')}
+              </button>
+            </KeyTip>
+          </form>
+          {resultsOpen && results && results.length > 0 ? (
+            <div
+              id="sat-search-results"
+              role="listbox"
+              className="absolute inset-x-0 top-full z-30 mt-0.5 max-h-40 overflow-y-auto border border-border-strong bg-bg-elevated shadow-lg"
+            >
+              {results.map((record) => {
+                const already = selected.some((entry) => entry.catnr === record.catnr)
+                return (
+                  <button
+                    key={record.catnr}
+                    type="button"
+                    role="option"
+                    aria-selected={already}
+                    disabled={already}
+                    onClick={() => {
+                      addSatellite(record)
+                      setResultsOpen(false)
+                    }}
+                    className="flex w-full items-center justify-between gap-2 px-1.5 py-1.5 text-left font-mono text-[10px] text-subtle transition-colors hover:bg-surface/70 hover:text-fg disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    <span className="truncate">{record.name}</span>
+                    <span className="shrink-0 tabular text-muted">
+                      {already ? '·' : `+ ${record.catnr}`}
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+          ) : null}
+        </div>
 
         <div className="flex items-center justify-between gap-2">
           <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted">
@@ -137,7 +213,8 @@ export function SatellitesPanel({
             <button
               type="button"
               onClick={() => void refreshSelected()}
-              disabled={fetchingTle || selected.length === 0}
+              disabled={fetchingTle || selected.length === 0 || cacheFresh}
+              title={cacheFresh ? t('fields.sat_refresh_fresh') : t('fields.sat_refresh')}
               className="font-mono text-[10px] uppercase tracking-wider text-muted transition-colors hover:text-fg disabled:cursor-not-allowed disabled:opacity-40"
             >
               {t('fields.sat_refresh')}
@@ -166,7 +243,10 @@ export function SatellitesPanel({
             }}
             placeholder={t('fields.sat_filter_placeholder')}
             aria-label={t('fields.sat_filter_placeholder')}
-            className="h-6 w-full border border-border bg-surface/60 px-1.5 font-mono text-[10px] text-fg placeholder:text-muted focus:border-border-strong focus:outline-none"
+            className={cn(
+              'h-6 w-full border border-border bg-surface/60 px-1.5 font-mono text-[10px] text-fg placeholder:text-muted focus:border-border-strong focus:outline-none',
+              !framed && 'h-10 px-2 text-[12px]',
+            )}
           />
         ) : null}
 
@@ -178,7 +258,7 @@ export function SatellitesPanel({
              fleet scrolls in here while everything around it stays fixed. The
              old 40vh cap made the list scroll even when the screen had room
              to spare. */
-          className="min-h-0 overflow-y-auto"
+          className={cn('min-h-0 overflow-y-auto', !framed && 'flex-1')}
         >
           {listWindow.padTop > 0 ? <div style={{ height: listWindow.padTop }} /> : null}
           {listWindow.rows.map((entry) => {
@@ -234,8 +314,8 @@ export function SatellitesPanel({
           ) : null}
         </div>
 
-        {/* What the crowd costs, said plainly rather than left to be noticed. */}
-        {tier !== 'named' ? (
+        {/* Desktop overlay only: the sheet has no room for this copy. */}
+        {framed && tier !== 'named' ? (
           <div className="flex flex-col gap-1">
             <p className="font-mono text-[10px] leading-relaxed text-muted">
               {tier === 'trails'
@@ -251,38 +331,58 @@ export function SatellitesPanel({
         ) : null}
 
         {/* Group presets: the mass path, a whole catalogue group at once. */}
-        <div className="flex flex-col gap-1 border-t border-border/60 pt-1.5">
+        <div
+          className={cn(
+            'flex flex-col gap-1 border-t border-border/60 pt-1.5',
+            !framed && 'gap-2 pt-3',
+          )}
+        >
           <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted">
             {t('fields.sat_groups')}
           </p>
-          <div className="flex flex-wrap gap-1">
+          <div className={cn('flex flex-wrap gap-1', !framed && 'gap-2')}>
             {(Object.keys(CELESTRAK_GROUPS) as CelestrakGroupId[]).map((id) => (
               <button
                 key={id}
                 type="button"
                 aria-pressed={activeGroups.includes(id)}
                 aria-busy={loadingGroup === id}
-                disabled={fetchingTle}
+                disabled={loadingGroup !== null}
                 onClick={() => toggleGroup(id)}
                 className={cn(
                   'border border-border px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wider text-muted transition-colors hover:text-fg',
+                  !framed && 'min-h-10 px-2.5 py-2',
                   activeGroups.includes(id) && 'border-warn text-warn',
                   /* The chip being downloaded stays lit while the rest dim. */
                   loadingGroup === id ? 'border-fg text-fg' : 'disabled:opacity-50',
                 )}
               >
                 {t(`fields.sat_group_${id}`)}
-                {loadingGroup === id
-                  ? ` ${groupProgress === null ? '…' : `${Math.round(groupProgress * 100)}%`}`
-                  : ''}
               </button>
             ))}
           </div>
-          {tier === 'dots' ? (
+          {fetchError ? (
+            <p className="font-mono text-[10px] leading-relaxed text-warn">{fetchError}</p>
+          ) : null}
+          {fetchNotice ? (
+            <p className="font-mono text-[10px] leading-relaxed text-muted">{fetchNotice}</p>
+          ) : null}
+          {loadingGroup !== null ? (
+            <HairlineProgress
+              value={groupProgress}
+              label={
+                groupProgress === null
+                  ? t('fields.fetching')
+                  : t('fields.sat_group_progress', {
+                      percent: Math.round(groupProgress * 100),
+                    })
+              }
+            />
+          ) : swarmStatus.loading ? (
+            <HairlineProgress value={null} label={t('fields.fetching')} />
+          ) : tier === 'dots' ? (
             <p className="font-mono text-[10px] text-subtle">
-              {swarmStatus.loading
-                ? t('fields.fetching')
-                : t('fields.sat_group_count', { count: swarmStatus.count })}
+              {t('fields.sat_group_count', { count: swarmStatus.count })}
             </p>
           ) : null}
           {/* A real catalogue carries objects that will not parse or propagate.

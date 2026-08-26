@@ -141,7 +141,7 @@ After deploy, verify:
 
 - **MIT**: see [LICENSE.md](./LICENSE.md)
 - Footer disclaimer: no affiliation with NASA, ESA, SpaceX, Roscosmos, CNSA,
-  JAXA, ISRO, ASI, DLR, CNES, KARI, AEB, or any agency/company
+  JAXA, ISRO, ASI, DLR, CNES, KARI, AEB, CelesTrak™, or any agency/company
 - Voice: open-source educational tools, pure SI, non-profit. Avoid “industrial product” branding.
 
 ### Prose (no AI filler)

@@ -7,11 +7,13 @@ import {
   poleDirectionEcliptic,
   primeMeridianDirectionEcliptic,
   projectPoint,
+  reachableReturnScale,
   sampleOrbitEllipse,
   sunDirectionInView,
   zoomAtPointer,
   type SolarCamera,
 } from './scene-math'
+import { GLOBE_FLOOR_ZOOM, pxPerMeterAtEquatorZoom } from '../globe/scale'
 import {
   AU,
   bodyOrientation,
@@ -268,5 +270,25 @@ describe('body orientation vectors', () => {
     const later = primeMeridianDirectionEcliptic(bodyOrientation('earth', day))
     // One sidereal day of rotation brings the meridian back on itself.
     expect(vdot(start, later)).toBeCloseTo(1, 5)
+  })
+})
+
+describe('reachableReturnScale', () => {
+  it('returns the recorded scale when it lies within the clamped zoom range', () => {
+    expect(reachableReturnScale(100, 1, 5000)).toBe(100)
+  })
+
+  it('returns the reachable ceiling when the recorded scale lies beyond it', () => {
+    expect(reachableReturnScale(10_000, 1, 5000)).toBe(5000)
+  })
+
+  it('passes an exact match through unchanged', () => {
+    expect(reachableReturnScale(5000, 1, 5000)).toBe(5000)
+  })
+
+  it('a solar view opened from a link can still reach the globe floor before ZOOM_MAX', () => {
+    const base = (800 * 0.46) / (1.7 * AU)
+    const wanted = pxPerMeterAtEquatorZoom(GLOBE_FLOOR_ZOOM) * 1.1
+    expect(reachableReturnScale(wanted, base, 5000)).toBe(wanted)
   })
 })

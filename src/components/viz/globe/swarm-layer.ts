@@ -30,6 +30,7 @@
 import { MercatorCoordinate, type CustomLayerInterface, type CustomRenderMethodInput } from 'maplibre-gl'
 import { SWARM_FLOATS_PER_SATELLITE } from './swarm'
 import { SPHERE_OCCLUSION_GLSL } from './occlusion'
+import { drawRangesSkipping } from './swarm-ownership'
 
 export const SWARM_LAYER_ID = 'sidus-orbit-swarm'
 
@@ -78,6 +79,7 @@ type ShaderEntry = {
   uPointSize: WebGLUniformLocation | null
   uElevationScale: WebGLUniformLocation | null
   uHighlight: WebGLUniformLocation | null
+  uHidden: WebGLUniformLocation | null
 }
 
 export type SwarmLayer = CustomLayerInterface & {
@@ -90,11 +92,16 @@ export type SwarmLayer = CustomLayerInterface & {
   /** Base alpha for every marker; each one's RGB rides in the buffer. */
   setAlpha(alpha: number): void
   /**
-   * The PACKED SLOT of the marker drawn saturated and enlarged, or null. A
-   * slot rather than a satellite index, because skipped satellites compact the
-   * buffer and the shader only knows where a vertex sits in it.
+   * The PACKED SLOT of the marker drawn saturated and enlarged, or null.
+   * Slot k is satrec k; empty slots stay empty rather than compacting.
    */
   setHighlightSlot(slot: number | null): void
+  /**
+   * Packed slot that the full-treatment path already draws, or null. Hidden
+   * rather than highlighted: two markers of the same satellite is the offset
+   * speck next to its own trail.
+   */
+  setHiddenSlot(slot: number | null): void
   /** How many satellites the last keyframe carried. */
   count(): number
   isAttached(): boolean
@@ -120,6 +127,7 @@ export function createSwarmLayer(options: {
   let elevationEnabled = true
   let alpha = 0.9
   let highlightSlot = -1
+  let hiddenSlot = -1
 
   function getShader(
     context: GlContext,
@@ -145,10 +153,20 @@ export function createSwarmLayer(options: {
     uniform float u_elevation_scale;
     /* Index of the satellite drawn saturated and enlarged, or -1. */
     uniform float u_highlight;
+    uniform float u_hidden;
     out vec3 v_rgb;
     out float v_highlight;
+    out float v_hidden_flag;
 
     void main() {
+        if (isnan(a_start.x)) {
+            gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
+            gl_PointSize = 0.0;
+            v_highlight = 0.0;
+            v_hidden_flag = 1.0;
+            v_rgb = vec3(0.0);
+            return;
+        }
         vec3 here = a_start + u_progress * a_delta;
         vec2 pos = vec2(fract(here.x + 1.0), here.y);
         gl_Position = projectTileFor3D(pos, here.z * u_elevation_scale);
@@ -160,6 +178,7 @@ export function createSwarmLayer(options: {
             : ''
         }
         v_highlight = abs(float(gl_VertexID) - u_highlight) < 0.5 ? 1.0 : 0.0;
+        v_hidden_flag = abs(float(gl_VertexID) - u_hidden) < 0.5 ? 1.0 : 0.0;
         gl_PointSize = u_point_size * (1.0 + v_highlight * 0.8);
         v_rgb = a_rgb;
     }`
@@ -168,9 +187,11 @@ export function createSwarmLayer(options: {
     precision mediump float;
     in vec3 v_rgb;
     in float v_highlight;
+    in float v_hidden_flag;
     uniform float u_alpha;
     out highp vec4 fragColor;
     void main() {
+        if (v_hidden_flag > 0.5) discard;
         if (length(gl_PointCoord - vec2(0.5)) > 0.5) discard;
         fragColor = vec4(v_rgb, mix(u_alpha, 1.0, v_highlight));
     }`
@@ -207,6 +228,7 @@ export function createSwarmLayer(options: {
       uPointSize: context.getUniformLocation(program, 'u_point_size'),
       uElevationScale: context.getUniformLocation(program, 'u_elevation_scale'),
       uHighlight: context.getUniformLocation(program, 'u_highlight'),
+      uHidden: context.getUniformLocation(program, 'u_hidden'),
     }
     shaderMap.set(shaderDescription.variantName, entry)
     return entry
@@ -253,6 +275,10 @@ export function createSwarmLayer(options: {
 
     setHighlightSlot(slot) {
       highlightSlot = slot ?? -1
+    },
+
+    setHiddenSlot(slot) {
+      hiddenSlot = slot ?? -1
     },
 
     count() {
@@ -331,6 +357,7 @@ export function createSwarmLayer(options: {
       context.uniform1f(shader.uPointSize, pointSize)
       context.uniform1f(shader.uAlpha, alpha)
       context.uniform1f(shader.uHighlight, highlightSlot)
+      context.uniform1f(shader.uHidden, hiddenSlot)
       /* Metres under globe; mercator units under mercator, where elevation is a
          Z in the same 0..1 world space as the position. */
       const mercatorVariant = args.shaderData.variantName !== 'globe'
@@ -341,7 +368,9 @@ export function createSwarmLayer(options: {
 
       context.enable(context.BLEND)
       context.blendFunc(context.SRC_ALPHA, context.ONE_MINUS_SRC_ALPHA)
-      context.drawArrays(context.POINTS, 0, count)
+      for (const range of drawRangesSkipping(count, hiddenSlot)) {
+        context.drawArrays(context.POINTS, range.first, range.count)
+      }
 
       // Leave the attribute state as it was found, or MapLibre's own draws inherit it.
       context.disableVertexAttribArray(shader.aStart)

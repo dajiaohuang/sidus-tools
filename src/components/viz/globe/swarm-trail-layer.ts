@@ -46,6 +46,7 @@ import {
   SWARM_TRAIL_FLOATS_PER_VERTEX,
   SWARM_TRAIL_VERTICES_PER_SATELLITE,
 } from './swarm-trails'
+import { drawRangesSkipping } from './swarm-ownership'
 
 export const SWARM_TRAIL_LAYER_ID = 'sidus-orbit-swarm-trails'
 
@@ -97,9 +98,18 @@ export type SwarmTrailLayer = CustomLayerInterface & {
    * The one satellite whose trail is drawn saturated, or null. Its own pass
    * ignores the tier baseline and the appearance multipliers: it exists to say
    * "this one", and a control that could dim it back into the crowd would
-   * defeat that.
+   * defeat that. The refined GeoJSON/altitude track replaces this ring as
+   * soon as it exists, and THAT track takes the sliders.
    */
   setHighlight(satelliteIndex: number | null): void
+  /**
+   * Satrec index whose trail the full-treatment path already draws, or null.
+   * Skipped in the population pass so the refined line is not doubled by a
+   * coarser ring that does not sit on it.
+   */
+  setHiddenIndex(satelliteIndex: number | null): void
+  /** True when that satellite's trail has been uploaded, even outside the prefix. */
+  hasUploaded(satelliteIndex: number): boolean
   /**
    * True draws ONLY the highlighted trail, and nothing at all when there is
    * none. Ten thousand overlapping revolutions are a texture; sometimes the
@@ -133,7 +143,10 @@ export function createSwarmTrailLayer(options: {
   let baseWidthPx = SWARM_TRAIL_WIDTH_PX
   let baseAlpha = SWARM_TRAIL_ALPHA
   let highlight: number | null = null
+  let hiddenIndex: number | null = null
   let onlyHighlighted = false
+  /** Slots that have received at least one upload, including out-of-prefix refresh. */
+  const uploaded = new Set<number>()
   let projectionData: CustomRenderMethodInput['defaultProjectionData'] | null = null
   let variantName: string | null = null
 
@@ -253,6 +266,7 @@ export function createSwarmTrailLayer(options: {
       satelliteCount = nextCount
       filledCount = 0
       arrived.clear()
+      uploaded.clear()
       uploads.length = 0
       /* The buffer is reallocated on the next render, where the context is
          available; dropping the byte count is what asks for that. */
@@ -261,6 +275,7 @@ export function createSwarmTrailLayer(options: {
 
     setBatch(packed, startIndex, count) {
       if (count <= 0 || startIndex + count > satelliteCount) return
+      for (let i = 0; i < count; i++) uploaded.add(startIndex + i)
       uploads.push({ packed, startIndex, count })
       /* A batch landing entirely INSIDE the drawn prefix is re-doing a trail
          that already counted, so it has no place in the arrival bookkeeping:
@@ -316,6 +331,14 @@ export function createSwarmTrailLayer(options: {
       highlight = satelliteIndex
     },
 
+    setHiddenIndex(satelliteIndex) {
+      hiddenIndex = satelliteIndex
+    },
+
+    hasUploaded(satelliteIndex) {
+      return uploaded.has(satelliteIndex)
+    },
+
     setOnlyHighlighted(on) {
       onlyHighlighted = on
     },
@@ -355,7 +378,8 @@ export function createSwarmTrailLayer(options: {
       }
       uploads.length = 0
 
-      if (filledCount === 0) return
+      const lit = highlight !== null && uploaded.has(highlight) ? highlight : null
+      if (filledCount === 0 && lit === null) return
 
       context.useProgram(shader.program)
 
@@ -407,25 +431,22 @@ export function createSwarmTrailLayer(options: {
       /* The population pass, unless the view has been narrowed to one orbit.
          The highlight pass below still runs, so "only this one" and "this one
          picked out of the crowd" are the same draw with the crowd omitted. */
-      if (!onlyHighlighted) {
-        context.drawArrays(
-          context.LINES,
-          0,
-          filledCount * SWARM_TRAIL_VERTICES_PER_SATELLITE,
-        )
+      const verts = SWARM_TRAIL_VERTICES_PER_SATELLITE
+      const hidden =
+        hiddenIndex !== null && hiddenIndex >= 0 && uploaded.has(hiddenIndex) ? hiddenIndex : -1
+      if (!onlyHighlighted && filledCount > 0) {
+        for (const range of drawRangesSkipping(filledCount, hidden)) {
+          context.drawArrays(context.LINES, range.first * verts, range.count * verts)
+        }
       }
 
-      /* The identified trail again, opaque, over the top of its faint self.
-         One extra draw, which is why this is a second pass rather than a
-         per-vertex flag the whole population would carry. Its own colour comes
-         from the buffer like everyone else's; only the alpha changes. */
-      if (highlight !== null && highlight < filledCount) {
+      /* The identified trail again, opaque. Drawn even when it sits outside
+         the contiguous prefix: only-selected mode uploads that one trail as
+         a refresh, and requiring the prefix would leave hover with nothing
+         to light. */
+      if (lit !== null && lit !== hidden) {
         context.uniform1f(shader.uAlpha, 1)
-        context.drawArrays(
-          context.LINES,
-          highlight * SWARM_TRAIL_VERTICES_PER_SATELLITE,
-          SWARM_TRAIL_VERTICES_PER_SATELLITE,
-        )
+        context.drawArrays(context.LINES, lit * verts, verts)
       }
 
       context.disableVertexAttribArray(shader.aPosition)

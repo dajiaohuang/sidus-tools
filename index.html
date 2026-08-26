@@ -66,7 +66,7 @@
     <meta name="apple-mobile-web-app-title" content="SIDUS" />
     <meta name="application-name" content="SIDUS" />
     <meta name="msapplication-TileColor" content="#0a0a0b" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta
       name="description"
       content="Open-source pure-SI space engineering calculators: orbits, propulsion, SGP4, launch, RF, and crew ECLSS."
@@ -411,7 +411,7 @@
           <li><a href="https://www.nasa.gov/wp-content/uploads/2023/12/ochmo-tb-004-carbon-dioxide.pdf">NASA OCHMO</a>: crew metabolic / CO₂ briefs</li>
           <li><a href="https://www.nasa.gov/ohp/standards/">NASA-STD-3001 overview</a>: human spaceflight standards context</li>
           <li><a href="https://github.com/shashwatak/satellite-js">satellite.js (MIT)</a>: SGP4 in browser</li>
-          <li><a href="https://celestrak.org/">CelesTrak</a>: TLE documentation and catalogs</li>
+          <li><a href="https://celestrak.org/">CelesTrak™</a>: TLE documentation and catalogs</li>
           <li><a href="https://ssd.jpl.nasa.gov/horizons/">JPL Horizons</a>: Solar System body constants</li>
         </ul>
 
@@ -442,7 +442,7 @@
         </ul>
         <h2>How is source quality enforced?</h2>
         <p>
-          Each tool page lists linked references (Vallado, Curtis, NASA GRC, OCHMO, CelesTrak,
+          Each tool page lists linked references (Vallado, Curtis, NASA GRC, OCHMO, CelesTrak™,
           JPL Horizons, satellite.js, SMAD/Wertz for RF, etc.). Automated tests require every live
           tool to declare at least two resolvable source IDs with HTTPS URLs. Tags are normalized
           so partial-pressure labels (ppO₂ / ppCO₂) collapse to <code>atmosphere</code> and
@@ -489,12 +489,18 @@
       </div>
     </div>
     <script type="module" src="/src/main.tsx"></script>
-    <!-- Cloudflare Web Analytics -->
-    <script
-      type="module"
-      src="https://static.cloudflareinsights.com/beacon.min.js"
-      data-cf-beacon='{"token": "4d2c123952df439589d41f21f771a23a"}'
-    ></script>
+    <!-- Cloudflare Web Analytics: skip localhost (the beacon CORS-allows
+         http://localhost, not http://localhost:5173, and SPA param writes
+         would otherwise fill the console with rum failures). -->
+    <script type="module">
+      if (location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
+        const s = document.createElement('script')
+        s.type = 'module'
+        s.src = 'https://static.cloudflareinsights.com/beacon.min.js'
+        s.setAttribute('data-cf-beacon', '{"token": "4d2c123952df439589d41f21f771a23a"}')
+        document.body.appendChild(s)
+      }
+    </script>
     <!-- End Cloudflare Web Analytics -->
   </body>
 </html>

@@ -139,6 +139,7 @@ const BUCKET_SEED = 32
 
 export function createSwarmPickIndex(): SwarmPickIndex {
   const cellCount = SWARM_PICK_GRID * SWARM_PICK_GRID
+
   /*
    * Buckets are typed arrays rather than plain ones. The population puts a few
    * million segment references in here, and at that size `number[]` costs both
@@ -146,39 +147,59 @@ export function createSwarmPickIndex(): SwarmPickIndex {
    * enough to take the renderer down mid-convergence. Int32Array holds the same
    * references in four bytes each with no per-element overhead.
    */
-  let buckets: (Int32Array | null)[] = []
-  let bucketLengths = new Int32Array(0)
-  let trails = new Float32Array(0)
+  type Generation = { buckets: (Int32Array | null)[]; bucketLengths: Int32Array }
+  const emptyGeneration = (size: number): Generation => ({
+    buckets: new Array(size).fill(null),
+    bucketLengths: new Int32Array(size),
+  })
+
   /**
-   * First drawable vertex of each satellite as last INDEXED, or NaN.
+   * Two generations of the grid: `front` answers every query, `back` is what
+   * the arriving cycle is building.
    *
-   * The looping producer re-delivers every trail about once a minute, and a
-   * ground track moves a fraction of a degree in that time. Re-pushing ninety
-   * five segment ids per satellite per cycle would grow the buckets without
-   * bound for a session left open; comparing against this anchor skips the
-   * pushes while the trail has not moved by a meaningful fraction of a cell.
-   * The DATA is still copied in either way, so the exact stage always tests
-   * current geometry: a stale bucket entry can only cost a projection, never
-   * a wrong answer.
+   * `addBatch` indexes ALL of a batch's non-degenerate segments into `back`,
+   * unconditionally. The trail has to be findable at its CURRENT cells: the
+   * module header already spends most of the one-cell margin on altitude
+   * displacement at the limb, so skipping a re-index would let position drift
+   * stack onto that margin until the true segment left the ±1-cell ring
+   * `candidatesAt` searches, and hover would go dead until the next full
+   * re-index reached it. Reading BOTH generations in `candidatesAt` is what
+   * makes always-reindexing safe for hover: a satellite `back` has already
+   * reached this cycle is found there at its fresh cells, while everything
+   * `back` has not reached yet is still answered by `front`'s complete pass
+   * from the cycle before.
+   *
+   * `backSeen`/`backCovered` track how much of the population `back` has
+   * reached. Once every satellite has been indexed into it at least once,
+   * `back` becomes `front` and a freshly emptied grid takes over as `back`.
+   * That swap is what bounds memory instead of a skip: an old cycle's ids are
+   * dropped wholesale at the swap rather than accumulating, so residency is at
+   * most two cycles, one complete and one in progress, however long the
+   * session runs.
    */
-  let anchors = new Float32Array(0)
+  let front: Generation = emptyGeneration(0)
+  let back: Generation = emptyGeneration(0)
+  let backSeen = new Uint8Array(0)
+  let backCovered = 0
+
+  let trails = new Float32Array(0)
   let satelliteCount = 0
   let filledCount = 0
 
-  const push = (cell: number, id: number) => {
-    let bucket = buckets[cell]
-    const used = bucketLengths[cell]
+  const push = (generation: Generation, cell: number, id: number) => {
+    let bucket = generation.buckets[cell]
+    const used = generation.bucketLengths[cell]
     if (!bucket) {
       bucket = new Int32Array(BUCKET_SEED)
-      buckets[cell] = bucket
+      generation.buckets[cell] = bucket
     } else if (used === bucket.length) {
       const grown = new Int32Array(bucket.length * 2)
       grown.set(bucket)
       bucket = grown
-      buckets[cell] = grown
+      generation.buckets[cell] = grown
     }
     bucket[used] = id
-    bucketLengths[cell] = used + 1
+    generation.bucketLengths[cell] = used + 1
   }
 
   const cellX = (x: number) => {
@@ -193,9 +214,10 @@ export function createSwarmPickIndex(): SwarmPickIndex {
       satelliteCount = nextCount
       filledCount = 0
       trails = new Float32Array(nextCount * SWARM_TRAIL_FLOATS_PER_SATELLITE)
-      anchors = new Float32Array(nextCount * 2).fill(Number.NaN)
-      buckets = new Array(cellCount).fill(null)
-      bucketLengths = new Int32Array(cellCount)
+      front = emptyGeneration(cellCount)
+      back = emptyGeneration(cellCount)
+      backSeen = new Uint8Array(nextCount)
+      backCovered = 0
     },
 
     addBatch(packed, startIndex, count) {
@@ -203,25 +225,12 @@ export function createSwarmPickIndex(): SwarmPickIndex {
       trails.set(packed.subarray(0, count * SWARM_TRAIL_FLOATS_PER_SATELLITE), startIndex * SWARM_TRAIL_FLOATS_PER_SATELLITE)
 
       const stride = SWARM_TRAIL_FLOATS_PER_VERTEX
-      /* Half a cell of movement is where a stale bucket could start LYING by
-         omission; below that, skipping the re-index only leaves harmless
-         extra candidates. */
-      const reindexThreshold = 0.5 / SWARM_PICK_GRID
       for (let s = 0; s < count; s++) {
         const satellite = startIndex + s
+        /* Geometry is already in `trails`. Skip a satellite already indexed
+           this generation so only-selected refresh cannot grow the grid. */
+        if (backSeen[satellite] !== 0) continue
         const base = satellite * SWARM_TRAIL_FLOATS_PER_SATELLITE
-        const anchorX = trails[base]
-        const anchorY = trails[base + 1]
-        const last = anchors[satellite * 2]
-        let movedX = Math.abs(anchorX - (Number.isNaN(last) ? Infinity : last))
-        if (movedX > 0.5) movedX = 1 - movedX
-        const moved =
-          Number.isNaN(last) ||
-          movedX > reindexThreshold ||
-          Math.abs(anchorY - anchors[satellite * 2 + 1]) > reindexThreshold
-        if (!moved) continue
-        anchors[satellite * 2] = anchorX
-        anchors[satellite * 2 + 1] = anchorY
         for (let segment = 0; segment < SWARM_TRAIL_SEGMENTS; segment++) {
           const at = base + segment * stride * 2
           const ax = trails[at]
@@ -245,31 +254,43 @@ export function createSwarmPickIndex(): SwarmPickIndex {
           for (let cx = fromX; cx <= toX; cx++) {
             const wrappedX = ((cx % SWARM_PICK_GRID) + SWARM_PICK_GRID) % SWARM_PICK_GRID
             for (let cy = fromY; cy <= toY; cy++) {
-              push(cy * SWARM_PICK_GRID + wrappedX, id)
+              push(back, cy * SWARM_PICK_GRID + wrappedX, id)
             }
           }
         }
+        backSeen[satellite] = 1
+        backCovered++
       }
       if (startIndex + count > filledCount) filledCount = startIndex + count
+      if (backCovered === satelliteCount) {
+        front = back
+        back = emptyGeneration(cellCount)
+        backSeen.fill(0)
+        backCovered = 0
+      }
     },
 
     candidatesAt(x, y, neighbourhood = 1) {
-      if (buckets.length === 0) return []
+      if (front.buckets.length === 0) return []
       const centreX = cellX(x)
       const centreY = cellY(y)
       const seen = new Set<number>()
-      for (let dx = -neighbourhood; dx <= neighbourhood; dx++) {
-        const cx = ((centreX + dx) % SWARM_PICK_GRID + SWARM_PICK_GRID) % SWARM_PICK_GRID
-        for (let dy = -neighbourhood; dy <= neighbourhood; dy++) {
-          const cy = centreY + dy
-          if (cy < 0 || cy >= SWARM_PICK_GRID) continue
-          const cell = cy * SWARM_PICK_GRID + cx
-          const bucket = buckets[cell]
-          if (!bucket) continue
-          const used = bucketLengths[cell]
-          for (let i = 0; i < used; i++) seen.add(bucket[i])
+      const collect = (generation: Generation) => {
+        for (let dx = -neighbourhood; dx <= neighbourhood; dx++) {
+          const cx = ((centreX + dx) % SWARM_PICK_GRID + SWARM_PICK_GRID) % SWARM_PICK_GRID
+          for (let dy = -neighbourhood; dy <= neighbourhood; dy++) {
+            const cy = centreY + dy
+            if (cy < 0 || cy >= SWARM_PICK_GRID) continue
+            const cell = cy * SWARM_PICK_GRID + cx
+            const bucket = generation.buckets[cell]
+            if (!bucket) continue
+            const used = generation.bucketLengths[cell]
+            for (let i = 0; i < used; i++) seen.add(bucket[i])
+          }
         }
       }
+      collect(front)
+      collect(back)
       return [...seen]
     },
 
@@ -299,12 +320,14 @@ export function createSwarmPickIndex(): SwarmPickIndex {
     occupancy() {
       let entries = 0
       let max = 0
-      for (let cell = 0; cell < bucketLengths.length; cell++) {
-        const used = bucketLengths[cell]
-        entries += used
-        if (used > max) max = used
+      for (const generation of [front, back]) {
+        for (let cell = 0; cell < generation.bucketLengths.length; cell++) {
+          const used = generation.bucketLengths[cell]
+          entries += used
+          if (used > max) max = used
+        }
       }
-      const cells = bucketLengths.length
+      const cells = front.bucketLengths.length
       return { cells, entries, mean: entries / (cells || 1), max }
     },
   }

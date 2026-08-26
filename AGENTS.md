@@ -40,7 +40,7 @@ React 19 + Vite + TypeScript + Tailwind v4 · react-router · i18next · pure SI
 
 ## Footer / legal
 
-- No affiliation with NASA, ESA, SpaceX, Roscosmos, CNSA, JAXA, ISRO, ASI, DLR, CNES, KARI, AEB, …
+- No affiliation with NASA, ESA, SpaceX, Roscosmos, CNSA, JAXA, ISRO, ASI, DLR, CNES, KARI, AEB, CelesTrak™, …
 - 100% open source, non-profit · MIT
 - Made with ❤️ by Massimo De Luisa → https://massimo.deluisa.bio
 

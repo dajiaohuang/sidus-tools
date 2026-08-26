@@ -91,6 +91,52 @@ export function followPitchDeg(altitudeM: number, maxPitchDeg: number): number {
 }
 
 /**
+ * Zoom levels pulled back from the geometric ceiling so a framed target sits
+ * inside the view, not on the aiming limit. High ellipticals (ARKTIKA-M at
+ * apogee is ~40,000 km) need that slack or the marker rides the limb.
+ */
+export const FRAME_ZOOM_SLACK = 0.45
+
+/** Regional zoom when the marker is on the ground (altitude layer off). */
+const FRAME_GROUND_ZOOM = 3.5
+
+/**
+ * One-shot look at a satellite: turn the planet so the target sits on the
+ * camera–Earth line (nadir, north up). This is not Follow: no heading lock,
+ * no chase pitch. High orbits only change the zoom, so a marker drawn
+ * outside the globe stays on screen.
+ */
+export function frameSatelliteCamera(params: {
+  lonDeg: number
+  latDeg: number
+  altitudeM: number
+  /** True when the marker is drawn at altitude, not on the ground. */
+  elevated: boolean
+  fovRad: number
+  canvasCssHeight: number
+}): {
+  lonDeg: number
+  latDeg: number
+  bearingDeg: number
+  pitchDeg: number
+  zoom: number
+} {
+  const { lonDeg, latDeg, altitudeM, elevated, fovRad, canvasCssHeight } = params
+  if (!elevated || !(altitudeM > 0)) {
+    return { lonDeg, latDeg, bearingDeg: 0, pitchDeg: 0, zoom: FRAME_GROUND_ZOOM }
+  }
+  const ceiling = followZoomCeiling({
+    pitchDeg: 0,
+    altitudeM,
+    fovRad,
+    canvasCssHeight,
+    centerLatDeg: latDeg,
+  })
+  const zoom = Number.isFinite(ceiling) ? ceiling - FRAME_ZOOM_SLACK : FRAME_GROUND_ZOOM
+  return { lonDeg, latDeg, bearingDeg: 0, pitchDeg: 0, zoom }
+}
+
+/**
  * Highest zoom at which the elevated target is still centrable.
  *
  * Returns +Infinity when the geometry does not constrain the zoom (no
@@ -122,6 +168,26 @@ export function followZoomCeiling(params: {
   const cosLat = Math.cos(Math.min(85, Math.abs(centerLatDeg)) * DEG)
   const numerator = Math.PI * canvasCssHeight * cosLat
   return Math.log2(numerator / (TILE_SIZE_PX * Math.tan(fovRad / 2) * uMin))
+}
+
+/**
+ * The zoom that keeps the apparent ground scale constant across a change of
+ * centre latitude. MapLibre zoom is mercator scale at the centre latitude
+ * (m/px scales with cos(lat) / 2^zoom), so holding the on-screen scale while
+ * the centre moves toward a pole requires exactly this log2-cosine step:
+ * equator to 60 degrees is one whole zoom level down.
+ *
+ * Guarded on the latitudes themselves, not on the cosine: the correction
+ * genuinely diverges at the poles, so a latitude at or beyond 90 degrees is
+ * refused as undefined rather than approximated from `Math.cos(pi/2)`, which
+ * is not exactly zero in floating point. The negated comparison also refuses
+ * NaN.
+ */
+export function latCompensatedZoom(zoom: number, fromLatDeg: number, toLatDeg: number): number {
+  if (!(Math.abs(fromLatDeg) < 90) || !(Math.abs(toLatDeg) < 90)) return zoom
+  const from = Math.cos((fromLatDeg * Math.PI) / 180)
+  const to = Math.cos((toLatDeg * Math.PI) / 180)
+  return zoom + Math.log2(to / from)
 }
 
 /**
@@ -207,6 +273,8 @@ export function initialBearingDeg(
  */
 const CENTER_AZIMUTH_TOLERANCE_DEG = 1e-9
 const CENTER_AZIMUTH_MAX_PASSES = 8
+/** One secant step cannot jump more than this; polar leads would otherwise flip roots. */
+const CENTER_AZIMUTH_MAX_STEP_DEG = 20
 
 /**
  * Map centre that puts an elevated target at the screen centre for a camera
@@ -234,6 +302,16 @@ export function centerForElevatedTarget(
   leadRad: number,
 ): { lonDeg: number; latDeg: number } {
   if (!(leadRad > 1e-12)) return { lonDeg: targetLonDeg, latDeg: targetLatDeg }
+  /* Walking the lead over a pole flips longitude by ~180 deg. A 1 deg heading
+     change then hops the centre to the opposite meridian: the follow view
+     yaws left-right by itself. Cap the poleward component so the path stays
+     on this side of 89 deg. */
+  const poleward = Math.sign(targetLatDeg || 1) * Math.cos(cameraBearingDeg * DEG)
+  if (poleward > 0) {
+    const roomRad = (89 - Math.abs(targetLatDeg)) * DEG
+    leadRad = Math.min(leadRad, Math.max(0, roomRad))
+    if (!(leadRad > 1e-12)) return { lonDeg: targetLonDeg, latDeg: targetLatDeg }
+  }
   /** How far the camera's bearing at the centre misses, for a given departure. */
   const miss = (departureDeg: number) => {
     const center = destinationPoint(targetLonDeg, targetLatDeg, departureDeg, leadRad)
@@ -248,21 +326,28 @@ export function centerForElevatedTarget(
   let previousDeparture = cameraBearingDeg
   let previous = miss(previousDeparture)
   if (Math.abs(previous.error) < CENTER_AZIMUTH_TOLERANCE_DEG) return previous.center
-  /* Secant, not a plain "subtract the error" fix-up: the convergence angle
-     grows with the latitude, so near the poles the naive correction overshoots
-     and walks away (measured: it left 35 deg of error at 70 deg north with a
-     12.7 deg lead). The secant reads the local slope instead of assuming it. */
+  /* Secant: meridian convergence grows with latitude, so a naive subtract
+     overshoots near the poles. Clamp the step and keep the lowest-error
+     iterate so a polar chase cannot flip between two roots each frame. */
   let departure = previousDeparture - previous.error
+  let best = previous
   for (let pass = 0; pass < CENTER_AZIMUTH_MAX_PASSES; pass++) {
     const current = miss(departure)
+    if (Math.abs(current.error) < Math.abs(best.error)) best = current
     if (Math.abs(current.error) < CENTER_AZIMUTH_TOLERANCE_DEG) return current.center
-    const slope = (current.error - previous.error) / (departure - previousDeparture)
+    const delta = departure - previousDeparture
+    const slope = Math.abs(delta) < 1e-12 ? NaN : (current.error - previous.error) / delta
     previousDeparture = departure
     previous = current
     if (!Number.isFinite(slope) || Math.abs(slope) < 1e-9) break
-    departure -= current.error / slope
+    let step = current.error / slope
+    if (!Number.isFinite(step)) break
+    if (Math.abs(step) > CENTER_AZIMUTH_MAX_STEP_DEG) {
+      step = Math.sign(step) * CENTER_AZIMUTH_MAX_STEP_DEG
+    }
+    departure -= step
   }
-  return previous.center
+  return best.center
 }
 
 /**
@@ -368,4 +453,22 @@ export function globeScreenRadiusPx(
   const distance = cameraDistanceInRadii(clippingPlane)
   if (distance === null || !(distance > 1) || !(fovRad > 0) || !(canvasCssHeight > 0)) return null
   return (canvasCssHeight / 2) * (Math.tan(Math.asin(1 / distance)) / Math.tan(fovRad / 2))
+}
+
+/**
+ * Longest step the attract-mode rotate will take. A dropped frame must not
+ * become a visible jump; 1/30 s is one tick of a 30 fps hitch.
+ */
+export const AUTO_ROTATE_MAX_DT_S = 1 / 30
+
+/** Longitude into (-180, 180]. */
+export function wrapLngDeg(lng: number): number {
+  const wrapped = ((((lng + 180) % 360) + 360) % 360) - 180
+  return wrapped === -180 ? 180 : wrapped
+}
+
+/** Next centre longitude for a constant-rate eastward drift. */
+export function autoRotateLngDeg(lng: number, rateDegPerS: number, dtSeconds: number): number {
+  const dt = Math.min(AUTO_ROTATE_MAX_DT_S, Math.max(0, dtSeconds))
+  return wrapLngDeg(lng + rateDegPerS * dt)
 }

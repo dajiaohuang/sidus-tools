@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, type ReactNode } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { ToolRenderer } from '@/components/tools/ToolRenderer'
@@ -19,6 +19,41 @@ import {
 } from '@/lib/tool-ui-layout'
 import { tooltipProps } from '@/components/shared/tooltip'
 import { cn } from '@/lib/utils'
+
+/**
+ * Fullscreen tools fill the layout viewport. Overlay chrome is offset by
+ * `--vv-top` / `--vv-bottom` so controls stay in the visible hole.
+ */
+function FullscreenToolShell({ children }: { children: ReactNode }) {
+  useEffect(() => {
+    const root = document.documentElement
+    const sync = () => {
+      const vv = window.visualViewport
+      const layoutH = Math.max(document.documentElement.clientHeight, window.innerHeight)
+      const height = vv?.height ?? layoutH
+      const top = Math.max(0, vv?.offsetTop ?? 0)
+      const bottom = Math.max(0, layoutH - top - height)
+      root.style.setProperty('--vv-top', `${Math.round(top)}px`)
+      root.style.setProperty('--vv-bottom', `${Math.round(bottom)}px`)
+    }
+    sync()
+    window.visualViewport?.addEventListener('resize', sync)
+    window.visualViewport?.addEventListener('scroll', sync)
+    window.addEventListener('orientationchange', sync)
+    return () => {
+      window.visualViewport?.removeEventListener('resize', sync)
+      window.visualViewport?.removeEventListener('scroll', sync)
+      window.removeEventListener('orientationchange', sync)
+      root.style.removeProperty('--vv-top')
+      root.style.removeProperty('--vv-bottom')
+    }
+  }, [])
+  return (
+    <div className="h-full w-full min-w-0 overflow-hidden" data-tool-fullscreen="1">
+      {children}
+    </div>
+  )
+}
 
 export function ToolDetailPage() {
   const { id = '' } = useParams()
@@ -88,12 +123,12 @@ export function ToolDetailPage() {
      tool component draws its own overlay chrome on top of the canvas. */
   if (tool.fullscreen) {
     return (
-      <div className="relative h-dvh w-full min-w-0 overflow-hidden" data-tool-fullscreen="1">
+      <FullscreenToolShell>
         {seo}
         <ToolUiLayoutProvider value={ui}>
           <ToolRenderer id={tool.id} />
         </ToolUiLayoutProvider>
-      </div>
+      </FullscreenToolShell>
     )
   }
 

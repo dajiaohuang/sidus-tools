@@ -29,8 +29,11 @@ import {
   elevatedCenterLeadRad,
   followZoomCeiling,
   globeScreenRadiusPx,
+  latCompensatedZoom,
   skyAimCamera,
   followPitchDeg,
+  frameSatelliteCamera,
+  wrapLngDeg,
 } from './globe/camera'
 import { cssRgbaWithAlpha, parseCssRgba } from './globe/color'
 import {
@@ -54,19 +57,23 @@ import {
 } from './globe/swarm-pick'
 import { pickNearestTrail, type TrailPolyline } from './globe/trail-pick'
 import { keyframeProgress, SWARM_FLOATS_PER_SATELLITE } from './globe/swarm'
+import { pointOwnershipOf, trailOwnershipOf } from './globe/swarm-ownership'
 import { gmstRad } from '@/lib/physics'
 import { GLOBE_RADIUS_M } from './globe/track'
-import { formatAu, formatKm, scaleBarFor, viewScale, type ViewScale } from './globe/scale'
+import { GLOBE_FLOOR_ZOOM, viewScale, type ViewScale } from './globe/scale'
 import { spinDirection } from '@/components/tools/orbital-view/sky-math'
 import {
   CTRL_BTN_CLASS,
   CTRL_BTN_WIDE_CLASS,
   CTRL_PANEL_CLASS,
-  CTRL_PANEL_TITLE_CLASS,
+  GlobeScaleReadout,
   HoldButton,
+  isTypingTarget,
+  KeyTip,
   TrailProgress,
   TrailSlider,
 } from './globe/controls-ui'
+import { ChromeHost, ChromePanel, type OrbitalChromeSheet } from './globe/chrome-overlay'
 import { drawGlobeAxes } from './globe/draw-axes'
 import { GLOBE_POIS, grokipediaUrl, type GlobePoi } from './globe/pois'
 import {
@@ -92,6 +99,7 @@ import {
   trailSourceIds,
   trailIsDashed,
   trailWeightFor,
+  paintedTrailWeight,
 } from './globe/style'
 import { daylightBands } from './globe/terminator'
 import {
@@ -124,6 +132,7 @@ import {
   buildTrailGeojsonPair,
   composeBearingDeg,
   computeBearingDeg,
+  smoothFollowHeading,
   fadeProgressFraction,
   resolveTrackPointAt,
   splitTrackAt,
@@ -135,18 +144,33 @@ const INITIAL_ZOOM = 1.5
 const MAX_PITCH = 80
 /** MapLibre's own default zoom ceiling, the limit for the follow pose too. */
 const MAX_ZOOM = 22
+
+/** Native MapLibre camera writers must not run while follow owns the pose. */
+function setFollowNativeHandlers(map: MapLibreMap, following: boolean) {
+  const action = following ? 'disable' : 'enable'
+  map.dragPan[action]()
+  map.dragRotate[action]()
+  map.scrollZoom[action]()
+  map.touchZoomRotate[action]()
+  map.touchPitch[action]()
+  map.doubleClickZoom[action]()
+  map.boxZoom[action]()
+}
 /** MapLibre's default vertical field of view, for the frame before the first render. */
 const DEFAULT_FOV_RAD = (36.87 * Math.PI) / 180
 /** Eased camera flights: aiming at a body, and the chip route between scenes. */
 const CAMERA_FLIGHT_MS = 1100
 /** Fill-rate cap for high-density screens; see the map constructor. */
 const MAX_DEVICE_PIXEL_RATIO = 2
+
 /** Point diameter for the mass swarm, before the device pixel ratio. */
 const SWARM_DEFAULT_POINT_PX = 2.5
 /** Wheel delta to zoom levels while following, matched to MapLibre's own feel. */
 const FOLLOW_WHEEL_ZOOM_FACTOR = 1 / 250
-/** MapLibre accepts -2 to 24; -2 is the widest space view available. */
-export const GLOBE_MIN_ZOOM = -2
+/** Zoom levels per +/- press: half a level, so key repeat compounds it like the wheel. */
+const KEY_ZOOM_STEP = 0.5
+/** Widest globe zoom; below this the view hands over to the solar scene. */
+export const GLOBE_MIN_ZOOM = GLOBE_FLOOR_ZOOM
 /** Zoom slack for "sitting on the floor": the wheel leaves a fractional remainder. */
 const FLOOR_EXIT_EPSILON = 0.02
 /**
@@ -154,7 +178,7 @@ const FLOOR_EXIT_EPSILON = 0.02
  * widest framing of the globe and worth sitting in, so leaving it takes a
  * deliberate push rather than the one notch that arrives there.
  */
-const FLOOR_EXIT_NOTCHES = 3
+const FLOOR_EXIT_NOTCHES = 8
 /**
  * Pointer distance at which a satellite marker claims the tooltip. Wider than
  * the 6 px dot it is drawn as, because the dot is small and moving.
@@ -308,7 +332,12 @@ type Props = {
    */
   skyTooltipFor?: (bodyId: string) => { title: string; rows: [string, string][] } | null
   /** Same contract for a satellite, keyed by catalogue number. */
-  satelliteTooltipFor?: (catnr: string) => { title: string; rows: [string, string][] } | null
+  satelliteTooltipFor?: (catnr: string) => {
+    title: string
+    rows: [string, string][]
+    href?: string
+    linkLabel?: string
+  } | null
   /** Sun-body-Earth angle of the Moon [rad], for its drawn phase. */
   moonPhaseAngleRad?: number
   /**
@@ -328,7 +357,7 @@ type Props = {
     count: number
     epochMs: number
     spanMs: number
-    /** Packed slot to satellite index; skipped satellites compact the buffer. */
+    /** Packed slot to satellite index. Slot k is satrec k. */
     indices: Uint32Array
   } | null
   /** Colour of the swarm points. */
@@ -380,6 +409,8 @@ type Props = {
   swarmTrailOpacity?: number
   /** Narrows the trails to the identified satellite alone. */
   swarmTrailOnlySelected?: boolean
+  /** Why All trails were refused; empty when the last request succeeded. */
+  trailScopeNotice?: string
   /**
    * How much of the population has a trail yet, 0..1, or null when there is
    * nothing to wait for. The trails converge over about a minute, and a view
@@ -393,12 +424,6 @@ type Props = {
     onlySelected: boolean
   }) => void
   /**
-   * True when every enabled sky body is out of sight, behind the planet or off
-   * the frame. Reported on change so the caller can say so rather than leave an
-   * empty sky reading as a fault.
-   */
-  onSkyBodiesOffScreen?: (allOffScreen: boolean) => void
-  /**
    * Draw a name beside every satellite marker. False leaves the labels to the
    * caller's own rules (a follow target, a hovered entry), because past a few
    * dozen the names overlap into a smear rather than identifying anything.
@@ -408,6 +433,8 @@ type Props = {
   swarmPointSizePx?: number
   /** Opening zoom. Defaults to the standard whole-Earth view. */
   initialZoom?: number
+  /** Opening centre `[lng, lat]`. Defaults to a slightly north-of-equator view. */
+  initialCenter?: [number, number]
   /** With `initialZoom` set, ease on from there to the standard view on arrival. */
   easeToDefaultOnOpen?: boolean
   /**
@@ -420,6 +447,17 @@ type Props = {
    * a new request, so the same body can be aimed at twice.
    */
   aimAt?: { direction: [number, number, number] } | null
+  /**
+   * One-shot fly that frames a satellite. A new `nonce` asks again, so clicking
+   * the same row twice still flies. High orbits (ARKTIKA-M, GEO) zoom out far
+   * enough that a marker drawn outside the globe stays on screen.
+   */
+  frameTarget?: {
+    lon: number
+    lat: number
+    altKm: number
+    nonce: number
+  } | null
   /** Satellite the follow control chases. Defaults to the first one. */
   followTargetId?: string | null
   /** Initial state of the altitude toggle; the control owns it afterwards. */
@@ -428,6 +466,14 @@ type Props = {
   onAltitudeChange?: (on: boolean) => void
   /** Camera state after a settled move. Not fired while following. */
   onViewChange?: (view: GlobeView) => void
+  cameraLng?: number
+  cameraLat?: number
+  cameraZoom?: number
+  cameraPitch?: number
+  cameraBearing?: number
+  /** Restore follow from a shared link. */
+  followWanted?: boolean
+  onResetView?: () => void
   /** Caption above the attribution bar. Already translated by the caller. */
   caption?: string
   title?: string
@@ -439,6 +485,29 @@ type Props = {
    */
   height?: number
   className?: string
+  /**
+   * Hides the built-in control chrome for an embedded, unattended view: the
+   * camera/view/trail panel column and the info button. The MapLibre
+   * AttributionControl and the caption stay, since those are legal, not
+   * chrome. Also skips the window keydown/keyup camera-shortcut listeners,
+   * which belong to a page that owns the keyboard; an embed sharing the
+   * page with other content must not capture its arrow keys. Defaults to
+   * true (the tool's own full chrome).
+   */
+  chrome?: boolean
+  /**
+   * Collapse CAMERA / VIEW / TRAJECTORIES into bottom sheets.
+   * The parent owns the dock that opens them.
+   */
+  compactChrome?: boolean
+  /** Which compact sheet is open; ignored unless `compactChrome`. */
+  chromeSheet?: Extract<OrbitalChromeSheet, 'camera' | 'view' | 'trails'> | null
+  onChromeSheetClose?: () => void
+  /**
+   * Attract-mode rotation: degrees of longitude per second around Earth's
+   * polar axis (the map centre's longitude, north kept up). Omit for none.
+   */
+  autoRotateDegPerS?: number
 }
 
 function markerFeature(
@@ -461,10 +530,42 @@ function trailWindowOf(sat: GlobeSatellite): { start: Date; end: Date } | null {
   return { start: points[0].date, end: points[points.length - 1].date }
 }
 
+function applySwarmPointOwnership(
+  layer: SwarmLayer,
+  keyframe: { count: number; indices: Uint32Array },
+  identified: string | null | undefined,
+  swarmIds: readonly string[] | undefined,
+  satellites: readonly GlobeSatellite[],
+  hiddenSlotRef: { current: number | null },
+): void {
+  const { highlight, hidden } = pointOwnershipOf(identified, swarmIds, keyframe, satellites)
+  layer.setHighlightSlot(highlight)
+  layer.setHiddenSlot(hidden)
+  hiddenSlotRef.current = hidden
+}
+
+function applySwarmTrailOwnership(
+  layer: { setHighlight(i: number | null): void; setHiddenIndex(i: number | null): void },
+  identified: string | null | undefined,
+  swarmIds: readonly string[] | undefined,
+  satellites: readonly GlobeSatellite[],
+  hiddenIndexRef: { current: number | null },
+): void {
+  const { highlight, hidden } = trailOwnershipOf(identified, swarmIds, satellites)
+  layer.setHighlight(highlight)
+  layer.setHiddenIndex(hidden)
+  hiddenIndexRef.current = hidden
+}
+
+const closeChromeSheetNoop = () => {}
+
 export function GlobeMap(props: Props) {
   const { t } = useTranslation()
   const { satellites, observer, markers, subsolar, caption, title, height, className } = props
   const { aimAt, flyToFloorNonce } = props
+  const chrome = props.chrome ?? true
+  const compactChrome = chrome && (props.compactChrome ?? false)
+  const closeChromeSheet = props.onChromeSheetClose ?? closeChromeSheetNoop
 
   const containerRef = useRef<HTMLDivElement | null>(null)
   const mapRef = useRef<MapLibreMap | null>(null)
@@ -474,12 +575,18 @@ export function GlobeMap(props: Props) {
   const skyCanvasRef = useRef<HTMLCanvasElement | null>(null)
   const swarmLayerRef = useRef<SwarmLayer | null>(null)
   const swarmTrailLayerRef = useRef<SwarmTrailLayer | null>(null)
+  /** Population the trail buffer was last sized for; reset only when it changes. */
+  const trailLayerCountRef = useRef(0)
   /** Last reported answer to "is every enabled sky body out of sight". */
-  const skyAllOffScreenRef = useRef<boolean | null>(null)
+
   /** CPU mirror of the drawn trails, indexed for picking. */
   const swarmPickRef = useRef<SwarmPickIndex>(createSwarmPickIndex())
   /** Cost of the last swarm pick, for the debug reader. */
   const swarmPickCostRef = useRef({ candidates: 0, projections: 0, ms: 0 })
+  /** Packed swarm slot already drawn by the full-treatment marker. */
+  const swarmHiddenSlotRef = useRef<number | null>(null)
+  /** Satrec index whose swarm trail the full-treatment path already owns. */
+  const swarmHiddenIndexRef = useRef<number | null>(null)
   /** Last satellite identity reported, from any source, so only changes are sent. */
   const hoverIdentityRef = useRef<string | null>(null)
   /** Per-body refined path samples, kept across frames (directions, not pixels). */
@@ -512,6 +619,8 @@ export function GlobeMap(props: Props) {
    * single place the camera is set.
    */
   const followPoseRef = useRef({ bearingOffsetDeg: 0, pitchDeg: MAX_PITCH, zoom: FOLLOW_ZOOM })
+  /** Smoothed motion heading, so a one-frame azimuth flip cannot yaw the chase. */
+  const followHeadingRef = useRef<number | null>(null)
   const followActiveRef = useRef(false)
   /** Deliberate wheel notches accumulated at the zoom floor (see FLOOR_EXIT_NOTCHES). */
   const floorNotchesRef = useRef(0)
@@ -632,6 +741,7 @@ export function GlobeMap(props: Props) {
             if (satellite >= ids.length) continue
             const at = i * SWARM_FLOATS_PER_SATELLITE
             const mercX = keyframe.packed[at] + progress * keyframe.packed[at + 3]
+            if (!Number.isFinite(mercX)) continue
             const mercY = keyframe.packed[at + 1] + progress * keyframe.packed[at + 4]
             const elevation = keyframe.packed[at + 2] + progress * keyframe.packed[at + 5]
             const { lonDeg: lon, latDeg: lat } = lonLatOfMercator(mercX, mercY)
@@ -751,6 +861,18 @@ export function GlobeMap(props: Props) {
   const altitudeOnRef = useRef(props.showAltitude ?? false)
   const propsRef = useRef(props)
   propsRef.current = props
+  /* panBy/rotateBearingBy/tiltBy/zoomByKey are useCallback values defined
+     further down the component, after the keydown listener that has to call
+     them: capturing them there directly would read the const before its own
+     initialiser runs. Reading them off a ref updated on every render, the
+     same escape hatch as propsRef above, sidesteps the ordering instead of
+     moving the callbacks. */
+  const keyControlsRef = useRef<{
+    panBy: (dLatSign: number, dLonSign: number) => void
+    rotateBearingBy: (sign: number) => void
+    tiltBy: (sign: number) => void
+    zoomByKey: (sign: 1 | -1) => void
+  } | null>(null)
 
   const [ready, setReady] = useState(false)
   /**
@@ -768,11 +890,20 @@ export function GlobeMap(props: Props) {
   const readyMapRef = useRef<MapLibreMap | null>(null)
   const [followActive, setFollowActive] = useState(false)
   const [altitudeOn, setAltitudeOn] = useState(props.showAltitude ?? false)
+  /**
+   * Live TRAJECTORIES multipliers. The URL is written on slider *release*,
+   * not on every tick: each tick was a history.replace that GTM treated as a
+   * page view. The globe still follows the drag; only the address bar waits.
+   */
+  const [liveTrailWidth, setLiveTrailWidth] = useState(props.swarmTrailWidth ?? 1)
+  const [liveTrailOpacity, setLiveTrailOpacity] = useState(props.swarmTrailOpacity ?? 1)
   const [errors, setErrors] = useState<string[]>([])
   /** Hover state that the DOM needs; the canvas reads the ref instead. */
   const [hoverBodyId, setHoverBodyId] = useState<string | null>(null)
   const [hoverSatelliteId, setHoverSatelliteId] = useState<string | null>(null)
   const [hoverPoint, setHoverPoint] = useState({ x: 0, y: 0 })
+  /** The hover box itself, so a pointer walking onto its link is not a miss. */
+  const hoverTooltipRef = useRef<HTMLDivElement | null>(null)
   /**
    * Zoom, and what it means as a length. Read from the map on every move
    * rather than derived from a prop: the wheel, the chase and the fly-to all
@@ -800,6 +931,11 @@ export function GlobeMap(props: Props) {
     [],
   )
 
+  useEffect(() => {
+    setLiveTrailWidth(props.swarmTrailWidth ?? 1)
+    setLiveTrailOpacity(props.swarmTrailOpacity ?? 1)
+  }, [props.swarmTrailWidth, props.swarmTrailOpacity])
+
   const logError = useCallback((label: string, err: unknown) => {
     const time = new Date().toISOString().slice(11, 23)
     const detail = err instanceof Error ? (err.stack ?? err.message) : String(err)
@@ -820,6 +956,10 @@ export function GlobeMap(props: Props) {
     for (const sat of current.satellites) {
       const point = livePositionRef.current.get(sat.id)
       if (!point) continue
+      /* The altitude layer already draws this marker at r = R + h. A second
+         GeoJSON circle at the same lat/lon is the unlabeled duplicate on
+         the ground when that visibility hide misses a frame. */
+      if (altitudeOnRef.current) continue
       features.push(
         markerFeature(point.lon, point.lat, {
           kind: 'satellite',
@@ -873,9 +1013,15 @@ export function GlobeMap(props: Props) {
     if (!projection) return
     const sats = propsRef.current.satellites
     if (sats.length === 0) return
-    const sat = sats[refineCursorRef.current++ % sats.length]
-    const entry = refinedTrailRef.current.get(sat.id)
-    if (!entry || entry.settled || !sat.positionAt) return
+    let sat = sats[0]
+    let entry = refinedTrailRef.current.get(sat.id)
+    for (let n = 0; n < sats.length; n++) {
+      sat = sats[refineCursorRef.current++ % sats.length]
+      entry = refinedTrailRef.current.get(sat.id)
+      if (entry && !entry.settled && sat.positionAt) break
+      entry = undefined
+    }
+    if (!entry || !sat.positionAt) return
     const canvas = map.getCanvas()
     const variant = layer.lastVariantName()
     const project = (point: GlobeTrackPoint) =>
@@ -1051,12 +1197,13 @@ export function GlobeMap(props: Props) {
     if (keyframe && keyframe.count > 0 && ids) {
       const progress = keyframeProgress(Date.now(), keyframe.epochMs, keyframe.spanMs)
       for (let i = 0; i < keyframe.count; i++) {
-        /* Slot i is not satellite i: a satellite the propagator could not place
-           is skipped, which compacts the buffer. */
+        if (swarmHiddenSlotRef.current !== null && i === swarmHiddenSlotRef.current) continue
         const satellite = keyframe.indices[i]
         if (satellite >= ids.length) continue
+        if (swarmHiddenIndexRef.current !== null && satellite === swarmHiddenIndexRef.current) continue
         const at = i * SWARM_FLOATS_PER_SATELLITE
         const px = keyframe.packed[at] + progress * keyframe.packed[at + 3]
+        if (!Number.isFinite(px)) continue
         const py = keyframe.packed[at + 1] + progress * keyframe.packed[at + 4]
         const elevation = keyframe.packed[at + 2] + progress * keyframe.packed[at + 5]
         const screen = project(px, py, elevation)
@@ -1081,7 +1228,11 @@ export function GlobeMap(props: Props) {
         candidates = found.length
         const nearest = nearestCandidateSegment(index, found, x, y, project)
         projections += nearest?.projections ?? found.length * 2
-        if (nearest && nearest.satellite < ids.length) {
+        if (
+          nearest &&
+          nearest.satellite < ids.length &&
+          nearest.satellite !== swarmHiddenIndexRef.current
+        ) {
           if (!best || nearest.distancePx < best.distance) {
             best = { id: ids[nearest.satellite], distance: nearest.distancePx }
           }
@@ -1288,16 +1439,8 @@ export function GlobeMap(props: Props) {
     }
 
     if (skyDebugRef.current) skyDebugRef.current = []
-    /* Bodies that land inside the actual viewport, which is stricter than the
-       projection gate: that one keeps samples out to 1.5x the frame so a path
-       entering from off-screen still draws its approach. A body counted here
-       is one the viewer can actually see. */
-    let onScreen = 0
     for (const body of bodies) {
       const screen = visible(body.direction)
-      if (screen && screen.x >= 0 && screen.x <= width && screen.y >= 0 && screen.y <= height) {
-        onScreen++
-      }
       const truePx = angularSizeToPixels(
         (body.angularDiameterRad * 180) / Math.PI,
         frame.fov,
@@ -1368,14 +1511,6 @@ export function GlobeMap(props: Props) {
         drawDot(ctx, screen, Math.max(truePx / 2, PLANET_MIN_DOT_PX / 2, grown), body.color)
       }
     }
-
-    /* Every enabled body behind the planet or off the frame. Reported only on
-       CHANGE: this runs per frame and the answer is stable for seconds at a time. */
-    const allOff = onScreen === 0
-    if (skyAllOffScreenRef.current !== allOff) {
-      skyAllOffScreenRef.current = allOff
-      propsRef.current.onSkyBodiesOffScreen?.(allOff)
-    }
   }, [sunDirectionNow, refinedPathOf])
 
   /** Re-push stored trails and live points, e.g. after the layer is re-added. */
@@ -1399,7 +1534,12 @@ export function GlobeMap(props: Props) {
     const map = new MapLibreMap({
       container,
       style: buildBaseStyle(),
-      center: INITIAL_CENTER,
+      center:
+        propsRef.current.cameraLng != null && propsRef.current.cameraLat != null
+          ? [propsRef.current.cameraLng, propsRef.current.cameraLat]
+          : (propsRef.current.initialCenter ?? INITIAL_CENTER),
+      pitch: propsRef.current.cameraPitch ?? 0,
+      bearing: propsRef.current.cameraBearing ?? 0,
       /*
        * Fill rate, not resolution, is what limits this view on a phone: a
        * dpr-3 iPhone asks the GPU for nine times the pixels of a dpr-1 screen
@@ -1408,11 +1548,11 @@ export function GlobeMap(props: Props) {
        * devices. Desktop screens are dpr 1 or 2 and are unaffected.
        */
       pixelRatio: Math.min(window.devicePixelRatio || 1, MAX_DEVICE_PIXEL_RATIO),
-      zoom: propsRef.current.initialZoom ?? INITIAL_ZOOM,
+      zoom: propsRef.current.cameraZoom ?? propsRef.current.initialZoom ?? INITIAL_ZOOM,
       maxPitch: MAX_PITCH,
-      /* MapLibre's documented floor. Its default is 0, so this widens the view
-         by two zoom levels: 4x linear, 16x area. That is the whole range the
-         library allows; ~100x area would need about zoom -3.3. */
+      /* Default minZoom is 0. Negative values zoom out past the whole-Earth
+         view; -4 is 16× linear / 256× area versus zoom 0, the zoom at which
+         the view hands over to the solar scene. */
       minZoom: GLOBE_MIN_ZOOM,
       /* centerClampedToGround defaults to true and, per its own doc comment,
          "the elevation of the center point will automatically be set to the
@@ -1426,6 +1566,16 @@ export function GlobeMap(props: Props) {
          renders two stacked attribution bars alongside the explicit control
          added below. */
       attributionControl: false,
+      /* MapLibre's own keyboard pan moves the centre by SCREEN pixels, which
+         on a globe drifts latitude and bearing on a horizontal pan and
+         changes the apparent scale on a vertical one (zoom is mercator scale
+         AT the centre latitude). The bindings are reimplemented below as pure
+         globe rotations. */
+      keyboard: false,
+      /* Attract-mode is a continuous camera move. The default 300 ms tile
+         crossfade restarts on every camera write and reads as the globe
+         flashing. Zero keeps the already-resident mesh. */
+      fadeDuration: propsRef.current.autoRotateDegPerS ? 0 : 300,
     })
     mapRef.current = map
 
@@ -1491,6 +1641,7 @@ export function GlobeMap(props: Props) {
     map.on('zoomend', () => layer.refreshDashLengths(true))
     map.on('moveend', () => {
       if (followActiveRef.current) return
+      if (propsRef.current.autoRotateDegPerS) return
       const center = map.getCenter()
       propsRef.current.onViewChange?.({
         center: [center.lng, center.lat],
@@ -1561,12 +1712,11 @@ export function GlobeMap(props: Props) {
       const map = mapRef.current
       const wasFollowing = followActiveRef.current
       followActiveRef.current = false
+      followHeadingRef.current = null
       setFollowActive(false)
       stopFollowLoop()
       if (!map) return
-      map.dragPan.enable()
-      map.dragRotate.enable()
-      map.scrollZoom.enable()
+      setFollowNativeHandlers(map, false)
       if (!altitudeBeforeFollowRef.current) setAltitude(false)
       if (wasFollowing && (options.restoreCamera ?? true)) {
         /* The satellite's own ground point, NOT map.getCenter(): during follow
@@ -1605,7 +1755,8 @@ export function GlobeMap(props: Props) {
     const point = positionOf(sat, now)
     if (point) {
       const ahead = positionOf(sat, new Date(now.getTime() + HEADING_LOOKAHEAD_MS))
-      const heading = ahead ? computeBearingDeg(point, ahead) : map.getBearing()
+      const rawHeading = ahead ? computeBearingDeg(point, ahead) : map.getBearing()
+      const heading = smoothFollowHeading(followHeadingRef, rawHeading)
       const pose = followPoseRef.current
       const bearing = composeBearingDeg(heading, pose.bearingOffsetDeg)
 
@@ -1664,6 +1815,7 @@ export function GlobeMap(props: Props) {
     zoomBeforeFollowRef.current = map.getZoom()
     if (!altitudeOnRef.current) setAltitude(true)
     followActiveRef.current = true
+    followHeadingRef.current = null
     /* The entry pitch scales down with the orbit: LEO gets the leaning chase,
        a navigation or geosynchronous bird is followed straight down, where
        the elevated-centre lead is zero and the geometry stays a camera. */
@@ -1676,11 +1828,9 @@ export function GlobeMap(props: Props) {
     setFollowActive(true)
     /* Every native camera handler is off for the whole session: pan, rotate
        and wheel zoom all write the camera directly, and during follow the
-       per-frame compose step is the only writer. Their jobs are taken over by
-       the gesture handlers below, which move the pose instead. */
-    map.dragPan.disable()
-    map.dragRotate.disable()
-    map.scrollZoom.disable()
+       per-frame compose step is the only writer. Touch zoom/pitch too: they
+       would fight the jumpTo loop so pinches felt like they did nothing. */
+    setFollowNativeHandlers(map, true)
 
     /*
      * The entry easing has to land on the pose the chase loop will hold, or
@@ -1730,6 +1880,44 @@ export function GlobeMap(props: Props) {
     else enterFollow()
   }, [enterFollow, exitFollow])
 
+  useEffect(() => {
+    if (!ready) return
+    if (props.followWanted) {
+      if (!followActiveRef.current) enterFollow()
+      return
+    }
+    if (followActiveRef.current) exitFollow({ restoreCamera: false })
+  }, [ready, props.followWanted, enterFollow, exitFollow, props.followTargetId, props.satellites.length])
+
+  useEffect(() => {
+    if (!ready || followActive) return
+    if (props.cameraZoom == null || props.cameraLng == null || props.cameraLat == null) return
+    const map = mapRef.current
+    if (!map) return
+    const centre = map.getCenter()
+    const same =
+      Math.abs(centre.lng - props.cameraLng) < 1e-3 &&
+      Math.abs(centre.lat - props.cameraLat) < 1e-3 &&
+      Math.abs(map.getZoom() - props.cameraZoom) < 0.02 &&
+      Math.abs(map.getPitch() - (props.cameraPitch ?? 0)) < 0.5 &&
+      Math.abs(map.getBearing() - (props.cameraBearing ?? 0)) < 0.5
+    if (same) return
+    map.jumpTo({
+      center: [props.cameraLng, props.cameraLat],
+      zoom: props.cameraZoom,
+      pitch: props.cameraPitch ?? 0,
+      bearing: props.cameraBearing ?? 0,
+    })
+  }, [
+    ready,
+    followActive,
+    props.cameraLng,
+    props.cameraLat,
+    props.cameraZoom,
+    props.cameraPitch,
+    props.cameraBearing,
+  ])
+
   // --- Keyboard, wheel and drag gestures ---------------------------------
   useEffect(() => {
     if (!ready) return
@@ -1744,8 +1932,9 @@ export function GlobeMap(props: Props) {
     let lookDragging = false
     let lookLastX = 0
     let lookLastY = 0
-    /** In-flight swarm pick, so the hover costs at most one per frame. */
+    /** At most one swarm pick per frame; the latest pointer wins. */
     let swarmPickFrame = 0
+    let swarmPickAt = { x: 0, y: 0 }
     /** Where the press landed, so a drag is not mistaken for a click. */
     let pressAt: { x: number; y: number } | null = null
 
@@ -1756,20 +1945,14 @@ export function GlobeMap(props: Props) {
       map.dragRotate.enable()
     }
 
-    /* The globe shares the page with tool inputs, so the F shortcut must
-       ignore keystrokes aimed at a field. */
-    const isTypingTarget = (target: EventTarget | null): boolean => {
-      if (!(target instanceof HTMLElement)) return false
-      return (
-        target.isContentEditable ||
-        target instanceof HTMLInputElement ||
-        target instanceof HTMLTextAreaElement ||
-        target instanceof HTMLSelectElement
-      )
-    }
-
+    /* Arrows pan the globe (ArrowRight rotates the view eastward, matching
+       the map-keys convention and the CAMERA panel's own buttons); SHIFT
+       with them turns and tilts instead, and plus/minus zoom. Routed through
+       the same panBy / rotateBearingBy / tiltBy / zoomByKey the on-screen
+       buttons call, not through MapLibre's disabled KeyboardHandler, so a
+       globe rotation is exactly what a press produces. */
     const onKeyDown = (e: KeyboardEvent) => {
-      if ((e.key === 'f' || e.key === 'F') && !e.altKey && !e.ctrlKey && !e.metaKey) {
+      if ((e.key === 'c' || e.key === 'C') && !e.altKey && !e.ctrlKey && !e.metaKey) {
         if (isTypingTarget(e.target)) return
         toggleFollow()
         return
@@ -1778,6 +1961,43 @@ export function GlobeMap(props: Props) {
         altHeld = true
         // Follow already keeps scrollZoom off for the whole session.
         if (!followActiveRef.current) map.scrollZoom.disable()
+      }
+      if (e.ctrlKey || e.metaKey || e.altKey) return
+      if (!e.key.startsWith('Arrow') && !'+=-_'.includes(e.key)) return
+      const controls = keyControlsRef.current
+      if (!controls) return
+      if (isTypingTarget(e.target)) return
+      switch (e.key) {
+        case 'ArrowRight':
+          e.preventDefault()
+          if (e.shiftKey) controls.rotateBearingBy(1)
+          else controls.panBy(0, 1)
+          break
+        case 'ArrowLeft':
+          e.preventDefault()
+          if (e.shiftKey) controls.rotateBearingBy(-1)
+          else controls.panBy(0, -1)
+          break
+        case 'ArrowUp':
+          e.preventDefault()
+          if (e.shiftKey) controls.tiltBy(1)
+          else controls.panBy(1, 0)
+          break
+        case 'ArrowDown':
+          e.preventDefault()
+          if (e.shiftKey) controls.tiltBy(-1)
+          else controls.panBy(-1, 0)
+          break
+        case '+':
+        case '=':
+          e.preventDefault()
+          controls.zoomByKey(1)
+          break
+        case '-':
+        case '_':
+          e.preventDefault()
+          controls.zoomByKey(-1)
+          break
       }
     }
 
@@ -1826,6 +2046,11 @@ export function GlobeMap(props: Props) {
       floorNotchesRef.current += 1
       if (floorNotchesRef.current < FLOOR_EXIT_NOTCHES) return
       floorNotchesRef.current = 0
+      /* Measured under whatever pitch the camera currently holds, unlike the
+         chip's flight-out path below, which eases to pitch 0 first: this
+         radius can therefore exceed the pitch-0 radius and record a return
+         scale beyond what the solar scene's own zoom range can reach, which
+         is why that side clamps the return threshold to its reachable range. */
       const radiusPx = globeScreenRadiusPx(
         frame.defaultProjectionData.clippingPlane,
         frame.fov,
@@ -1835,15 +2060,43 @@ export function GlobeMap(props: Props) {
       handoff(radiusPx)
     }
 
+    const followPointers = new Map<number, { x: number; y: number }>()
+    let pinchStartDist = 0
+    let pinchStartZoom = 0
+
+    const endFollowPointer = (pointerId: number) => {
+      followPointers.delete(pointerId)
+      if (followPointers.size < 2) pinchStartDist = 0
+      if (followPointers.size === 0) lookDragging = false
+      else if (followPointers.size === 1) {
+        const remaining = followPointers.values().next().value
+        if (remaining) {
+          lookDragging = true
+          lookLastX = remaining.x
+          lookLastY = remaining.y
+        }
+      }
+    }
+
     const onPointerDown = (e: PointerEvent) => {
       pressAt = { x: e.clientX, y: e.clientY }
       if (followActiveRef.current) {
-        /* While following, ANY plain drag looks around: dragPan/dragRotate
-           are already disabled for the whole session, so there is no native
-           handler left to conflict with. */
-        lookDragging = true
-        lookLastX = e.clientX
-        lookLastY = e.clientY
+        try {
+          canvas.setPointerCapture(e.pointerId)
+        } catch {
+          /* Capture can throw if the pointer is already gone. */
+        }
+        followPointers.set(e.pointerId, { x: e.clientX, y: e.clientY })
+        if (followPointers.size >= 2) {
+          lookDragging = false
+          const pts = [...followPointers.values()]
+          pinchStartDist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y)
+          pinchStartZoom = followPoseRef.current.zoom
+        } else {
+          lookDragging = true
+          lookLastX = e.clientX
+          lookLastY = e.clientY
+        }
         e.preventDefault()
         return
       }
@@ -1857,6 +2110,19 @@ export function GlobeMap(props: Props) {
     }
 
     const onPointerMove = (e: PointerEvent) => {
+      if (followActiveRef.current && followPointers.has(e.pointerId)) {
+        followPointers.set(e.pointerId, { x: e.clientX, y: e.clientY })
+        if (followPointers.size >= 2 && pinchStartDist > 0) {
+          const pts = [...followPointers.values()]
+          const dist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y)
+          const ratio = dist / pinchStartDist
+          followPoseRef.current.zoom = Math.max(
+            GLOBE_MIN_ZOOM,
+            Math.min(MAX_ZOOM, pinchStartZoom + Math.log2(Math.max(1e-6, ratio))),
+          )
+          return
+        }
+      }
       if (lookDragging) {
         if (!followActiveRef.current) {
           lookDragging = false
@@ -1895,76 +2161,132 @@ export function GlobeMap(props: Props) {
       })
     }
 
-    /* Hover picking. Suppressed during any gesture and during follow, so it can
-       never argue with a drag, a zoom or the chase. */
+    const pointerOnTooltip = (e: PointerEvent) => {
+      const tooltipEl = hoverTooltipRef.current
+      if (!tooltipEl) return false
+      if (tooltipEl.contains(e.target as Node)) return true
+      const box = tooltipEl.getBoundingClientRect()
+      return (
+        e.clientX >= box.left &&
+        e.clientX <= box.right &&
+        e.clientY >= box.top &&
+        e.clientY <= box.bottom
+      )
+    }
+
+    const clearHover = () => {
+      if (hoverRef.current.bodyId !== null) {
+        hoverRef.current = { bodyId: null, x: hoverRef.current.x, y: hoverRef.current.y }
+        setHoverBodyId(null)
+        propsRef.current.onSkyBodyHover?.(null)
+      }
+      if (hoverIdentityRef.current !== null) {
+        hoverIdentityRef.current = null
+        setHoverSatelliteId(null)
+        propsRef.current.onSatelliteHover?.(null)
+      }
+    }
+
+    const claimSatellite = (id: string, x: number, y: number) => {
+      if (hoverIdentityRef.current !== id) {
+        hoverIdentityRef.current = id
+        setHoverSatelliteId(id)
+        propsRef.current.onSatelliteHover?.(id)
+      }
+      if (hoverRef.current.bodyId !== null) {
+        hoverRef.current = { bodyId: null, x, y }
+        setHoverBodyId(null)
+        propsRef.current.onSkyBodyHover?.(null)
+      }
+      setHoverPoint({ x, y })
+    }
+
+    const claimSky = (id: string, x: number, y: number) => {
+      if (hoverRef.current.bodyId !== id) {
+        hoverRef.current = { bodyId: id, x, y }
+        setHoverBodyId(id)
+        propsRef.current.onSkyBodyHover?.(id)
+      }
+      if (hoverIdentityRef.current !== null) {
+        hoverIdentityRef.current = null
+        setHoverSatelliteId(null)
+        propsRef.current.onSatelliteHover?.(null)
+      }
+      setHoverPoint({ x, y })
+    }
+
+    /* Sticky tooltip: stays until a click outside it or another feature. */
     const onHoverMove = (e: PointerEvent) => {
-      const gesturing =
-        lookDragging || altDragging || followActiveRef.current || mapMovingRef.current
+      if (pointerOnTooltip(e)) return
+      if (lookDragging || altDragging || followActiveRef.current) return
       const rect = canvas.getBoundingClientRect()
       const x = e.clientX - rect.left
       const y = e.clientY - rect.top
       const inside = x >= 0 && y >= 0 && x <= rect.width && y <= rect.height
-      if (gesturing || !inside) {
-        if (hoverRef.current.bodyId !== null) {
-          hoverRef.current = { bodyId: null, x, y }
-          setHoverBodyId(null)
-          propsRef.current.onSkyBodyHover?.(null)
-        }
-        if (hoverIdentityRef.current !== null) {
-          hoverIdentityRef.current = null
-          setHoverSatelliteId(null)
-          propsRef.current.onSatelliteHover?.(null)
-        }
-        return
-      }
+      if (!inside) return
+
       let nearestSat: { id: string; distance: number } | null = null
       for (const [id, at] of satScreenRef.current) {
         const distance = Math.hypot(at.x - x, at.y - y)
         if (distance > SATELLITE_HOVER_PX) continue
         if (!nearestSat || distance < nearestSat.distance) nearestSat = { id, distance }
       }
-
-      /*
-       * One identity, whatever the pointer actually landed on. A marker
-       * answers immediately; anything else costs a projection pass, so it runs
-       * at most once a frame and only when no marker already won.
-       */
-      const report = (id: string | null) => {
-        if (hoverIdentityRef.current === id) return
-        hoverIdentityRef.current = id
-        setHoverSatelliteId(id)
-        propsRef.current.onSatelliteHover?.(id)
-      }
       if (nearestSat) {
-        report(nearestSat.id)
-      } else if (swarmPickFrame === 0) {
-        swarmPickFrame = requestAnimationFrame(() => {
-          swarmPickFrame = 0
-          report(pickSatelliteAt(x, y))
-        })
+        const at = satScreenRef.current.get(nearestSat.id)
+        claimSatellite(nearestSat.id, at?.x ?? x, at?.y ?? y)
+        return
       }
-      let best: { id: string; distance: number } | null = null
-      for (const [id, points] of hoverPathsRef.current) {
-        const distance = distanceToPolylinePx(points, x, y)
-        if (distance > SKY_PATH_HOVER_PX) continue
-        if (!best || distance < best.distance) best = { id, distance }
-      }
-      const previousBody = hoverRef.current.bodyId
-      const nextBody = best?.id ?? null
-      hoverRef.current = { bodyId: nextBody, x, y }
-      setHoverPoint({ x, y })
-      /* Only on CHANGE: this runs on every pointer move, and the panel it
-         reports to should hear about crossing a path, not about the mouse. */
-      if (previousBody !== nextBody) {
-        setHoverBodyId(nextBody)
-        propsRef.current.onSkyBodyHover?.(nextBody)
-      }
-      /* The satellite identity belongs to `report` above: writing it again here
-         would undo a trail or swarm hit the moment it was found. */
+      /* Satellites first. Sky is claimed only if the sat pick misses. */
+      swarmPickAt = { x, y }
+      if (swarmPickFrame !== 0) return
+      swarmPickFrame = requestAnimationFrame(() => {
+        swarmPickFrame = 0
+        const px = swarmPickAt.x
+        const py = swarmPickAt.y
+        const id = pickSatelliteAt(px, py)
+        if (id) {
+          const at = satScreenRef.current.get(id)
+          claimSatellite(id, at?.x ?? px, at?.y ?? py)
+          return
+        }
+        let best: { id: string; distance: number } | null = null
+        for (const [pathId, points] of hoverPathsRef.current) {
+          const distance = distanceToPolylinePx(points, px, py)
+          if (distance > SKY_PATH_HOVER_PX) continue
+          if (!best || distance < best.distance) best = { id: pathId, distance }
+        }
+        if (best) claimSky(best.id, px, py)
+      })
     }
 
-    const onPointerUp = () => {
-      lookDragging = false
+    const onOutsidePointerDown = (e: PointerEvent) => {
+      if (!hoverIdentityRef.current && hoverRef.current.bodyId === null) return
+      if (pointerOnTooltip(e)) return
+      const rect = canvas.getBoundingClientRect()
+      const x = e.clientX - rect.left
+      const y = e.clientY - rect.top
+      const onCanvas = x >= 0 && y >= 0 && x <= rect.width && y <= rect.height
+      if (onCanvas) {
+        for (const at of satScreenRef.current.values()) {
+          if (Math.hypot(at.x - x, at.y - y) <= SATELLITE_HOVER_PX) return
+        }
+        if (pickSatelliteAt(x, y)) return
+        for (const points of hoverPathsRef.current.values()) {
+          if (distanceToPolylinePx(points, x, y) <= SKY_PATH_HOVER_PX) return
+        }
+      }
+      clearHover()
+    }
+
+    const onPointerUp = (e: PointerEvent) => {
+      if (canvas.hasPointerCapture?.(e.pointerId)) {
+        try {
+          canvas.releasePointerCapture(e.pointerId)
+        } catch {
+          /* already released */
+        }
+      }
+      endFollowPointer(e.pointerId)
       stopAltDrag()
     }
 
@@ -1994,33 +2316,112 @@ export function GlobeMap(props: Props) {
         altHeld = false
         if (!followActiveRef.current) map.scrollZoom.enable()
       }
+      followPointers.clear()
+      pinchStartDist = 0
       lookDragging = false
       stopAltDrag()
     }
 
-    window.addEventListener('keydown', onKeyDown)
-    window.addEventListener('keyup', onKeyUp)
+    const onTouchMoveLock = (e: TouchEvent) => {
+      e.preventDefault()
+    }
+
+    /* Camera shortcuts are the tool page's own keyboard: an embed sharing
+       the page with other content must not steal its arrow keys. */
+    if (chrome) {
+      window.addEventListener('keydown', onKeyDown)
+      window.addEventListener('keyup', onKeyUp)
+    }
     window.addEventListener('pointermove', onPointerMove)
     window.addEventListener('pointermove', onHoverMove)
     window.addEventListener('pointerup', onPointerUp)
+    window.addEventListener('pointercancel', onPointerUp)
+    window.addEventListener('pointerdown', onOutsidePointerDown, true)
     window.addEventListener('blur', onBlur)
     canvas.addEventListener('wheel', onWheel, { passive: false })
     canvas.addEventListener('pointerdown', onPointerDown)
     canvas.addEventListener('click', onCanvasClick)
+    /* Safari still needs a non-passive touchmove to refuse rubber-band scroll
+       when the finger is on the globe; Chrome honours touch-action: none. */
+    canvas.addEventListener('touchmove', onTouchMoveLock, { passive: false })
 
     return () => {
-      window.removeEventListener('keydown', onKeyDown)
-      window.removeEventListener('keyup', onKeyUp)
+      if (chrome) {
+        window.removeEventListener('keydown', onKeyDown)
+        window.removeEventListener('keyup', onKeyUp)
+      }
       window.removeEventListener('pointermove', onPointerMove)
       window.removeEventListener('pointermove', onHoverMove)
       window.removeEventListener('pointerup', onPointerUp)
+      window.removeEventListener('pointercancel', onPointerUp)
+      window.removeEventListener('pointerdown', onOutsidePointerDown, true)
       window.removeEventListener('blur', onBlur)
       canvas.removeEventListener('wheel', onWheel)
       canvas.removeEventListener('pointerdown', onPointerDown)
       canvas.removeEventListener('click', onCanvasClick)
+      canvas.removeEventListener('touchmove', onTouchMoveLock)
       if (swarmPickFrame !== 0) cancelAnimationFrame(swarmPickFrame)
     }
-  }, [ready, toggleFollow, pickSatelliteAt])
+  }, [ready, toggleFollow, pickSatelliteAt, chrome])
+
+  /*
+   * Attract-mode auto-rotation around Earth's polar axis.
+   *
+   * Longitude of the map centre, with north kept up: the poles stay put and
+   * the planet turns underneath. Bearing rotation was tried and spun the
+   * view around the camera instead. jumpTo every frame was also tried and
+   * retessellated the globe mesh against the trail layer. easeTo interpolates
+   * inside MapLibre's own render loop, so tiles and custom layers share a
+   * transform. 90° chunks keep the short-arc interpolator on the eastward
+   * step; wrapping 180→270 as 180→−90 would otherwise take the long way.
+   */
+  useEffect(() => {
+    const rate = props.autoRotateDegPerS
+    if (!ready || !rate || followActive) return
+    const map = mapRef.current
+    if (!map) return
+    const chunkDeg = 90
+    const durationMs = (chunkDeg / Math.abs(rate)) * 1000
+    const deltaDeg = Math.sign(rate) * chunkDeg
+    let generation = 0
+    let onEnd: (() => void) | null = null
+    const run = () => {
+      const my = ++generation
+      if (onEnd) map.off('moveend', onEnd)
+      onEnd = () => {
+        if (my !== generation) return
+        run()
+      }
+      const center = map.getCenter()
+      map.easeTo({
+        center: [wrapLngDeg(center.lng + deltaDeg), center.lat],
+        bearing: 0,
+        pitch: 0,
+        duration: durationMs,
+        easing: (t) => t,
+        essential: true,
+      })
+      map.once('moveend', onEnd)
+    }
+    run()
+    const onVisibility = () => {
+      if (document.visibilityState === 'hidden') {
+        generation += 1
+        if (onEnd) map.off('moveend', onEnd)
+        onEnd = null
+        map.stop()
+        return
+      }
+      run()
+    }
+    document.addEventListener('visibilitychange', onVisibility)
+    return () => {
+      generation += 1
+      if (onEnd) map.off('moveend', onEnd)
+      map.stop()
+      document.removeEventListener('visibilitychange', onVisibility)
+    }
+  }, [ready, props.autoRotateDegPerS, followActive])
 
   /*
    * The scale readout. `move` covers every camera write MapLibre knows about,
@@ -2029,6 +2430,10 @@ export function GlobeMap(props: Props) {
    */
   useEffect(() => {
     if (!ready) return
+    /* jumpTo in attract-mode is a move+moveend every frame. Writing React
+       state on those events re-renders the map sixty times a second and the
+       globe hitchs. The scale strip and site tooltip are chrome-only. */
+    if (!chrome) return
     const map = mapRef.current
     if (!map) return
     const read = () => {
@@ -2071,7 +2476,7 @@ export function GlobeMap(props: Props) {
       map.off('move', read)
       map.off('resize', read)
     }
-  }, [ready, activePoi, syncMarkers])
+  }, [ready, activePoi, syncMarkers, chrome])
 
   // --- Satellite sources, layers and data --------------------------------
   useEffect(() => {
@@ -2081,8 +2486,12 @@ export function GlobeMap(props: Props) {
     if (!map || !layer || map !== readyMapRef.current) return
 
     /* Trails thin and dim as the population grows: with a crowd on screen the
-       lines are context, not the subject. */
-    const weight = trailWeightFor(satellites.length)
+       lines are context, not the subject. The identified satellite is the
+       subject: same dashed future and weight as a lone ISS, then the
+       TRAJECTORIES sliders on top. */
+    const crowdWeight = trailWeightFor(satellites.length)
+    const identifiedId = props.identifiedSatelliteId
+    const onlySelected = props.swarmTrailOnlySelected ?? false
     const present = new Set<string>()
     for (const sat of satellites) {
       present.add(sat.id)
@@ -2093,7 +2502,15 @@ export function GlobeMap(props: Props) {
         ? (trailWindow.end.getTime() - trailWindow.start.getTime()) / 2 / 60000
         : 0
       const fadeFraction = fadeProgressFraction(halfWindowMinutes)
-      const paintKey = `${sat.color}|${fadeFraction}|${weight.widthPx}|${weight.alpha}`
+      const subject = identifiedId != null && sat.id === identifiedId
+      const baseWeight = subject ? trailWeightFor(1) : crowdWeight
+      const weight = paintedTrailWeight(
+        subject ? 1 : satellites.length,
+        liveTrailWidth,
+        liveTrailOpacity,
+      )
+      const dashed = trailIsDashed(baseWeight)
+      const paintKey = `${sat.color}|${fadeFraction}|${weight.widthPx}|${weight.alpha}|${dashed}`
 
       if (!map.getSource(sources.body)) {
         map.addSource(sources.body, { type: 'geojson', data: EMPTY_FEATURE_COLLECTION })
@@ -2105,13 +2522,10 @@ export function GlobeMap(props: Props) {
           lineMetrics: true,
           data: EMPTY_FEATURE_COLLECTION,
         })
-        for (const spec of trailLayerSpecs(sat.id, sat.color, fadeFraction, weight)) {
+        for (const spec of trailLayerSpecs(sat.id, sat.color, fadeFraction, weight, dashed)) {
           map.addLayer(spec, MARKERS_FIRST_LAYER_ID)
         }
         trailPaintKeyRef.current.set(sat.id, paintKey)
-        if (altitudeOnRef.current) {
-          for (const id of trailLayerIds(sat.id)) map.setLayoutProperty(id, 'visibility', 'none')
-        }
       } else if (trailPaintKeyRef.current.get(sat.id) !== paintKey) {
         const [solidFade, solidBody, dashedBody, dashedFade] = trailLayerIds(sat.id)
         const gradients = trailFadeGradients(sat.color, fadeFraction, weight.alpha)
@@ -2120,10 +2534,24 @@ export function GlobeMap(props: Props) {
         map.setPaintProperty(dashedFade, 'line-gradient', gradients.dashed)
         map.setPaintProperty(solidBody, 'line-color', bodyColor)
         map.setPaintProperty(dashedBody, 'line-color', bodyColor)
+        const dash: [number, number] = dashed ? [2, 2] : [1, 0]
+        map.setPaintProperty(dashedBody, 'line-dasharray', dash)
+        map.setPaintProperty(dashedFade, 'line-dasharray', dash)
         for (const id of trailLayerIds(sat.id)) {
           map.setPaintProperty(id, 'line-width', weight.widthPx)
         }
         trailPaintKeyRef.current.set(sat.id, paintKey)
+      }
+
+      const hideTrail = onlySelected && sat.id !== identifiedId
+      for (const id of trailLayerIds(sat.id)) {
+        if (map.getLayer(id)) {
+          map.setLayoutProperty(
+            id,
+            'visibility',
+            hideTrail || altitudeOnRef.current ? 'none' : 'visible',
+          )
+        }
       }
 
       const splitAt = sat.splitAt ?? points[points.length - 1]?.date ?? new Date()
@@ -2149,7 +2577,7 @@ export function GlobeMap(props: Props) {
           layer.dropSatellite(sat.id)
           refinedTrailRef.current.delete(sat.id)
         }
-        if (trailWindow) {
+        if (trailWindow && !hideTrail) {
           const trail: AltitudeTrailInput = {
             id: sat.id,
             colorRgba: parseCssRgba(sat.color),
@@ -2157,7 +2585,7 @@ export function GlobeMap(props: Props) {
             future,
             windowStart: trailWindow.start,
             windowEnd: trailWindow.end,
-            dashed: trailIsDashed(weight),
+            dashed,
           }
           altitudeDataRef.current.set(sat.id, trail)
           layer.setTrail(trail)
@@ -2174,6 +2602,38 @@ export function GlobeMap(props: Props) {
         layer.refreshDashLengths(false)
       }
 
+      if (hideTrail && altitudeDataRef.current.has(sat.id)) {
+        layer.setTrail({
+          id: sat.id,
+          colorRgba: parseCssRgba(sat.color),
+          past: [],
+          future: [],
+          windowStart: new Date(0),
+          windowEnd: new Date(0),
+          dashed: false,
+        })
+        altitudeDataRef.current.delete(sat.id)
+        refinedTrailRef.current.delete(sat.id)
+      } else if (!hideTrail && trailWindow && !altitudeDataRef.current.has(sat.id)) {
+        const trail: AltitudeTrailInput = {
+          id: sat.id,
+          colorRgba: parseCssRgba(sat.color),
+          past,
+          future,
+          windowStart: trailWindow.start,
+          windowEnd: trailWindow.end,
+          dashed,
+        }
+        altitudeDataRef.current.set(sat.id, trail)
+        layer.setTrail(trail)
+        refinedTrailRef.current.set(sat.id, {
+          key: signature,
+          past: [...past],
+          future: [...future],
+          settled: false,
+        })
+      }
+
       /* While following, the per-frame loop owns the live position and must
          not be fought by the caller's slower cadence. */
       if (!followActiveRef.current) {
@@ -2181,6 +2641,9 @@ export function GlobeMap(props: Props) {
         if (live) {
           livePositionRef.current.set(sat.id, live)
           layer.setPoint(sat.id, parseCssRgba(sat.color), live)
+        } else {
+          livePositionRef.current.delete(sat.id)
+          if (!altitudeDataRef.current.has(sat.id)) layer.dropSatellite(sat.id)
         }
       }
     }
@@ -2205,7 +2668,18 @@ export function GlobeMap(props: Props) {
 
     syncMarkers()
     updateLabelOverlays()
-  }, [ready, satellites, observer, markers, syncMarkers, updateLabelOverlays])
+  }, [
+    ready,
+    satellites,
+    observer,
+    markers,
+    syncMarkers,
+    updateLabelOverlays,
+    liveTrailWidth,
+    liveTrailOpacity,
+    props.identifiedSatelliteId,
+    props.swarmTrailOnlySelected,
+  ])
 
   /* --- Twilight bands -----------------------------------------------------
      Rounded to 0.01 deg (about 2.4 s of the subsolar point's 0.25 deg/min
@@ -2250,6 +2724,38 @@ export function GlobeMap(props: Props) {
       duration: CAMERA_FLIGHT_MS,
     })
   }, [ready, aimAt, exitFollow])
+
+  const handledFrameNonceRef = useRef(0)
+  /**
+   * List / globe pin: turn the planet under the satellite, then stop.
+   * Follow, if on, steps aside first: this click is a look, not a chase.
+   */
+  useEffect(() => {
+    const map = mapRef.current
+    const target = props.frameTarget
+    if (!ready || !map || !target) return
+    if (handledFrameNonceRef.current === target.nonce) return
+    handledFrameNonceRef.current = target.nonce
+    if (followActiveRef.current) exitFollow({ restoreCamera: false })
+    const high = target.altKm > 200
+    const elevated = altitudeOnRef.current || high
+    if (high && !altitudeOnRef.current) setAltitude(true)
+    const pose = frameSatelliteCamera({
+      lonDeg: target.lon,
+      latDeg: target.lat,
+      altitudeM: target.altKm * 1000,
+      elevated,
+      fovRad: sunFrameRef.current?.fov ?? DEFAULT_FOV_RAD,
+      canvasCssHeight: map.getCanvas().clientHeight,
+    })
+    map.easeTo({
+      center: [pose.lonDeg, pose.latDeg],
+      bearing: pose.bearingDeg,
+      pitch: pose.pitchDeg,
+      zoom: Math.max(GLOBE_MIN_ZOOM, Math.min(MAX_ZOOM, pose.zoom)),
+      duration: CAMERA_FLIGHT_MS,
+    })
+  }, [ready, props.frameTarget, setAltitude, exitFollow])
 
   /* The scene chips fly the same route the wheel takes, rather than cutting:
      out to the floor, then over to the wider scene at the matching scale.
@@ -2306,16 +2812,26 @@ export function GlobeMap(props: Props) {
       return
     }
     if (!swarmLayerRef.current) swarmLayerRef.current = createSwarmLayer({ onError: logError })
-    if (!map.getLayer(SWARM_LAYER_ID)) map.addLayer(swarmLayerRef.current)
     const layer = swarmLayerRef.current
-    layer.setPointSize(props.swarmPointSizePx ?? SWARM_DEFAULT_POINT_PX)
+    layer.setPointSize(
+      (props.swarmPointSizePx ?? SWARM_DEFAULT_POINT_PX) * (compactChrome ? 1.65 : 1),
+    )
     layer.setAlpha(0.9)
     /* One rule for altitude across the whole view: with the toggle off the
        swarm lies on the surface exactly as the trails do. */
     layer.setElevationEnabled(altitudeOnRef.current)
     layer.setKeyframe(keyframe.packed, keyframe.count, keyframe.epochMs, keyframe.spanMs)
+    applySwarmPointOwnership(
+      layer,
+      keyframe,
+      propsRef.current.identifiedSatelliteId,
+      propsRef.current.swarmIds,
+      propsRef.current.satellites,
+      swarmHiddenSlotRef,
+    )
+    if (!map.getLayer(SWARM_LAYER_ID)) map.addLayer(layer)
     map.triggerRepaint()
-  }, [ready, props.swarmKeyframe, props.swarmPointSizePx, altitudeOn, logError])
+  }, [ready, props.swarmKeyframe, props.swarmPointSizePx, altitudeOn, compactChrome, logError])
 
   /*
    * The identified satellite's own MARKER, enlarged and saturated: without
@@ -2332,20 +2848,16 @@ export function GlobeMap(props: Props) {
     const layer = swarmLayerRef.current
     const keyframe = props.swarmKeyframe
     if (!ready || !layer || !keyframe) return
-    const identified = props.identifiedSatelliteId
-    const satellite = identified ? (props.swarmIds ?? []).indexOf(identified) : -1
-    let slot = -1
-    if (satellite >= 0) {
-      for (let i = 0; i < keyframe.count; i++) {
-        if (keyframe.indices[i] === satellite) {
-          slot = i
-          break
-        }
-      }
-    }
-    layer.setHighlightSlot(slot >= 0 ? slot : null)
+    applySwarmPointOwnership(
+      layer,
+      keyframe,
+      props.identifiedSatelliteId,
+      props.swarmIds,
+      props.satellites,
+      swarmHiddenSlotRef,
+    )
     mapRef.current?.triggerRepaint()
-  }, [ready, props.swarmKeyframe, props.identifiedSatelliteId, props.swarmIds])
+  }, [ready, props.swarmKeyframe, props.identifiedSatelliteId, props.swarmIds, props.satellites])
 
   // --- Swarm trails --------------------------------------------------------
   /*
@@ -2363,6 +2875,8 @@ export function GlobeMap(props: Props) {
         map.removeLayer(SWARM_TRAIL_LAYER_ID)
       }
       swarmTrailLayerRef.current = null
+      swarmPickRef.current.reset(0)
+      trailLayerCountRef.current = 0
       return
     }
     if (!swarmTrailLayerRef.current) {
@@ -2387,9 +2901,13 @@ export function GlobeMap(props: Props) {
       swarmTrailLayerRef.current.setOnlyHighlighted(
         propsRef.current.swarmTrailOnlySelected ?? false,
       )
-      const identified = propsRef.current.identifiedSatelliteId
-      const at = identified ? (propsRef.current.swarmIds ?? []).indexOf(identified) : -1
-      swarmTrailLayerRef.current.setHighlight(at >= 0 ? at : null)
+      applySwarmTrailOwnership(
+        swarmTrailLayerRef.current,
+        propsRef.current.identifiedSatelliteId,
+        propsRef.current.swarmIds,
+        propsRef.current.satellites,
+        swarmHiddenIndexRef,
+      )
     }
     /* Below the dots, so a marker is never hidden by the lines it belongs to. */
     if (!map.getLayer(SWARM_TRAIL_LAYER_ID)) {
@@ -2398,8 +2916,14 @@ export function GlobeMap(props: Props) {
         map.getLayer(SWARM_LAYER_ID) ? SWARM_LAYER_ID : undefined,
       )
     }
-    swarmTrailLayerRef.current.reset(count)
-    swarmPickRef.current.reset(count)
+    /* reset() zeros the drawn prefix. Re-running this effect at the same
+       count (a parent render, a logError identity change) would flash the
+       trails off and wait for the next worker batch. */
+    if (trailLayerCountRef.current !== count) {
+      swarmTrailLayerRef.current.reset(count)
+      swarmPickRef.current.reset(count)
+      trailLayerCountRef.current = count
+    }
     map.triggerRepaint()
   }, [ready, props.swarmTrailCount, logError])
 
@@ -2410,15 +2934,10 @@ export function GlobeMap(props: Props) {
     layer.setBatch(batch.packed, batch.startIndex, batch.count)
     /* The same batch into the CPU mirror. It has to happen here rather than in
        the layer, because the layer hands its arrays to the GPU and forgets
-       them, while picking needs them for as long as they are drawn.
-       A REFRESH is deliberately not re-indexed: the grid only appends, so
-       re-adding one satellite every couple of seconds would grow its buckets
-       for the rest of the session. The pick keeps the geometry it was built
-       with, which is at most a couple of pixels stale against a radius of
-       six, and the satellite being refreshed is the one already identified. */
-    if (!batch.refresh) {
-      swarmPickRef.current.addBatch(batch.packed, batch.startIndex, batch.count)
-    }
+       them, while picking needs them for as long as they are drawn. A satellite
+       already indexed this generation is not pushed again: the grid stays
+       bounded even when only-selected refresh never completes a population. */
+    swarmPickRef.current.addBatch(batch.packed, batch.startIndex, batch.count)
     mapRef.current?.triggerRepaint()
   }, [ready, props.swarmTrailBatch])
 
@@ -2428,31 +2947,25 @@ export function GlobeMap(props: Props) {
     layer.setAppearance(
       props.swarmTrailBaseWidthPx ?? 1,
       props.swarmTrailBaseAlpha ?? 1,
-      props.swarmTrailWidth ?? 1,
-      props.swarmTrailOpacity ?? 1,
+      liveTrailWidth,
+      liveTrailOpacity,
     )
     layer.setElevationEnabled(altitudeOn)
     layer.setOnlyHighlighted(props.swarmTrailOnlySelected ?? false)
-    /* The swarm's saturated ring stands down as soon as the identified
-       satellite carries a full-treatment track: that track IS the highlight
-       now, refined and Earth-fixed, and the ninety-six-sample ring drawn
-       beside it would read as a second, slightly wrong trajectory. The ring
-       only serves the moment before the track exists. */
-    const identified = props.identifiedSatelliteId
-    const tracked =
-      identified != null &&
-      props.satellites.some(
-        (sat) => sat.id === identified && (sat.positions?.length ?? 0) > 1,
-      )
-    const at = identified && !tracked ? (props.swarmIds ?? []).indexOf(identified) : -1
-    layer.setHighlight(at >= 0 ? at : null)
+    applySwarmTrailOwnership(
+      layer,
+      props.identifiedSatelliteId,
+      props.swarmIds,
+      props.satellites,
+      swarmHiddenIndexRef,
+    )
     mapRef.current?.triggerRepaint()
   }, [
     ready,
     props.swarmTrailBaseWidthPx,
     props.swarmTrailBaseAlpha,
-    props.swarmTrailWidth,
-    props.swarmTrailOpacity,
+    liveTrailWidth,
+    liveTrailOpacity,
     props.swarmTrailOnlySelected,
     props.identifiedSatelliteId,
     props.swarmIds,
@@ -2501,10 +3014,21 @@ export function GlobeMap(props: Props) {
 
     /* Satellites added later get this same visibility when their layers are
        created, so this effect does not need to re-run on every data tick. */
-    const hidden = propsRef.current.satellites
-      .flatMap((sat) => trailLayerIds(sat.id))
-      .concat(SATELLITE_MARKER_LAYER_IDS)
-    for (const id of hidden) {
+    const onlySelected = propsRef.current.swarmTrailOnlySelected ?? false
+    const identified = propsRef.current.identifiedSatelliteId
+    for (const sat of propsRef.current.satellites) {
+      const hideTrail = onlySelected && sat.id !== identified
+      for (const id of trailLayerIds(sat.id)) {
+        if (map.getLayer(id)) {
+          map.setLayoutProperty(
+            id,
+            'visibility',
+            altitudeOn || hideTrail ? 'none' : 'visible',
+          )
+        }
+      }
+    }
+    for (const id of SATELLITE_MARKER_LAYER_IDS) {
       if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', altitudeOn ? 'none' : 'visible')
     }
 
@@ -2524,7 +3048,15 @@ export function GlobeMap(props: Props) {
       }
       labelPosRef.current.clear()
     }
-  }, [ready, altitudeOn, pushAltitudeData])
+    syncMarkers()
+  }, [ready, altitudeOn, pushAltitudeData, syncMarkers])
+
+  useEffect(() => {
+    const layer = layerRef.current
+    if (!ready || !layer) return
+    layer.setAppearance(liveTrailWidth, liveTrailOpacity)
+    layer.setMarkerSize(compactChrome ? 10 : 6)
+  }, [ready, liveTrailWidth, liveTrailOpacity, compactChrome])
 
   // --- Controls -----------------------------------------------------------
   const rotationStepDeg = useCallback(() => {
@@ -2541,9 +3073,30 @@ export function GlobeMap(props: Props) {
       const step = rotationStepDeg()
       const center = map.getCenter()
       const nextLat = Math.max(-85, Math.min(85, center.lat + dLatSign * step))
-      map.easeTo({ center: [center.lng + dLonSign * step, nextLat], duration: 150 })
+      const nextZoom = Math.max(
+        map.getMinZoom(),
+        Math.min(map.getMaxZoom(), latCompensatedZoom(map.getZoom(), center.lat, nextLat)),
+      )
+      map.easeTo({ center: [center.lng + dLonSign * step, nextLat], zoom: nextZoom, duration: 150 })
     },
     [rotationStepDeg],
+  )
+
+  /* Mirrors the wheel's own two zoom paths (see onWheel above) so a key press
+     feels like a notch of the same wheel: an easeTo outside follow, MapLibre
+     clamping the target zoom on its own, and a pose nudge inside follow using
+     the same FOLLOW_WHEEL_ZOOM_FACTOR the wheel already scales by. */
+  const zoomByKey = useCallback(
+    (sign: 1 | -1) => {
+      const map = mapRef.current
+      if (!map) return
+      if (followActiveRef.current) {
+        nudgeFollowPose({ zoomFactor: sign * 100 * FOLLOW_WHEEL_ZOOM_FACTOR })
+        return
+      }
+      map.easeTo({ zoom: map.getZoom() + sign * KEY_ZOOM_STEP, duration: 150 })
+    },
+    [nudgeFollowPose],
   )
 
   /* Both controls feed the pose while following, exactly like the drag and
@@ -2554,7 +3107,12 @@ export function GlobeMap(props: Props) {
       const map = mapRef.current
       if (!map) return
       if (followActiveRef.current) nudgeFollowPose({ bearingDeg: sign * 15 })
-      else map.easeTo({ bearing: map.getBearing() + sign * 15, duration: 150 })
+      else {
+        /* jumpTo, not easeTo: on globe, easeTo also interpolates the centre
+           (setLocationAtPoint), so Turn would pan the planet. Hold-repeat
+           at 120 ms would also kill a 150 ms ease mid-flight. */
+        map.jumpTo({ bearing: map.getBearing() + sign * 15 })
+      }
     },
     [nudgeFollowPose],
   )
@@ -2567,13 +3125,13 @@ export function GlobeMap(props: Props) {
         nudgeFollowPose({ pitchDeg: sign * 10 })
         return
       }
-      map.easeTo({
+      map.jumpTo({
         pitch: Math.max(0, Math.min(MAX_PITCH, map.getPitch() + sign * 10)),
-        duration: 150,
       })
     },
     [nudgeFollowPose],
   )
+  keyControlsRef.current = { panBy, rotateBearingBy, tiltBy, zoomByKey }
 
   const homeTo = useCallback(
     (center: LngLatLike, zoom: number) => {
@@ -2591,11 +3149,20 @@ export function GlobeMap(props: Props) {
 
   /* A satellite under the pointer wins over a sky path behind it: it is the
      nearer thing and the one the pointer was almost certainly aiming at. */
-  const skyTooltip = hoverSatelliteId
+  const skyTooltip: {
+    title: string
+    rows: [string, string][]
+    href?: string
+    linkLabel?: string
+  } | null = hoverSatelliteId
     ? (props.satelliteTooltipFor?.(hoverSatelliteId) ?? null)
     : hoverBodyId
       ? (props.skyTooltipFor?.(hoverBodyId) ?? null)
       : null
+
+  const identifiedTooltip = props.identifiedSatelliteId
+    ? (props.satelliteTooltipFor?.(props.identifiedSatelliteId) ?? null)
+    : null
 
   const hint = followActive ? t('fields.globe_hint_following') : t('fields.globe_hint')
   /* One stable ref callback per satellite id: a fresh closure per render
@@ -2628,7 +3195,7 @@ export function GlobeMap(props: Props) {
       */}
       <div
         ref={containerRef}
-        className="absolute inset-0 h-full w-full"
+        className="absolute inset-0 h-full w-full touch-none"
         role="img"
         aria-label={title ?? t('fields.title_pass_globe')}
       />
@@ -2640,11 +3207,11 @@ export function GlobeMap(props: Props) {
         className="pointer-events-none absolute left-0 top-0 z-[1]"
       />
 
-      {/* Hover tooltip for a sky path. Offset from the pointer and flipped near
-          the edges, so it never leaves the view or sits under the cursor. */}
-      {skyTooltip ? (
+      {/* Sticky hover tooltip: stays until a click outside it or another feature. */}
+      {skyTooltip && !compactChrome ? (
         <div
-          className="pointer-events-none absolute z-20 w-max max-w-[15rem] border border-border bg-bg/92 px-2 py-1.5 backdrop-blur-sm"
+          ref={hoverTooltipRef}
+          className="pointer-events-auto absolute z-20 w-max max-w-[15rem] border border-border bg-bg/92 px-2 py-1.5 backdrop-blur-sm"
           style={{
             left: hoverPoint.x + (hoverPoint.x > (containerRef.current?.clientWidth ?? 0) - 200 ? -196 : 14),
             top: hoverPoint.y + (hoverPoint.y > (containerRef.current?.clientHeight ?? 0) - 130 ? -126 : 12),
@@ -2659,6 +3226,16 @@ export function GlobeMap(props: Props) {
               <span className="tabular">{value}</span>
             </p>
           ))}
+          {skyTooltip.href && skyTooltip.linkLabel ? (
+            <a
+              href={skyTooltip.href}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-1 block font-mono text-[10px] text-signal underline-offset-2 transition-colors hover:text-fg hover:underline"
+            >
+              {skyTooltip.linkLabel} ↗
+            </a>
+          ) : null}
         </div>
       ) : null}
 
@@ -2704,7 +3281,7 @@ export function GlobeMap(props: Props) {
             rel="noopener noreferrer"
             className="mt-1 block font-mono text-[10px] text-signal underline-offset-2 transition-colors hover:text-fg hover:underline"
           >
-            Grokipedia ↗
+            {t('fields.globe_grokipedia')} ↗
           </a>
         </div>
       ) : null}
@@ -2729,19 +3306,36 @@ export function GlobeMap(props: Props) {
         </div>
       ))}
 
-      <div className="absolute bottom-8 left-4 z-[2]">
-        <button
-          type="button"
-          aria-haspopup="dialog"
-          aria-expanded={infoOpen}
-          title={t('fields.globe_info_title')}
-          aria-label={t('fields.globe_info_title')}
-          className="flex h-6 w-6 items-center justify-center rounded-full border border-border bg-surface/80 font-mono text-[11px] leading-none text-muted transition-colors hover:border-warn hover:text-fg"
-          onClick={() => setInfoOpen((open) => !open)}
+      {chrome ? (
+        <div
+          className={cn(
+            'absolute z-[2]',
+            compactChrome
+              ? 'left-[max(0.75rem,var(--safe-left))] bottom-[calc(4.25rem+var(--safe-bottom))]'
+              : 'bottom-8 left-4',
+          )}
         >
-          i
-        </button>
-      </div>
+          <button
+            type="button"
+            aria-haspopup="dialog"
+            aria-expanded={infoOpen}
+            title={t('fields.globe_info_title')}
+            aria-label={t('fields.globe_info_title')}
+            className={cn(
+              'pointer-events-auto relative z-[3] flex shrink-0 items-center justify-center rounded-full border bg-surface/80 font-mono leading-none transition-colors',
+              compactChrome ? 'h-8 w-8 text-[12px]' : 'h-6 w-6 text-[11px]',
+              compactChrome && identifiedTooltip
+                ? 'border-warn text-warn hover:border-warn hover:text-fg'
+                : 'border-border text-muted hover:border-warn hover:text-fg',
+            )}
+            onClick={() => setInfoOpen((open) => !open)}
+          >
+            <span className="pointer-events-none" aria-hidden>
+              i
+            </span>
+          </button>
+        </div>
+      ) : null}
 
       {infoOpen ? (
         <div
@@ -2769,8 +3363,40 @@ export function GlobeMap(props: Props) {
               </button>
             </div>
             <p className="font-mono text-[11px] leading-relaxed text-subtle">{hint}</p>
+            <p className="font-mono text-[11px] leading-relaxed text-subtle">
+              {t('fields.globe_not_tracking')}
+            </p>
             {caption ? (
               <p className="font-mono text-[11px] leading-relaxed text-subtle">{caption}</p>
+            ) : null}
+            {identifiedTooltip ? (
+              <div className="flex flex-col gap-1 border-t border-border pt-2">
+                <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted">
+                  {t('fields.globe_info_selected')}
+                </p>
+                <p className="font-mono text-[11px] uppercase tracking-[0.12em] text-fg">
+                  {identifiedTooltip.title}
+                </p>
+                {identifiedTooltip.rows.map(([label, value]) => (
+                  <p
+                    key={label}
+                    className="flex justify-between gap-3 font-mono text-[11px] text-subtle"
+                  >
+                    <span className="text-muted">{label}</span>
+                    <span className="tabular">{value}</span>
+                  </p>
+                ))}
+                {identifiedTooltip.href && identifiedTooltip.linkLabel ? (
+                  <a
+                    href={identifiedTooltip.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-1 block font-mono text-[10px] text-signal underline-offset-2 transition-colors hover:text-fg hover:underline"
+                  >
+                    {identifiedTooltip.linkLabel} ↗
+                  </a>
+                ) : null}
+              </div>
             ) : null}
           </div>
         </div>
@@ -2781,147 +3407,174 @@ export function GlobeMap(props: Props) {
         for them: move the camera, then decide what the globe carries, then
         dress the trails, then hand the camera to a satellite.
       */}
-      <div className="absolute bottom-4 right-4 z-[2] flex flex-col items-end gap-2">
-        <div className={CTRL_PANEL_CLASS} title={t('fields.globe_pan')}>
-          <p className={CTRL_PANEL_TITLE_CLASS}>{t('fields.globe_camera')}</p>
-          {/*
-            The keys are MapLibre's own, read off its KeyboardHandler rather
-            than assumed: arrows pan, SHIFT with them turns and tilts, and plus
-            and minus zoom. A button that names a shortcut it does not have is
-            worse than a button that names none, so these are the bindings the
-            shipped handler actually switches on.
-          */}
-          <div className="flex items-start gap-2">
-            <div className="grid grid-cols-3 grid-rows-3 gap-[3px]">
-              <HoldButton
-                onTrigger={() => panBy(1, 0)}
-                title={t('fields.globe_pan_north')}
-                className={cn(CTRL_BTN_CLASS, 'col-start-2 row-start-1')}
-              >
-                <span className="flex flex-col items-center leading-none">
-                  <span>▲</span>
-                  <span className="text-[7px] text-muted">↑</span>
-                </span>
-              </HoldButton>
-              <HoldButton
-                onTrigger={() => panBy(0, -1)}
-                title={t('fields.globe_pan_west')}
-                className={cn(CTRL_BTN_CLASS, 'col-start-1 row-start-2')}
-              >
-                <span className="flex flex-col items-center leading-none">
-                  <span>◀</span>
-                  <span className="text-[7px] text-muted">←</span>
-                </span>
-              </HoldButton>
-              <HoldButton
-                onTrigger={() => panBy(0, 1)}
-                title={t('fields.globe_pan_east')}
-                className={cn(CTRL_BTN_CLASS, 'col-start-3 row-start-2')}
-              >
-                <span className="flex flex-col items-center leading-none">
-                  <span>▶</span>
-                  <span className="text-[7px] text-muted">→</span>
-                </span>
-              </HoldButton>
-              <HoldButton
-                onTrigger={() => panBy(-1, 0)}
-                title={t('fields.globe_pan_south')}
-                className={cn(CTRL_BTN_CLASS, 'col-start-2 row-start-3')}
-              >
-                <span className="flex flex-col items-center leading-none">
-                  <span>▼</span>
-                  <span className="text-[7px] text-muted">↓</span>
-                </span>
-              </HoldButton>
-            </div>
-            {/* Orientation: which way is up, and how far the camera leans. */}
-            <div className="grid grid-cols-2 gap-[3px]">
-              <HoldButton
-                onTrigger={() => rotateBearingBy(-1)}
-                title={t('fields.globe_bearing_left')}
-                className={CTRL_BTN_CLASS}
-              >
-                <span className="flex flex-col items-center leading-none">
-                  <span>↺</span>
-                  <span className="text-[7px] text-muted">⇧←</span>
-                </span>
-              </HoldButton>
-              <HoldButton
-                onTrigger={() => rotateBearingBy(1)}
-                title={t('fields.globe_bearing_right')}
-                className={CTRL_BTN_CLASS}
-              >
-                <span className="flex flex-col items-center leading-none">
-                  <span>↻</span>
-                  <span className="text-[7px] text-muted">⇧→</span>
-                </span>
-              </HoldButton>
-              <HoldButton
-                onTrigger={() => tiltBy(1)}
-                title={t('fields.globe_tilt_up')}
-                className={CTRL_BTN_CLASS}
-              >
-                <span className="flex flex-col items-center leading-none">
-                  <span>⇑</span>
-                  <span className="text-[7px] text-muted">⇧↑</span>
-                </span>
-              </HoldButton>
-              <HoldButton
-                onTrigger={() => tiltBy(-1)}
-                title={t('fields.globe_tilt_down')}
-                className={CTRL_BTN_CLASS}
-              >
-                <span className="flex flex-col items-center leading-none">
-                  <span>⇓</span>
-                  <span className="text-[7px] text-muted">⇧↓</span>
-                </span>
-              </HoldButton>
-            </div>
+      {chrome && compactChrome && cameraScale ? (
+        <div className="pointer-events-none absolute right-4 bottom-20 z-[2] hidden md:block lg:hidden">
+          <div className={cn(CTRL_PANEL_CLASS, 'pointer-events-auto')}>
+            <GlobeScaleReadout zoom={cameraScale.zoom} scale={cameraScale.scale} />
           </div>
         </div>
+      ) : null}
+
+      {chrome ? (
+      <ChromeHost compact={compactChrome}>
+        {!compactChrome && cameraScale ? (
+          <div className={CTRL_PANEL_CLASS}>
+            <GlobeScaleReadout zoom={cameraScale.zoom} scale={cameraScale.scale} />
+          </div>
+        ) : null}
+        <ChromePanel
+          compact={compactChrome}
+          open={props.chromeSheet === 'camera'}
+          title={t('fields.globe_camera')}
+          onClose={closeChromeSheet}
+          bodyClassName="flex justify-center"
+        >
+          {/*
+            The keys are this component's own, not MapLibre's KeyboardHandler:
+            its screen-space pan drifts the bearing on a horizontal press and
+            drifts the mercator scale on a vertical one, both wrong for a
+            globe. The bound set is unchanged though: arrows pan, SHIFT with
+            them turns and tilts, and plus and minus zoom.
+          */}
+          <div
+            className={cn(
+              'flex items-start gap-2',
+              compactChrome && 'w-full justify-center [&_button]:h-10 [&_button]:w-10',
+            )}
+          >
+            <KeyTip label={t('fields.kbd_rotate')} keys={['↑', '↓', '←', '→']}>
+              <div className="grid grid-cols-3 grid-rows-3 gap-[3px]">
+                <HoldButton
+                  onTrigger={() => panBy(1, 0)}
+                  title={t('fields.globe_pan_north')}
+                  className={cn(CTRL_BTN_CLASS, 'col-start-2 row-start-1')}
+                >
+                  <span className="flex flex-col items-center leading-none">
+                    <span>▲</span>
+                    <span className="text-[7px] text-muted">↑</span>
+                  </span>
+                </HoldButton>
+                <HoldButton
+                  onTrigger={() => panBy(0, -1)}
+                  title={t('fields.globe_pan_west')}
+                  className={cn(CTRL_BTN_CLASS, 'col-start-1 row-start-2')}
+                >
+                  <span className="flex flex-col items-center leading-none">
+                    <span>◀</span>
+                    <span className="text-[7px] text-muted">←</span>
+                  </span>
+                </HoldButton>
+                <HoldButton
+                  onTrigger={() => panBy(0, 1)}
+                  title={t('fields.globe_pan_east')}
+                  className={cn(CTRL_BTN_CLASS, 'col-start-3 row-start-2')}
+                >
+                  <span className="flex flex-col items-center leading-none">
+                    <span>▶</span>
+                    <span className="text-[7px] text-muted">→</span>
+                  </span>
+                </HoldButton>
+                <HoldButton
+                  onTrigger={() => panBy(-1, 0)}
+                  title={t('fields.globe_pan_south')}
+                  className={cn(CTRL_BTN_CLASS, 'col-start-2 row-start-3')}
+                >
+                  <span className="flex flex-col items-center leading-none">
+                    <span>▼</span>
+                    <span className="text-[7px] text-muted">↓</span>
+                  </span>
+                </HoldButton>
+              </div>
+            </KeyTip>
+            {/* Orientation and zoom: three flex rows rather than one grid,
+                so the bearing pair, the tilt pair and the zoom pair can each
+                carry their own KeyTip. The fixed button size makes the stack
+                the same height as the pan pad beside it. */}
+            <div className="flex flex-col gap-[3px]">
+              <KeyTip label={t('fields.kbd_turn_tilt')} keys={['Shift', '←/→']}>
+                <div className="flex gap-[3px]">
+                  <HoldButton
+                    onTrigger={() => rotateBearingBy(-1)}
+                    title={t('fields.globe_bearing_left')}
+                    className={CTRL_BTN_CLASS}
+                  >
+                    <span className="flex flex-col items-center leading-none">
+                      <span>↺</span>
+                      <span className="text-[7px] text-muted">⇧←</span>
+                    </span>
+                  </HoldButton>
+                  <HoldButton
+                    onTrigger={() => rotateBearingBy(1)}
+                    title={t('fields.globe_bearing_right')}
+                    className={CTRL_BTN_CLASS}
+                  >
+                    <span className="flex flex-col items-center leading-none">
+                      <span>↻</span>
+                      <span className="text-[7px] text-muted">⇧→</span>
+                    </span>
+                  </HoldButton>
+                </div>
+              </KeyTip>
+              <KeyTip label={t('fields.kbd_turn_tilt')} keys={['Shift', '↑/↓']}>
+                <div className="flex gap-[3px]">
+                  <HoldButton
+                    onTrigger={() => tiltBy(1)}
+                    title={t('fields.globe_tilt_up')}
+                    className={CTRL_BTN_CLASS}
+                  >
+                    <span className="flex flex-col items-center leading-none">
+                      <span>⇑</span>
+                      <span className="text-[7px] text-muted">⇧↑</span>
+                    </span>
+                  </HoldButton>
+                  <HoldButton
+                    onTrigger={() => tiltBy(-1)}
+                    title={t('fields.globe_tilt_down')}
+                    className={CTRL_BTN_CLASS}
+                  >
+                    <span className="flex flex-col items-center leading-none">
+                      <span>⇓</span>
+                      <span className="text-[7px] text-muted">⇧↓</span>
+                    </span>
+                  </HoldButton>
+                </div>
+              </KeyTip>
+              <KeyTip label={t('fields.kbd_zoom')} keys={['+', '−']}>
+                <div className="flex gap-[3px]">
+                  <HoldButton
+                    onTrigger={() => zoomByKey(1)}
+                    title={t('fields.globe_zoom_in')}
+                    className={CTRL_BTN_CLASS}
+                  >
+                    +
+                  </HoldButton>
+                  <HoldButton
+                    onTrigger={() => zoomByKey(-1)}
+                    title={t('fields.globe_zoom_out')}
+                    className={CTRL_BTN_CLASS}
+                  >
+                    −
+                  </HoldButton>
+                </div>
+              </KeyTip>
+            </div>
+          </div>
+        </ChromePanel>
 
         {/*
-          The VIEW panel: what the camera is showing and where to send it.
-          Reading (zoom, the scale rule, the au width), going (the site
-          dropdown, the my-location pin) and the two per-satellite modes,
-          which follow the camera rather than move it. The CAMERA panel above
-          keeps only movement, so each panel answers one question.
+          The VIEW panel: where to send the camera, and the two per-satellite
+          modes. Zoom and the scale bar sit above CAMERA on desktop/tablet;
+          on the phone they stay here because there is no persistent pad.
         */}
-        <div className={CTRL_PANEL_CLASS}>
-          <p className={CTRL_PANEL_TITLE_CLASS}>{t('fields.globe_view_panel')}</p>
-          {/*
-            A real map scale: a rule whose drawn width IS the length it names,
-            so nobody multiplies km-per-pixel in their head. The zoom number
-            rides above it and the astronomical unit under it, because the au
-            is what the solar scene is read in and the two scenes should be
-            comparable rather than merely adjacent.
-          */}
-          {cameraScale ? (
-            <div
-              className="flex flex-col gap-0.5 font-mono text-[10px] leading-tight text-muted"
-              title={t('fields.globe_scale_hint')}
-            >
-              <div className="flex justify-between gap-2">
-                <span>{t('fields.globe_zoom')}</span>
-                <span className="tabular-nums text-subtle">{cameraScale.zoom.toFixed(2)}</span>
-              </div>
-              {(() => {
-                const bar = scaleBarFor(cameraScale.scale.metresPerPixel)
-                if (!bar) return null
-                return (
-                  <div className="flex items-baseline gap-1.5">
-                    <span
-                      className="h-[5px] shrink-0 border-b border-l border-r border-subtle"
-                      style={{ width: `${bar.widthPx}px` }}
-                      aria-hidden
-                    />
-                    <span className="tabular-nums text-subtle">{formatKm(bar.metres)}</span>
-                  </div>
-                )
-              })()}
-              <span className="tabular-nums">
-                {t('fields.globe_view_width')} {formatAu(cameraScale.scale.viewWidthAu)}
-              </span>
+        <ChromePanel
+          compact={compactChrome}
+          open={props.chromeSheet === 'view'}
+          title={t('fields.globe_view_panel')}
+          onClose={closeChromeSheet}
+        >
+          {compactChrome && cameraScale ? (
+            <div className="md:hidden">
+              <GlobeScaleReadout zoom={cameraScale.zoom} scale={cameraScale.scale} />
             </div>
           ) : null}
 
@@ -2929,12 +3582,12 @@ export function GlobeMap(props: Props) {
               sites are a dropdown because a dozen buttons is a panel, and one
               button that only knows Starbase was a bookmark pretending to be
               a feature. */}
-          <div className="flex gap-[3px]">
+          <div className="flex gap-[3px] max-lg:gap-2">
             <select
               value=""
               aria-label={t('fields.globe_pois')}
               title={t('fields.globe_pois_hint')}
-              className="h-7 min-w-0 flex-1 cursor-pointer rounded border border-border bg-fg/[0.03] px-1.5 font-mono text-[11px] text-fg transition-colors hover:border-warn"
+              className="h-7 min-w-0 flex-1 cursor-pointer rounded border border-border bg-fg/[0.03] px-1.5 font-mono text-[11px] text-fg transition-colors hover:border-warn max-lg:h-10"
               onChange={(e) => {
                 const poi = GLOBE_POIS.find((candidate) => candidate.id === e.target.value)
                 if (poi) {
@@ -2955,7 +3608,7 @@ export function GlobeMap(props: Props) {
             </select>
             <button
               type="button"
-              className={cn(CTRL_BTN_CLASS, 'w-9')}
+              className={cn(CTRL_BTN_CLASS, 'w-9 max-lg:h-10 max-lg:w-10')}
               title={t('fields.use_my_location')}
               aria-label={t('fields.use_my_location')}
               onClick={(e) => {
@@ -2975,8 +3628,11 @@ export function GlobeMap(props: Props) {
           {/* The two per-satellite modes: they follow the camera's subject
               rather than move the camera, which is why they close this panel
               instead of living in the movement one. */}
-          <div className="flex items-center gap-[3px]" title={t('fields.globe_altitude_hint')}>
-            <label className="flex h-7 cursor-pointer items-center gap-1.5 whitespace-nowrap px-2 font-mono text-[11px] text-fg">
+          <div
+            className="flex items-center gap-[3px] max-lg:flex-col max-lg:items-stretch max-lg:gap-2"
+            title={t('fields.globe_altitude_hint')}
+          >
+            <label className="flex h-7 cursor-pointer items-center gap-1.5 whitespace-nowrap px-2 font-mono text-[11px] text-fg max-lg:h-10">
               <input
                 type="checkbox"
                 checked={altitudeOn}
@@ -2987,74 +3643,108 @@ export function GlobeMap(props: Props) {
               {t('fields.globe_altitude')}
             </label>
             {followTargetId ? (
-              <button
-                type="button"
-                aria-pressed={followActive}
-                title={t('fields.globe_follow_hint', { label: followTargetLabel })}
-                className={cn(
-                  CTRL_BTN_WIDE_CLASS,
-                  'flex-1',
-                  followActive && 'border-warn bg-warn/25 text-warn',
-                )}
-                onClick={(e) => {
-                  toggleFollow()
-                  e.currentTarget.blur()
-                }}
-              >
-                {t('fields.globe_follow')}
-                <span className="ml-1.5 text-[9px] text-muted">F</span>
-              </button>
+              // The wrapping div carries the flex-1 that used to sit on the
+              // button itself: KeyTip's own wrapper shrinks to its content by
+              // default, and flex-col + stretch here is what hands that width
+              // back down to the button.
+              <div className="flex flex-1 flex-col">
+                <KeyTip label={t('fields.kbd_follow')} keys={['C']}>
+                  <button
+                    type="button"
+                    aria-pressed={followActive}
+                    title={t('fields.globe_follow_hint', { label: followTargetLabel })}
+                    className={cn(
+                      CTRL_BTN_WIDE_CLASS,
+                      'flex-1 max-lg:h-10',
+                      followActive && 'border-warn bg-warn/25 text-warn',
+                    )}
+                    onClick={(e) => {
+                      toggleFollow()
+                      e.currentTarget.blur()
+                    }}
+                  >
+                    {t('fields.globe_follow')}
+                    <span className="ml-1.5 text-[9px] text-muted">C</span>
+                  </button>
+                </KeyTip>
+              </div>
             ) : null}
           </div>
-        </div>
+          {props.onResetView ? (
+            <button
+              type="button"
+              className={cn(CTRL_BTN_WIDE_CLASS, 'max-lg:h-10')}
+              onClick={(e) => {
+                propsRef.current.onResetView?.()
+                e.currentTarget.blur()
+              }}
+            >
+              {t('fields.globe_reset_all')}
+            </button>
+          ) : null}
+        </ChromePanel>
 
-        {/* Only meaningful while the population's trails are the thing on screen. */}
-        {props.onTrailAppearanceChange && (props.swarmTrailCount ?? 0) > 0 ? (
-          <div className={CTRL_PANEL_CLASS} title={t('fields.globe_trail_style_hint')}>
-            <p className={CTRL_PANEL_TITLE_CLASS}>{t('fields.globe_trail_style')}</p>
+        {/* Trails to dress: the swarm, or the full-treatment tracks. Hidden
+            only when nothing is on the globe to style. */}
+        {props.onTrailAppearanceChange &&
+        ((props.swarmTrailCount ?? 0) > 0 || satellites.length > 0) ? (
+          <ChromePanel
+            compact={compactChrome}
+            open={props.chromeSheet === 'trails'}
+            title={t('fields.globe_trail_style')}
+            onClose={closeChromeSheet}
+          >
             {/*
               Scope first: it decides whether the two sliders under it are
               dressing a crowd or a single orbit.
             */}
-            <div
-              className="flex gap-[3px]"
-              role="radiogroup"
-              aria-label={t('fields.globe_trail_style')}
-              title={t('fields.globe_trail_scope_hint')}
-            >
-              {[false, true].map((onlySelected) => (
-                <button
-                  key={String(onlySelected)}
-                  type="button"
-                  role="radio"
-                  aria-checked={(props.swarmTrailOnlySelected ?? false) === onlySelected}
-                  className={cn(
-                    CTRL_BTN_WIDE_CLASS,
-                    'flex-1',
-                    (props.swarmTrailOnlySelected ?? false) === onlySelected &&
-                      'border-warn bg-warn/25 text-warn',
-                  )}
-                  onClick={(e) => {
-                    props.onTrailAppearanceChange?.({
-                      width: props.swarmTrailWidth ?? 1,
-                      opacity: props.swarmTrailOpacity ?? 1,
-                      onlySelected,
-                    })
-                    e.currentTarget.blur()
-                  }}
-                >
-                  {onlySelected
-                    ? t('fields.globe_trail_scope_selected')
-                    : t('fields.globe_trail_scope_all')}
-                </button>
-              ))}
-            </div>
+            <KeyTip label={t('fields.kbd_trails')} keys={['T']}>
+              <div
+                className="flex w-full gap-[3px] max-lg:gap-2"
+                role="radiogroup"
+                aria-label={t('fields.globe_trail_style')}
+                title={t('fields.globe_trail_scope_hint')}
+              >
+                {[false, true].map((onlySelected) => (
+                  <button
+                    key={String(onlySelected)}
+                    type="button"
+                    role="radio"
+                    aria-checked={(props.swarmTrailOnlySelected ?? false) === onlySelected}
+                    className={cn(
+                      CTRL_BTN_WIDE_CLASS,
+                      'flex-1 max-lg:h-10',
+                      (props.swarmTrailOnlySelected ?? false) === onlySelected &&
+                        'border-warn bg-warn/25 text-warn',
+                    )}
+                    onClick={(e) => {
+                      props.onTrailAppearanceChange?.({
+                        width: liveTrailWidth,
+                        opacity: liveTrailOpacity,
+                        onlySelected,
+                      })
+                      e.currentTarget.blur()
+                    }}
+                  >
+                    {onlySelected
+                      ? t('fields.globe_trail_scope_selected')
+                      : t('fields.globe_trail_scope_all')}
+                  </button>
+                ))}
+              </div>
+            </KeyTip>
+            {props.trailScopeNotice ? (
+              <p className="font-mono text-[10px] leading-relaxed text-warn">
+                {props.trailScopeNotice}
+              </p>
+            ) : null}
             <TrailSlider
               label={t('fields.globe_trail_opacity')}
-              value={props.swarmTrailOpacity ?? 1}
-              onChange={(opacity) =>
+              value={liveTrailOpacity}
+              onChange={setLiveTrailOpacity}
+              onCommit={(opacity) =>
                 props.onTrailAppearanceChange?.({
-                  width: props.swarmTrailWidth ?? 1,
+                  width: liveTrailWidth,
                   opacity,
                   onlySelected: props.swarmTrailOnlySelected ?? false,
                 })
@@ -3062,20 +3752,22 @@ export function GlobeMap(props: Props) {
             />
             <TrailSlider
               label={t('fields.globe_trail_width')}
-              value={props.swarmTrailWidth ?? 1}
-              onChange={(width) =>
+              value={liveTrailWidth}
+              onChange={setLiveTrailWidth}
+              onCommit={(width) =>
                 props.onTrailAppearanceChange?.({
                   width,
-                  opacity: props.swarmTrailOpacity ?? 1,
+                  opacity: liveTrailOpacity,
                   onlySelected: props.swarmTrailOnlySelected ?? false,
                 })
               }
             />
             <TrailProgress value={props.swarmTrailProgress ?? null} />
-          </div>
+          </ChromePanel>
         ) : null}
 
-      </div>
+      </ChromeHost>
+      ) : null}
 
       {errors.length > 0 ? (
         <div className="absolute right-0 top-0 z-[3] flex max-h-[60%] w-[26rem] max-w-[90%] flex-col border border-danger/60 bg-danger/20 font-mono text-[11px] leading-relaxed text-fg">

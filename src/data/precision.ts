@@ -80,7 +80,7 @@ const SGP4: ToolPrecision = {
   modelClass: 'two-body-series',
   errorClass: 'SGP4/SDP4 vs precise OD: typically km-class after days for LEO TLEs; TEME frame caveats apply.',
   limits: `satellite.js SGP4/SDP4 educational wrapper; TLE epoch/frame limitations; not SPICE. ${IEEE}`,
-  referenceHint: 'NORAD SGP4 via satellite.js (MIT); CelesTrak TLE docs',
+  referenceHint: 'NORAD SGP4 via satellite.js (MIT); CelesTrak™ TLE docs',
 }
 
 /** Default when tool id missing */
@@ -446,7 +446,7 @@ export const TOOL_PRECISION: Record<string, ToolPrecision> = {
     errorClass:
       'Visualization of SGP4 output; accuracy follows the TLE age (kilometres near epoch, degrading fast beyond it).',
     limits: `Ground track, terminator and altitude rendering from a single TLE. Not a tracking service and not flight software. ${IEEE}`,
-    referenceHint: 'SGP4 / TEME to geodetic, CelesTrak TLE',
+    referenceHint: 'SGP4 / TEME to geodetic, CelesTrak™ TLE',
   },
 }
 

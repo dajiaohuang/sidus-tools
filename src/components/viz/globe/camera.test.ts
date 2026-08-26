@@ -8,11 +8,17 @@ import {
   elevatedCenterLeadRad,
   followZoomCeiling,
   globeScreenRadiusPx,
+  latCompensatedZoom,
   skyAimCamera,
   SKY_AIM_PITCH_DEG,
   SKY_AIM_ABOVE_CENTER_DEG,
   FOLLOW_CAMERA_ALTITUDE_MARGIN,
   followPitchDeg,
+  frameSatelliteCamera,
+  FRAME_ZOOM_SLACK,
+  wrapLngDeg,
+  autoRotateLngDeg,
+  AUTO_ROTATE_MAX_DT_S,
 } from './camera'
 import { GLOBE_RADIUS_M } from './track'
 import { sphereDirection } from './sun'
@@ -136,6 +142,99 @@ describe('followZoomCeiling', () => {
         centerLatDeg: 0,
       })
     expect(at(1800) - at(900)).toBeCloseTo(1, 12)
+  })
+})
+
+describe('frameSatelliteCamera', () => {
+  const canvas = { fovRad: FOV_RAD, canvasCssHeight: CANVAS_H }
+
+  it('looks straight down on a ground marker, north up', () => {
+    const pose = frameSatelliteCamera({
+      lonDeg: 12,
+      latDeg: 45,
+      altitudeM: 400_000,
+      elevated: false,
+      ...canvas,
+    })
+    expect(pose.lonDeg).toBe(12)
+    expect(pose.latDeg).toBe(45)
+    expect(pose.pitchDeg).toBe(0)
+    expect(pose.bearingDeg).toBe(0)
+    expect(pose.zoom).toBe(3.5)
+  })
+
+  it('keeps LEO on the camera–Earth line without a chase pitch', () => {
+    const pose = frameSatelliteCamera({
+      lonDeg: 10,
+      latDeg: 20,
+      altitudeM: ISS_ALTITUDE_M,
+      elevated: true,
+      ...canvas,
+    })
+    expect(pose.lonDeg).toBe(10)
+    expect(pose.latDeg).toBe(20)
+    expect(pose.pitchDeg).toBe(0)
+    expect(pose.bearingDeg).toBe(0)
+    expect(cameraRadiiAt(pose.zoom, pose.pitchDeg, CANVAS_H, pose.latDeg)).toBeGreaterThan(
+      1 + ISS_ALTITUDE_M / EARTH_RADIUS,
+    )
+  })
+
+  it('looks down on a high elliptical and zooms out past it, not into the planet', () => {
+    /** ARKTIKA-M class: Molniya apogee, well outside the globe. */
+    const ARKTIKA_APOGEE_M = 40_000_000
+    const pose = frameSatelliteCamera({
+      lonDeg: 80,
+      latDeg: 63,
+      altitudeM: ARKTIKA_APOGEE_M,
+      elevated: true,
+      ...canvas,
+    })
+    expect(pose.pitchDeg).toBe(0)
+    expect(pose.bearingDeg).toBe(0)
+    expect(pose.zoom).toBeLessThan(1)
+    expect(cameraRadiiAt(pose.zoom, pose.pitchDeg, CANVAS_H, pose.latDeg)).toBeGreaterThan(
+      1 + ARKTIKA_APOGEE_M / EARTH_RADIUS,
+    )
+  })
+
+  it('is wider than the geometric ceiling by the framing slack', () => {
+    const pose = frameSatelliteCamera({
+      lonDeg: 0,
+      latDeg: 0,
+      altitudeM: ISS_ALTITUDE_M,
+      elevated: true,
+      ...canvas,
+    })
+    const ceiling = followZoomCeiling({
+      pitchDeg: 0,
+      altitudeM: ISS_ALTITUDE_M,
+      fovRad: FOV_RAD,
+      canvasCssHeight: CANVAS_H,
+      centerLatDeg: pose.latDeg,
+    })
+    expect(ceiling - pose.zoom).toBeCloseTo(FRAME_ZOOM_SLACK, 12)
+  })
+})
+
+describe('latCompensatedZoom', () => {
+  it('returns the same zoom when the latitude does not change', () => {
+    expect(latCompensatedZoom(5, 30, 30)).toBe(5)
+  })
+
+  it('steps exactly one zoom level for the equator-to-60-degree benchmark', () => {
+    expect(latCompensatedZoom(5, 0, 60)).toBeCloseTo(4, 10)
+    expect(latCompensatedZoom(5, 60, 0)).toBeCloseTo(6, 10)
+  })
+
+  it('round-trips back to the original zoom', () => {
+    expect(latCompensatedZoom(latCompensatedZoom(5, 0, 47.3), 47.3, 0)).toBeCloseTo(5, 10)
+  })
+
+  it('refuses a latitude at or beyond the poles, and NaN, as undefined', () => {
+    expect(latCompensatedZoom(5, 30, 90)).toBe(5)
+    expect(latCompensatedZoom(5, 90, 30)).toBe(5)
+    expect(latCompensatedZoom(5, Number.NaN, 10)).toBe(5)
   })
 })
 
@@ -264,6 +363,16 @@ describe('centerForElevatedTarget', () => {
     const center = centerForElevatedTarget(25, 10, 0, 0.15)
     expect(center.lonDeg).toBeCloseTo(25, 9)
     expect(center.latDeg).toBeGreaterThan(10)
+  })
+
+  it('does not hop meridians when a polar lead would cross the pole', () => {
+    const lead = 12.7 * DEG
+    const a = centerForElevatedTarget(20, 85, 0, lead)
+    const b = centerForElevatedTarget(20, 85, 2, lead)
+    expect(Math.abs(a.latDeg)).toBeLessThan(89.01)
+    expect(Math.abs(b.latDeg)).toBeLessThan(89.01)
+    const dLon = Math.abs((((a.lonDeg - b.lonDeg) % 360) + 540) % 360 - 180)
+    expect(dLon).toBeLessThan(5)
   })
 })
 
@@ -414,5 +523,18 @@ describe('followPitchDeg', () => {
     const half = followPitchDeg(6_371_008.8 / 2, 80)
     expect(half).toBeCloseTo(40, 5)
     expect(followPitchDeg(0, 80)).toBe(80)
+  })
+})
+
+describe('autoRotateLngDeg', () => {
+  it('wraps through the antimeridian the short way', () => {
+    expect(wrapLngDeg(181)).toBe(-179)
+    expect(wrapLngDeg(-181)).toBe(179)
+    expect(autoRotateLngDeg(179.9, 6, 1)).toBeCloseTo(-179.9, 10)
+  })
+
+  it('does not spend a hitch as one jump', () => {
+    const drifted = autoRotateLngDeg(0, 1.5, 2)
+    expect(drifted).toBeCloseTo(1.5 * AUTO_ROTATE_MAX_DT_S, 10)
   })
 })

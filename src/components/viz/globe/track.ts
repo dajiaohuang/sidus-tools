@@ -17,6 +17,99 @@ const DEG = Math.PI / 180
  */
 export const GLOBE_RADIUS_M = 6371008.8
 
+/** Web Mercator is undefined at the poles; MapLibre clamps tiled layers here. */
+export const WEB_MERCATOR_MAX_LAT_DEG = 85.051129
+/**
+ * Globe `projectToSphere` inverts mercator y outside 0..1 to latitudes above
+ * 85°. Clamping to the web-mercator edge draws a fake circle at ±85° around
+ * each pole as polar orbits' longitude races. 89.95° keeps y finite.
+ */
+export const GLOBE_MERCATOR_MAX_LAT_DEG = 89.95
+
+export function lonLatToMercator(
+  lonDeg: number,
+  latDeg: number,
+  maxAbsLat = GLOBE_MERCATOR_MAX_LAT_DEG,
+): { x: number; y: number } {
+  const lat = Math.max(-maxAbsLat, Math.min(maxAbsLat, latDeg))
+  const sin = Math.sin(lat * DEG)
+  return {
+    x: lonDeg / 360 + 0.5,
+    y: 0.5 - Math.log((1 + sin) / (1 - sin)) / (4 * Math.PI),
+  }
+}
+
+/** Longitude jump near a pole: mercator draws a parallel, not a polar crossing. */
+export function isPolarWrap(
+  a: { lon: number; lat: number },
+  b: { lon: number; lat: number },
+): boolean {
+  return Math.max(Math.abs(a.lat), Math.abs(b.lat)) > 70 && Math.abs(wrappedDeltaLonDeg(a.lon, b.lon)) > 90
+}
+
+/**
+ * Max central angle of one drawn trail chord.
+ *
+ * Uniform-in-time sampling of a deep ellipse (CLUSTER II e≈0.91, Chandra,
+ * XMM-Newton, Polar) puts almost every sample at apogee and maybe one on
+ * each side of perigee. Connecting those two draws a chord through the
+ * Earth: the "broken" SCIENCE trails after a wide zoom. LEO steps are ~4 deg;
+ * 25 deg is several times that and still well below a skipped perigee.
+ */
+export const MAX_TRAIL_CHORD_ANGLE_RAD = (25 * Math.PI) / 180
+
+export function wrappedDeltaLonDeg(a: number, b: number): number {
+  let d = b - a
+  while (d > 180) d -= 360
+  while (d < -180) d += 360
+  return d
+}
+
+/** Date-line step: the long way in raw longitude, the short way on the globe. */
+export function crossesDateLine(a: { lon: number }, b: { lon: number }): boolean {
+  return Math.abs(a.lon - b.lon) > 180
+}
+
+/** Angle at Earth's centre between two geodetic positions. */
+export function groundCentralAngleRad(
+  a: { lon: number; lat: number },
+  b: { lon: number; lat: number },
+): number {
+  const lat1 = a.lat * DEG
+  const lat2 = b.lat * DEG
+  const dLat = lat2 - lat1
+  const dLon = wrappedDeltaLonDeg(a.lon, b.lon) * DEG
+  const hav =
+    Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) ** 2
+  return 2 * Math.asin(Math.min(1, Math.sqrt(hav)))
+}
+
+/** True when the 3D chord between two elevated samples goes through the Earth. */
+export function trailChordPiercesEarth(
+  a: { lon: number; lat: number; altKm: number },
+  b: { lon: number; lat: number; altKm: number },
+): boolean {
+  const A = ecefMetersOf(a)
+  const B = ecefMetersOf(b)
+  const midR = Math.hypot((A[0] + B[0]) / 2, (A[1] + B[1]) / 2, (A[2] + B[2]) / 2)
+  return midR < GLOBE_RADIUS_M
+}
+
+export function trailSegmentConnects(
+  a: { lon: number; lat: number; altKm?: number },
+  b: { lon: number; lat: number; altKm?: number },
+  allowDateLineWrap = false,
+): boolean {
+  if (!allowDateLineWrap && crossesDateLine(a, b)) return false
+  if (a.altKm != null && b.altKm != null) {
+    return !trailChordPiercesEarth(
+      { lon: a.lon, lat: a.lat, altKm: a.altKm },
+      { lon: b.lon, lat: b.lat, altKm: b.altKm },
+    )
+  }
+  return groundCentralAngleRad(a, b) <= MAX_TRAIL_CHORD_ANGLE_RAD
+}
+
 /** Alpha ramps in over the first FADE_MINUTES of the trail window and out over the last. */
 export const FADE_MINUTES = 8
 
@@ -202,6 +295,31 @@ export function composeBearingDeg(headingDeg: number, offsetDeg: number): number
   return (((headingDeg + offsetDeg) % 360) + 360) % 360
 }
 
+/** Shortest signed delta from `fromDeg` to `toDeg` in (-180, 180]. */
+export function bearingDeltaDeg(fromDeg: number, toDeg: number): number {
+  return (((toDeg - fromDeg) % 360) + 540) % 360 - 180
+}
+
+/**
+ * Low-pass the satellite's motion heading. A single SGP4 sample pair near a
+ * pole can flip ~180 deg for one frame; without this the chase yaws the
+ * whole globe left-right while the user is only holding a steep look.
+ */
+export function smoothFollowHeading(
+  held: { current: number | null },
+  rawDeg: number,
+  alpha = 0.35,
+): number {
+  const prev = held.current
+  if (prev == null) {
+    held.current = ((rawDeg % 360) + 360) % 360
+    return held.current
+  }
+  const next = prev + bearingDeltaDeg(prev, rawDeg) * alpha
+  held.current = ((next % 360) + 360) % 360
+  return held.current
+}
+
 /*
  * Zoom-adaptive dashing for the elevated (future) trail.
  *
@@ -230,7 +348,7 @@ export const GAP_SCREEN_TARGET_PX = 8
  * every data update to track motion; only the meters-per-dash figure it
  * uses is throttled.
  */
-export const DASH_REBUILD_ZOOM_HYSTERESIS = 0.5
+export const DASH_REBUILD_ZOOM_HYSTERESIS = 0.08
 
 export function groundResolutionMetersPerPixel(zoom: number, latDeg: number): number {
   return (Math.cos(latDeg * DEG) * 2 * Math.PI * GLOBE_RADIUS_M) / (TILE_SIZE_PX * Math.pow(2, zoom))
@@ -253,6 +371,24 @@ export function shouldRebuildDashLength(
  * cumulative distance to place dash/gap boundaries; not meant for
  * long-range geodesy.
  */
+export function ecefMetersOf(p: { lon: number; lat: number; altKm: number }): [number, number, number] {
+  const r = GLOBE_RADIUS_M + p.altKm * 1000
+  const lat = p.lat * DEG
+  const lon = p.lon * DEG
+  const c = Math.cos(lat)
+  return [r * c * Math.cos(lon), r * c * Math.sin(lon), r * Math.sin(lat)]
+}
+
+/** Straight-line distance in metres between two elevated samples. */
+export function chordMeters(
+  a: { lon: number; lat: number; altKm: number },
+  b: { lon: number; lat: number; altKm: number },
+): number {
+  const A = ecefMetersOf(a)
+  const B = ecefMetersOf(b)
+  return Math.hypot(A[0] - B[0], A[1] - B[1], A[2] - B[2])
+}
+
 export function haversineMeters(
   a: { lon: number; lat: number },
   b: { lon: number; lat: number },
@@ -289,8 +425,84 @@ export function lerpTrackPoint(a: GlobeTrackPoint, b: GlobeTrackPoint, t: number
 }
 
 /**
+ * Interpolate along the ECEF chord, then read geodetic back. Lon/lat lerp of
+ * a deep-ellipse perigee step is a different curve (the yellow fan through
+ * Earth). ECEF lerp of two nearby orbit samples is the chord of the ellipse.
+ */
+export function lerpTrackPointEcef(a: GlobeTrackPoint, b: GlobeTrackPoint, t: number): GlobeTrackPoint {
+  const A = ecefMetersOf(a)
+  const B = ecefMetersOf(b)
+  const x = A[0] + (B[0] - A[0]) * t
+  const y = A[1] + (B[1] - A[1]) * t
+  const z = A[2] + (B[2] - A[2]) * t
+  const r = Math.hypot(x, y, z)
+  if (!(r > 0)) return a
+  return geodeticFromEcef(x, y, z, a, b, t)
+}
+
+/**
+ * Spherical lerp of the radius vectors. Consecutive samples of a Keplerian
+ * arc lie in a plane through Earth's centre, so this is the orbit itself.
+ * Linear ECEF between two points on opposite sides of a pole is a chord
+ * under the planet — the sharp corner at the polar cap.
+ */
+export function slerpTrackPoint(a: GlobeTrackPoint, b: GlobeTrackPoint, t: number): GlobeTrackPoint {
+  const A = ecefMetersOf(a)
+  const B = ecefMetersOf(b)
+  const rA = Math.hypot(A[0], A[1], A[2])
+  const rB = Math.hypot(B[0], B[1], B[2])
+  if (!(rA > 0) || !(rB > 0)) return lerpTrackPointEcef(a, b, t)
+  const uAx = A[0] / rA
+  const uAy = A[1] / rA
+  const uAz = A[2] / rA
+  const uBx = B[0] / rB
+  const uBy = B[1] / rB
+  const uBz = B[2] / rB
+  const dot = Math.min(1, Math.max(-1, uAx * uBx + uAy * uBy + uAz * uBz))
+  const omega = Math.acos(dot)
+  const r = rA + (rB - rA) * t
+  let x: number
+  let y: number
+  let z: number
+  if (omega < 1e-8) {
+    x = A[0] + (B[0] - A[0]) * t
+    y = A[1] + (B[1] - A[1]) * t
+    z = A[2] + (B[2] - A[2]) * t
+  } else {
+    const s = Math.sin(omega)
+    const wA = Math.sin((1 - t) * omega) / s
+    const wB = Math.sin(t * omega) / s
+    x = (wA * uAx + wB * uBx) * r
+    y = (wA * uAy + wB * uBy) * r
+    z = (wA * uAz + wB * uBz) * r
+  }
+  return geodeticFromEcef(x, y, z, a, b, t)
+}
+
+function geodeticFromEcef(
+  x: number,
+  y: number,
+  z: number,
+  a: GlobeTrackPoint,
+  b: GlobeTrackPoint,
+  t: number,
+): GlobeTrackPoint {
+  const r = Math.hypot(x, y, z)
+  if (!(r > 0)) return a
+  return {
+    lon: Math.atan2(y, x) / DEG,
+    lat: Math.asin(Math.max(-1, Math.min(1, z / r))) / DEG,
+    altKm: (r - GLOBE_RADIUS_M) / 1000,
+    date: new Date(a.date.getTime() + (b.date.getTime() - a.date.getTime()) * t),
+  }
+}
+
+/**
  * Walks an ordered point list and cuts it into alternating dash/gap runs of
- * fixed METER length, returning only the "on" (dash-visible) runs as
+ * fixed 3D chord length (metres along the elevated path, not ground
+ * haversine). Combined with a dash length taken from on-screen metres at
+ * the satellite's altitude, the pattern stays a screen length as the
+ * camera moves. Returns only the "on" (dash-visible) runs as
  * [startPoint, endPoint] pairs ready for GL_LINES. The pattern always
  * starts "on" so a dash begins right at the solid/dashed split point.
  * ANTIMERIDIAN: an edge with |b.lon - a.lon| > 180 crosses the date line.
@@ -321,14 +533,14 @@ export function buildDashedLineSegments(
     const a = points[i]
     const b = points[i + 1]
 
-    if (Math.abs(b.lon - a.lon) > 180) {
+    if (!trailSegmentConnects(a, b, true)) {
       on = true
       patternRemaining = dashLengthMeters
       continue
     }
 
     let edgeStart = a
-    let edgeRemaining = haversineMeters(a, b)
+    let edgeRemaining = chordMeters(a, b)
 
     while (edgeRemaining > 0) {
       if (edgeRemaining < patternRemaining) {
@@ -337,7 +549,7 @@ export function buildDashedLineSegments(
         edgeRemaining = 0
       } else {
         const t = patternRemaining / edgeRemaining
-        const boundary = lerpTrackPoint(edgeStart, b, t)
+        const boundary = lerpTrackPointEcef(edgeStart, b, t)
         if (on) segments.push([edgeStart, boundary])
         edgeRemaining -= patternRemaining
         edgeStart = boundary
