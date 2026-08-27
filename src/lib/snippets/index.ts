@@ -60,7 +60,7 @@ import {
 } from './wave3'
 import {
   solarArraySnippets, batterySnippets, rcsSnippets, angDiamSnippets, diffSnippets,
-  thermSnippets, dragSnippets, wheelSnippets, apoSnippets, gtSnippets, atSnippets, pmSnippets, ebSnippets,
+  thermSnippets, dragSnippets, wheelSnippets, apoSnippets, gtSnippets, gtShiftSnippets, atSnippets, pmSnippets, ebSnippets,
 } from './wave4'
 import { hohmannTimeSnippets, energySnippets, trueAnomSnippets, flybySnippets, nodalSnippets, eccAnomSnippets, scaleSnippets } from './wave5'
 import { catchupSnippets, impulseBudgetSnippets, ssoPeriodSnippets, massStackSnippets } from './wave6'
@@ -242,6 +242,7 @@ const MAP: Record<string, FormulaSnippet> = {
   [wheelSnippets.formulaId]: wheelSnippets,
   [apoSnippets.formulaId]: apoSnippets,
   [gtSnippets.formulaId]: gtSnippets,
+  [gtShiftSnippets.formulaId]: gtShiftSnippets,
   [atSnippets.formulaId]: atSnippets,
   [pmSnippets.formulaId]: pmSnippets,
   [ebSnippets.formulaId]: ebSnippets,

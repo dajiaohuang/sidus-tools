@@ -5,6 +5,7 @@
  */
 
 import { useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useElementSize } from './use-element-size'
 import { useVizViewport } from './use-viz-viewport'
 import { VizControls } from './VizControls'
@@ -35,7 +36,6 @@ type Props = {
   subsolarLon: number
   className?: string
   title?: string
-  /** Shown under controls (e.g. "Equirectangular · night shading"). */
   subtitle?: string
 }
 
@@ -106,9 +106,12 @@ export function WorldMap({
   subsolarLat,
   subsolarLon,
   className = '',
-  title = 'world map',
-  subtitle = 'Equirectangular · night shading at the marked instant',
+  title,
+  subtitle,
 }: Props) {
+  const { t } = useTranslation()
+  const resolvedTitle = title ?? t('fields.world_map')
+  const resolvedSubtitle = subtitle ?? t('fields.world_map_subtitle')
   const { ref, ready } = useElementSize<HTMLDivElement>(1, 1)
   const { svgRef, vp, transform, reset, zoomAbout, handlers } = useVizViewport(MAP_W, MAP_H)
 
@@ -157,7 +160,7 @@ export function WorldMap({
         onZoomOut={() => zoomAbout(1 / 1.2)}
         onReset={reset}
         scaleLabel={`${(vp.scale * 100).toFixed(0)}%`}
-        hint={`Scroll zoom · drag pan · ${subtitle}`}
+        hint={`${t('common.viz_hint')} · ${resolvedSubtitle}`}
       />
       <div ref={ref} className="relative min-h-0 w-full flex-1 bg-bg">
         {ready ? (
@@ -170,7 +173,7 @@ export function WorldMap({
             className="absolute inset-0 cursor-grab touch-none active:cursor-grabbing"
             preserveAspectRatio="xMidYMid meet"
             role="img"
-            aria-label={title}
+            aria-label={resolvedTitle}
             {...handlers}
           >
             <rect width={MAP_W} height={MAP_H} fill="var(--color-bg)" />

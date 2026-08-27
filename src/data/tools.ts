@@ -688,10 +688,20 @@ const TOOLS_RAW: ToolMeta[] = [
   {
     id: 'ground-track',
     category: 'satellite',
+    title: 'Ground track',
+    description: 'Lat/lon samples of a satellite ground track on an equirectangular map (SGP4 or spherical Kepler).',
+    tags: ['satellite', 'operations', 'geo', 'earth-observation'],
+    formulaId: 'ground-track',
+    status: 'live',
+    sourceIds: ['satellite-js', 'vallado', 'celestrak'],
+  },
+  {
+    id: 'ground-track-shift',
+    category: 'satellite',
     title: 'Ground-track shift / rev',
     description: 'Earth-rotation longitude shift per orbit and revs/day (no J2).',
     tags: ['satellite', 'operations', 'geo', 'earth-observation'],
-    formulaId: 'ground-track',
+    formulaId: 'ground-track-shift',
     status: 'live',
     sourceIds: ['vallado', 'curtis', 'wertz'],
   },
@@ -962,13 +972,13 @@ const TOOLS_RAW: ToolMeta[] = [
     sourceIds: ['vallado', 'curtis', 'nasa-grc'],
   },
   {
-    id: 'surface-access',
+    id: 'surface-g-escape',
     category: 'planetary',
-    title: 'Surface access',
+    title: 'Surface g / escape / parking',
     description:
       'Surface g, escape speed, parking circular speed, circ→esc Δv, and SOI estimate for any catalog body.',
     tags: ['planetary', 'mission-design', 'orbital'],
-    formulaId: 'surface-access',
+    formulaId: 'surface-g-escape',
     status: 'live',
     sourceIds: ['vallado', 'curtis', 'jpl-horizons'],
   },
@@ -1983,4 +1993,9 @@ export function primaryTag(tool: ToolMeta): string {
 
 export function getTool(id: string): ToolMeta | undefined {
   return TOOLS.find((t) => t.id === id)
+}
+
+/** Retired slugs → live id. ToolDetailPage issues a replace navigate. */
+export const TOOL_REDIRECTS: Record<string, string> = {
+  'surface-access': 'surface-g-escape',
 }

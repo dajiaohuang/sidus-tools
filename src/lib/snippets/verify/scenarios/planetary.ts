@@ -151,7 +151,7 @@ export const PLANETARY_SCENARIOS: Record<string, Scenario[]> = {
     },
   ],
 
-  'surface-access': [
+  'surface-g-escape': [
     {
       name: 'lunar-parking-orbit',
       source: 'shipped BODIES.moon mu/radius; 100 km parking orbit (well-documented Apollo-era lunar parking altitude).',

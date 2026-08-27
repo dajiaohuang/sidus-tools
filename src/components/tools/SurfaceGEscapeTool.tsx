@@ -24,14 +24,13 @@ const SCHEMA = {
   h: numParam(100, { min: 0 }),
   hu: strParam('km', TOOL_UNIT_SETS.altitude) } as const
 
-export function SurfaceAccessTool() {
+export function SurfaceGEscapeTool() {
   const { t } = useTranslation()
   const [p, setP] = useToolSearchParams(SCHEMA)
   const body = getBody(p.body)
 
   const res = useMemo(() => {
     const park = toSi(p.h, p.hu)
-    // Moon: Laplace SOI about Earth; planets may use catalog soi field
     const aParent = body.id === 'moon' ? 384_400_000 : undefined
     return surfaceAccess({
       body,
@@ -95,7 +94,7 @@ export function SurfaceAccessTool() {
       }
       code={
         <CodeExport
-          formulaId="surface-access"
+          formulaId="surface-g-escape"
           values={{
             mu: body.mu,
             R: body.radius,

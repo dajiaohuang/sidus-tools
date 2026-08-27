@@ -68,7 +68,8 @@
   <url><loc>https://sidus.tools/tools/drag-force</loc><lastmod>2026-08-20</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
   <url><loc>https://sidus.tools/tools/reaction-wheel</loc><lastmod>2026-08-20</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
   <url><loc>https://sidus.tools/tools/apo-raise</loc><lastmod>2026-08-20</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://sidus.tools/tools/ground-track</loc><lastmod>2026-08-20</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://sidus.tools/tools/ground-track</loc><lastmod>2026-08-26</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://sidus.tools/tools/ground-track-shift</loc><lastmod>2026-08-26</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
   <url><loc>https://sidus.tools/tools/along-track</loc><lastmod>2026-08-20</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
   <url><loc>https://sidus.tools/tools/period-match</loc><lastmod>2026-08-20</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
   <url><loc>https://sidus.tools/tools/eclipse-beta</loc><lastmod>2026-08-20</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
@@ -95,7 +96,7 @@
   <url><loc>https://sidus.tools/tools/vector-angle</loc><lastmod>2026-08-20</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
   <url><loc>https://sidus.tools/tools/helio-hohmann</loc><lastmod>2026-08-20</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
   <url><loc>https://sidus.tools/tools/patched-conic-depart</loc><lastmod>2026-08-20</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://sidus.tools/tools/surface-access</loc><lastmod>2026-08-20</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://sidus.tools/tools/surface-g-escape</loc><lastmod>2026-08-26</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
   <url><loc>https://sidus.tools/tools/orbit-3d</loc><lastmod>2026-08-20</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
   <url><loc>https://sidus.tools/tools/orbital-view</loc><lastmod>2026-08-20</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
   <url><loc>https://sidus.tools/tools/isentropic-nozzle</loc><lastmod>2026-08-20</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>

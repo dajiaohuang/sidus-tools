@@ -1,4 +1,5 @@
 import { lazy, Suspense, type ComponentType, type LazyExoticComponent } from 'react'
+import { useTranslation } from 'react-i18next'
 
 type LazyTool = LazyExoticComponent<ComponentType>
 
@@ -72,6 +73,7 @@ const MAP: Record<string, LazyTool> = {
   'reaction-wheel': L(() => import('./ReactionWheelTool').then((m) => ({ default: m.ReactionWheelTool }))),
   'apo-raise': L(() => import('./ApoRaiseTool').then((m) => ({ default: m.ApoRaiseTool }))),
   'ground-track': L(() => import('./GroundTrackTool').then((m) => ({ default: m.GroundTrackTool }))),
+  'ground-track-shift': L(() => import('./GroundTrackShiftTool').then((m) => ({ default: m.GroundTrackShiftTool }))),
   'along-track': L(() => import('./AlongTrackTool').then((m) => ({ default: m.AlongTrackTool }))),
   'period-match': L(() => import('./PeriodMatchTool').then((m) => ({ default: m.PeriodMatchTool }))),
   'eclipse-beta': L(() => import('./EclipseBetaTool').then((m) => ({ default: m.EclipseBetaTool }))),
@@ -98,7 +100,7 @@ const MAP: Record<string, LazyTool> = {
   'vector-angle': L(() => import('./VectorAngleTool').then((m) => ({ default: m.VectorAngleTool }))),
   'helio-hohmann': L(() => import('./HelioHohmannTool').then((m) => ({ default: m.HelioHohmannTool }))),
   'patched-conic-depart': L(() => import('./PatchedConicDepartTool').then((m) => ({ default: m.PatchedConicDepartTool }))),
-  'surface-access': L(() => import('./SurfaceAccessTool').then((m) => ({ default: m.SurfaceAccessTool }))),
+  'surface-g-escape': L(() => import('./SurfaceGEscapeTool').then((m) => ({ default: m.SurfaceGEscapeTool }))),
   'orbit-3d': L(() => import('./Orbit3dTool').then((m) => ({ default: m.Orbit3dTool }))),
   'orbital-view': L(() => import('./OrbitalViewTool').then((m) => ({ default: m.OrbitalViewTool }))),
   'isentropic-nozzle': L(() => import('./IsentropicNozzleTool').then((m) => ({ default: m.IsentropicNozzleTool }))),
@@ -202,11 +204,12 @@ const MAP: Record<string, LazyTool> = {
 type Props = { id: string }
 
 export function ToolRenderer({ id }: Props) {
+  const { t } = useTranslation()
   const Cmp = MAP[id]
   if (!Cmp) {
     return (
       <p className="sidus-card p-5 font-mono text-sm text-muted">
-        Unknown tool id: check the catalog registration.
+        {t('tools.unknown_id')}
       </p>
     )
   }
@@ -214,7 +217,7 @@ export function ToolRenderer({ id }: Props) {
     <Suspense
       fallback={
         <p className="font-mono text-sm text-muted" aria-live="polite">
-          Loading tool…
+          {t('tools.loading')}
         </p>
       }
     >

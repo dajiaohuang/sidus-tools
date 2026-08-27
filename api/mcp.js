@@ -21854,6 +21854,50 @@ function rvToElements(r, v, mu2) {
     energy
   };
 }
+function elementsToRv(el, mu2) {
+  const { a, e, i, raan, argp, nu } = el;
+  if (!(mu2 > 0) || e < 0) return null;
+  if (e >= 1 && !(a < 0)) {
+  }
+  let p;
+  if (Math.abs(e - 1) < 1e-12) {
+    return null;
+  }
+  p = a * (1 - e * e);
+  if (!(p > 0) && e < 1) return null;
+  if (e >= 1) {
+    p = Math.abs(a) * (e * e - 1);
+  }
+  const cnu = Math.cos(nu);
+  const snu = Math.sin(nu);
+  const denom = 1 + e * cnu;
+  if (Math.abs(denom) < EPS) return null;
+  const r_pqw = [p * cnu / denom, p * snu / denom, 0];
+  const sqrtMuP = Math.sqrt(mu2 / p);
+  const v_pqw = [-sqrtMuP * snu, sqrtMuP * (e + cnu), 0];
+  const cO = Math.cos(raan);
+  const sO = Math.sin(raan);
+  const co = Math.cos(argp);
+  const so = Math.sin(argp);
+  const ci = Math.cos(i);
+  const si = Math.sin(i);
+  const R = [
+    [cO * co - sO * so * ci, -cO * so - sO * co * ci, sO * si],
+    [sO * co + cO * so * ci, -sO * so + cO * co * ci, -cO * si],
+    [so * si, co * si, ci]
+  ];
+  const r = [
+    R[0][0] * r_pqw[0] + R[0][1] * r_pqw[1] + R[0][2] * r_pqw[2],
+    R[1][0] * r_pqw[0] + R[1][1] * r_pqw[1] + R[1][2] * r_pqw[2],
+    R[2][0] * r_pqw[0] + R[2][1] * r_pqw[1] + R[2][2] * r_pqw[2]
+  ];
+  const v = [
+    R[0][0] * v_pqw[0] + R[0][1] * v_pqw[1] + R[0][2] * v_pqw[2],
+    R[1][0] * v_pqw[0] + R[1][1] * v_pqw[1] + R[1][2] * v_pqw[2],
+    R[2][0] * v_pqw[0] + R[2][1] * v_pqw[1] + R[2][2] * v_pqw[2]
+  ];
+  return { r, v };
+}
 
 // src/lib/physics/kepler.ts
 function stumpffC(z) {
@@ -21996,6 +22040,50 @@ var j3oj2 = j3 / j2;
 var x2o3 = 2 / 3;
 var xpdotp = 1440 / (2 * pi);
 
+// node_modules/satellite.js/dist/ext.js
+function jdayInternal(year, mon, day, hr, minute, sec, msec = 0) {
+  return 367 * year - Math.floor(7 * (year + Math.floor((mon + 9) / 12)) * 0.25) + Math.floor(275 * mon / 9) + day + 17210135e-1 + ((msec / 6e4 + sec / 60 + minute) / 60 + hr) / 24;
+}
+function jday(yearOrDate, mon, day, hr, minute, sec, msec = 0) {
+  if (yearOrDate instanceof Date) {
+    const date4 = yearOrDate;
+    return jdayInternal(
+      date4.getUTCFullYear(),
+      date4.getUTCMonth() + 1,
+      // Note, this function requires months in range 1-12.
+      date4.getUTCDate(),
+      date4.getUTCHours(),
+      date4.getUTCMinutes(),
+      date4.getUTCSeconds(),
+      date4.getUTCMilliseconds()
+    );
+  }
+  return jdayInternal(yearOrDate, mon, day, hr, minute, sec, msec);
+}
+
+// node_modules/satellite.js/dist/propagation/gstime.js
+function gstimeInternal(jdut1) {
+  const tut1 = (jdut1 - 2451545) / 36525;
+  let temp = -62e-7 * tut1 * tut1 * tut1 + 0.093104 * tut1 * tut1 + (876600 * 3600 + 8640184812866e-6) * tut1 + 67310.54841;
+  temp = temp * deg2rad / 240 % twoPi;
+  if (temp < 0) {
+    temp += twoPi;
+  }
+  return temp;
+}
+function gstime(first, month, day, hour, minute, second, millisecond) {
+  if (first instanceof Date) {
+    return gstimeInternal(jday(first));
+  }
+  if (month !== void 0) {
+    return gstimeInternal(
+      // biome-ignore lint/style/noNonNullAssertion: overloads make sure those are non-null
+      jday(first, month, day, hour, minute, second, millisecond)
+    );
+  }
+  return gstimeInternal(first);
+}
+
 // node_modules/satellite.js/dist/propagation/SatRec.js
 var SatRecError;
 (function(SatRecError2) {
@@ -22008,6 +22096,9 @@ var SatRecError;
 })(SatRecError || (SatRecError = {}));
 
 // src/lib/physics/sgp4.ts
+function gmstRad(date4) {
+  return gstime(date4);
+}
 var CIVIL_DARKNESS_RAD = -6 * Math.PI / 180;
 
 // src/lib/physics/j2.ts
@@ -22640,6 +22731,55 @@ function eclipseWithBeta(a, bodyR, betaRad, periodS) {
   return periodS / Math.PI * betaShadow;
 }
 
+// src/lib/physics/ground-track.ts
+function wrapLongitudeDeg(lon) {
+  if (!Number.isFinite(lon)) return lon;
+  let x = ((lon + 180) % 360 + 360) % 360 - 180;
+  if (x === -180) return 180;
+  return x;
+}
+function keplerGroundTrack(opts) {
+  const mu2 = opts.mu ?? EARTH_MU;
+  const radiusM = opts.radiusM ?? EARTH_RADIUS;
+  const a = radiusM + opts.altitudeM;
+  const nSamp = Math.max(2, Math.floor(opts.samples));
+  if (!(opts.altitudeM >= 0) || !(mu2 > 0) || !(a > 0) || !(opts.durationS > 0)) return [];
+  const meanMotion = Math.sqrt(mu2 / (a * a * a));
+  if (!Number.isFinite(meanMotion) || !(meanMotion > 0)) return [];
+  const argp = opts.argpRad ?? 0;
+  const nu0 = opts.nu0Rad ?? 0;
+  const gmst0 = gmstRad(opts.epoch);
+  const out = [];
+  for (let k = 0; k < nSamp; k++) {
+    const t = opts.durationS * k / (nSamp - 1);
+    const nu = nu0 + meanMotion * t;
+    const st = elementsToRv(
+      {
+        a,
+        e: 0,
+        i: opts.inclinationRad,
+        raan: opts.raanRad,
+        argp,
+        nu
+      },
+      mu2
+    );
+    if (!st) continue;
+    const gmst = gmst0 + EARTH_ROTATION_RATE * t;
+    const c = Math.cos(gmst);
+    const s = Math.sin(gmst);
+    const [x, y, z] = st.r;
+    const xe = x * c + y * s;
+    const ye = -x * s + y * c;
+    const r = vnorm([xe, ye, z]);
+    if (!(r > 0)) continue;
+    const lat = Math.asin(Math.min(1, Math.max(-1, z / r))) * 180 / Math.PI;
+    const lon = wrapLongitudeDeg(Math.atan2(ye, xe) * 180 / Math.PI);
+    out.push({ lat, lon, t });
+  }
+  return out;
+}
+
 // src/lib/physics/geometry.ts
 var DEG = Math.PI / 180;
 function greatCircleAngle(lat1, lon1, lat2, lon2) {
@@ -22772,6 +22912,7 @@ var PLANET_NOMINAL_ERROR = {
   neptune: { lon_rad: 10 * ARCSEC, lat_rad: 1 * ARCSEC, range_m: 200 * THOUSAND_KM }
 };
 var MOON_MASS_FRACTION = 1 / 82.300588;
+var SIDEREAL_MONTH_MS = 27.321661 * 864e5;
 var BODY_IDS = ["sun", ...PLANET_IDS, "moon"];
 
 // src/lib/physics/engines-ext.ts
@@ -23943,7 +24084,7 @@ var EARTH_ALTITUDE_CHIPS = [
 
 // mcp/full-catalog.ts
 var SIDUS_MCP_DISCLAIMER = "Educational pure-SI model (SIDUS). Not flight software. No affiliation with NASA, ESA, or SpaceX.";
-var CATALOG_NAMES = ["list_bodies", "list_mcp_tools", "circular_orbit", "hohmann", "escape_velocity", "bielliptic", "plane_change", "vis_viva", "apsides", "rocket_equation", "multi_stage", "j2_drift", "launch_azimuth", "sso_inclination", "dynamic_pressure", "cw_rendezvous", "link_budget", "phasing", "metabolic_load", "cabin_atmosphere", "lioh_scrubber", "cabin_leak", "thermal_loop", "custom_body", "hyperbolic_c3", "hohmann_plane", "propellant_mass", "ideal_thrust", "sphere_of_influence", "synodic_period", "eclipse_duration", "light_time", "solar_pressure", "circularize", "geo_radius", "delta_a_burn", "plane_change_apo", "heat_flux", "coelliptic", "los_range_rate", "oberth", "deorbit", "mean_motion", "solar_array", "rcs_delta_v", "apo_raise", "delta_v_budget", "equal_stage", "period_to_sma", "ballistic_drag", "horizon_range", "antenna_beamwidth", "battery", "angular_diameter", "diffraction", "thermal_rad", "drag_force", "reaction_wheel", "along_track", "ground_track", "eclipse_beta", "hohmann_time", "orbital_energy", "true_anomaly", "flyby_speed", "nodal_period", "eccentric_anomaly", "scale_height", "rendezvous_catchup", "impulse_budget", "sso_period", "mass_ratio_stack", "critical_inclination", "relative_period", "energy_vinf", "geo_light_time", "payload_fraction", "specific_angular_momentum", "escape_margin", "spherical_distance", "elevation_azimuth", "vector_angle", "helio_hohmann", "patched_conic_depart", "surface_access", "orbit_3d", "isentropic_nozzle", "characteristic_velocity_cstar", "throat_area_sizing", "rocket_thrust_chamber", "mixture_ratio", "tank_ullage", "blowdown_tank", "propellant_density_impulse", "cold_gas_thrust", "ion_thruster_efficiency", "hall_thruster_isp", "gnss_pseudorange", "gnss_geometry_gdop", "laser_link_budget", "laser_pointing_jitter", "laser_time_of_flight", "impedance_matching", "antenna_gain_effective", "doppler_shift_leo", "radar_equation", "rain_attenuation_simple", "ttc_ebno", "optical_ber_q", "gnss_troposphere_delay", "free_fall_time", "ballistic_range", "terminal_velocity", "parachute_descent", "coordinated_turn_bank", "slew_rate_pointing", "magnetic_torque", "gravity_gradient_torque", "rw_momentum_capacity", "sun_sensor_cone", "star_tracker_noise", "constellation_walker", "coverage_swath", "revisit_time_simple", "geo_stationkeeping_dv", "geo_propellant_budget", "drag_make_up_dv", "tisserand_parameter", "eps_orbit_average", "relativity_clock_rate", "gnss_ionosphere_klobuchar", "optical_gsd", "solar_sail_accel", "finite_burn_dv", "b_plane_impact", "cr3bp_jacobi", "orbit_lifetime_rough", "geo_drift_rate", "stefan_boltzmann", "wien_peak", "thruster_impulse_bit", "arg_perigee_drift_j2", "sar_azimuth_resolution", "radar_range_resolution", "link_margin", "aerobraking_pass", "diffraction_limit", "panel_eol_power", "magnetorquer_moment", "hyperbolic_eccentricity", "capture_circularize", "gravity_loss", "battery_dod", "umbra_length", "mean_anomaly_from_e", "flight_path_angle", "hoop_stress", "exponential_density", "hill_sphere", "edelbaum_dv", "repeating_ground_track", "pointing_budget_rss", "boiloff_rate", "residual_dipole_torque", "solar_flux_distance", "nyquist_rate", "data_volume", "earth_ir_flux", "molniya_tundra", "frozen_orbit", "thrust_to_weight", "planck_radiance", "eirp_gt", "quaternion_euler", "porkchop_earth_mars", "conjunction_pc", "b_plane_target", "quest_attitude", "herrick_gibbs", "lunisolar_rates", "pump_crank", "schweighart_sedwick", "bodies", "units", "plotter", "kepler_propagate", "lambert", "rv_elements", "sgp4", "look_angles", "pass_predict"];
+var CATALOG_NAMES = ["list_bodies", "list_mcp_tools", "circular_orbit", "hohmann", "escape_velocity", "bielliptic", "plane_change", "vis_viva", "apsides", "rocket_equation", "multi_stage", "j2_drift", "launch_azimuth", "sso_inclination", "dynamic_pressure", "cw_rendezvous", "link_budget", "phasing", "metabolic_load", "cabin_atmosphere", "lioh_scrubber", "cabin_leak", "thermal_loop", "custom_body", "hyperbolic_c3", "hohmann_plane", "propellant_mass", "ideal_thrust", "sphere_of_influence", "synodic_period", "eclipse_duration", "light_time", "solar_pressure", "circularize", "geo_radius", "delta_a_burn", "plane_change_apo", "heat_flux", "coelliptic", "los_range_rate", "oberth", "deorbit", "mean_motion", "solar_array", "rcs_delta_v", "apo_raise", "delta_v_budget", "equal_stage", "period_to_sma", "ballistic_drag", "horizon_range", "antenna_beamwidth", "battery", "angular_diameter", "diffraction", "thermal_rad", "drag_force", "reaction_wheel", "along_track", "ground_track_shift", "ground_track", "eclipse_beta", "hohmann_time", "orbital_energy", "true_anomaly", "flyby_speed", "nodal_period", "eccentric_anomaly", "scale_height", "rendezvous_catchup", "impulse_budget", "sso_period", "mass_ratio_stack", "critical_inclination", "relative_period", "energy_vinf", "geo_light_time", "payload_fraction", "specific_angular_momentum", "escape_margin", "spherical_distance", "elevation_azimuth", "vector_angle", "helio_hohmann", "patched_conic_depart", "surface_g_escape", "orbit_3d", "isentropic_nozzle", "characteristic_velocity_cstar", "throat_area_sizing", "rocket_thrust_chamber", "mixture_ratio", "tank_ullage", "blowdown_tank", "propellant_density_impulse", "cold_gas_thrust", "ion_thruster_efficiency", "hall_thruster_isp", "gnss_pseudorange", "gnss_geometry_gdop", "laser_link_budget", "laser_pointing_jitter", "laser_time_of_flight", "impedance_matching", "antenna_gain_effective", "doppler_shift_leo", "radar_equation", "rain_attenuation_simple", "ttc_ebno", "optical_ber_q", "gnss_troposphere_delay", "free_fall_time", "ballistic_range", "terminal_velocity", "parachute_descent", "coordinated_turn_bank", "slew_rate_pointing", "magnetic_torque", "gravity_gradient_torque", "rw_momentum_capacity", "sun_sensor_cone", "star_tracker_noise", "constellation_walker", "coverage_swath", "revisit_time_simple", "geo_stationkeeping_dv", "geo_propellant_budget", "drag_make_up_dv", "tisserand_parameter", "eps_orbit_average", "relativity_clock_rate", "gnss_ionosphere_klobuchar", "optical_gsd", "solar_sail_accel", "finite_burn_dv", "b_plane_impact", "cr3bp_jacobi", "orbit_lifetime_rough", "geo_drift_rate", "stefan_boltzmann", "wien_peak", "thruster_impulse_bit", "arg_perigee_drift_j2", "sar_azimuth_resolution", "radar_range_resolution", "link_margin", "aerobraking_pass", "diffraction_limit", "panel_eol_power", "magnetorquer_moment", "hyperbolic_eccentricity", "capture_circularize", "gravity_loss", "battery_dod", "umbra_length", "mean_anomaly_from_e", "flight_path_angle", "hoop_stress", "exponential_density", "hill_sphere", "edelbaum_dv", "repeating_ground_track", "pointing_budget_rss", "boiloff_rate", "residual_dipole_torque", "solar_flux_distance", "nyquist_rate", "data_volume", "earth_ir_flux", "molniya_tundra", "frozen_orbit", "thrust_to_weight", "planck_radiance", "eirp_gt", "quaternion_euler", "porkchop_earth_mars", "conjunction_pc", "b_plane_target", "quest_attitude", "herrick_gibbs", "lunisolar_rates", "pump_crank", "schweighart_sedwick", "bodies", "units", "plotter", "kepler_propagate", "lambert", "rv_elements", "sgp4", "look_angles", "pass_predict"];
 var MCP_TOOL_DEFS = [
   {
     name: "list_bodies",
@@ -24796,16 +24937,59 @@ var MCP_TOOL_DEFS = [
     }
   },
   {
-    name: "ground_track",
-    description: "Ground-track shift per orbit (Earth).",
+    name: "ground_track_shift",
+    description: "Ground-track longitude shift per orbit from Earth rotation: \u0394L \u2248 \u2212\u03C9_E T (no J2).",
     inputSchema: {
       a_m: number2(),
       mu: number2().optional()
     },
-    sample: { "a_m": 6778137 },
+    sample: { "a_m": 6878137 },
     run: (args) => {
-      const s = groundTrackShiftPerOrbit(args.mu ?? EARTH_MU, args.a_m);
-      return s == null ? null : { shift_rad: s };
+      const mu2 = args.mu ?? EARTH_MU;
+      const T = orbitalPeriod(mu2, args.a_m);
+      const s = groundTrackShiftPerOrbit(T);
+      return s == null ? null : { period_s: T, shift_rad: s };
+    }
+  },
+  {
+    name: "ground_track",
+    description: "Spherical two-body ground track lat/lon samples (circular Kepler, no J2). Not SGP4.",
+    inputSchema: {
+      altitude_m: number2(),
+      inclination_rad: number2().optional(),
+      raan_rad: number2().optional(),
+      duration_s: number2().optional(),
+      samples: number2().optional(),
+      mu: number2().optional(),
+      radius_m: number2().optional()
+    },
+    sample: { "altitude_m": 4e5, "inclination_rad": 0.9005898928, "samples": 48 },
+    run: (args) => {
+      const mu2 = args.mu ?? EARTH_MU;
+      const radiusM = args.radius_m ?? EARTH_RADIUS;
+      const motion = meanMotionFromAltitude(args.altitude_m, mu2, radiusM);
+      if (!motion) return null;
+      const n = Math.min(120, Math.max(8, Math.floor(args.samples ?? 48)));
+      const durationS = args.duration_s ?? motion.period;
+      const pts = keplerGroundTrack({
+        altitudeM: args.altitude_m,
+        inclinationRad: args.inclination_rad ?? 0.9005898928,
+        raanRad: args.raan_rad ?? 0,
+        epoch: /* @__PURE__ */ new Date("2000-01-01T12:00:00.000Z"),
+        durationS,
+        samples: n,
+        mu: mu2,
+        radiusM
+      });
+      const shift = groundTrackShiftPerOrbit(motion.period);
+      return {
+        propagator: "spherical-kepler-no-j2",
+        period_s: motion.period,
+        shift_rad: shift,
+        n: pts.length,
+        lat_deg: pts.map((p) => p.lat),
+        lon_deg: pts.map((p) => p.lon)
+      };
     }
   },
   {
@@ -25150,8 +25334,8 @@ var MCP_TOOL_DEFS = [
     }
   },
   {
-    name: "surface_access",
-    description: "Surface g and escape for body radius/\u03BC.",
+    name: "surface_g_escape",
+    description: "Surface g, escape speed, parking circular speed and circ\u2192esc \u0394v.",
     inputSchema: {
       radius_m: number2(),
       mu: number2(),

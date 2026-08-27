@@ -136,7 +136,7 @@ export const PLANETARY_EXPECTED: Record<string, ExpectedFn> = {
     return out
   },
 
-  'surface-access': (bag) => {
+  'surface-g-escape': (bag) => {
     const mu = num(bag, 'mu')
     const R = num(bag, 'R')
     const rPark = num(bag, 'r_park')

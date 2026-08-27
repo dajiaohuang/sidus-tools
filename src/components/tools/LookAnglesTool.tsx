@@ -144,7 +144,7 @@ export function LookAnglesTool() {
             />
             <ResultCard
               label={t('fields.above_horizon')}
-              value={look.elevationRad > 0 ? 'yes' : 'no'}
+              value={look.elevationRad > 0 ? t('common.yes') : t('common.no')}
             />
             <ResultCard
               label={t('fields.el_raw')}

@@ -1,8 +1,8 @@
 import { useEffect, type ReactNode } from 'react'
-import { Link, useParams, useSearchParams } from 'react-router-dom'
+import { Link, Navigate, useParams, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { ToolRenderer } from '@/components/tools/ToolRenderer'
-import { getTool } from '@/data/tools'
+import { getTool, TOOL_REDIRECTS } from '@/data/tools'
 import { resolveSources } from '@/data/sources'
 import { Panel } from '@/components/shared/Panel'
 import { SeoHead } from '@/components/site/SeoHead'
@@ -59,6 +59,7 @@ export function ToolDetailPage() {
   const { id = '' } = useParams()
   const [searchParams, setSearchParams] = useSearchParams()
   const { t } = useTranslation()
+  const redirectTo = TOOL_REDIRECTS[id]
   const tool = getTool(id)
   const sources = resolveSources(tool?.sourceIds)
   const ui = parseToolUiLayout(searchParams)
@@ -74,6 +75,11 @@ export function ToolDetailPage() {
     if (!tool) return
     trackEvent('tool_view', { tool_id: tool.id, tool_title: tool.title, category: tool.category })
   }, [tool])
+
+  if (redirectTo) {
+    const q = searchParams.toString()
+    return <Navigate to={q ? `/tools/${redirectTo}?${q}` : `/tools/${redirectTo}`} replace />
+  }
 
   if (!tool) {
     return (
@@ -93,7 +99,7 @@ export function ToolDetailPage() {
   const meta = toolOgMeta(tool.id)
   const hasParams = [...searchParams.keys()].length > 0
   const description = hasParams
-    ? `${tool.title}: ${meta.blurb}. Live pure-SI result from shared parameters.`
+    ? t('tools.live_si_blurb', { title: tool.title, blurb: meta.blurb })
     : tool.description
 
   const seo = (

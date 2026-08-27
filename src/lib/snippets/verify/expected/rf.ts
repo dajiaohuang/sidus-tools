@@ -436,6 +436,16 @@ export const RF_EXPECTED: Record<string, ExpectedFn> = {
     return out
   },
 
+  'ground-track-shift': (bag) => {
+    const mu = num(bag, 'mu')
+    const a = num(bag, 'R') + num(bag, 'h')
+    const T = orbitalPeriod(mu, a)
+    const out: Record<string, number> = {}
+    put(out, ['T', 't'], T)
+    put(out, ['dL', 'd_l'], groundTrackShiftPerOrbit(T))
+    return out
+  },
+
   'eclipse-duration': (bag) => {
     const R = num(bag, 'R')
     const a = R + num(bag, 'h')

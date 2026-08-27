@@ -85,6 +85,7 @@ import {
   wheelTorque,
   alongTrackFromDeltaM,
   groundTrackShiftPerOrbit,
+  keplerGroundTrack,
   eclipseWithBeta,
   meanAnomalyFromE,
   thrusterImpulseBit,
@@ -215,7 +216,7 @@ export type McpToolDef = {
   run: (args: McpArgs) => unknown
 }
 
-export const CATALOG_NAMES = ['list_bodies', 'list_mcp_tools', 'circular_orbit', 'hohmann', 'escape_velocity', 'bielliptic', 'plane_change', 'vis_viva', 'apsides', 'rocket_equation', 'multi_stage', 'j2_drift', 'launch_azimuth', 'sso_inclination', 'dynamic_pressure', 'cw_rendezvous', 'link_budget', 'phasing', 'metabolic_load', 'cabin_atmosphere', 'lioh_scrubber', 'cabin_leak', 'thermal_loop', 'custom_body', 'hyperbolic_c3', 'hohmann_plane', 'propellant_mass', 'ideal_thrust', 'sphere_of_influence', 'synodic_period', 'eclipse_duration', 'light_time', 'solar_pressure', 'circularize', 'geo_radius', 'delta_a_burn', 'plane_change_apo', 'heat_flux', 'coelliptic', 'los_range_rate', 'oberth', 'deorbit', 'mean_motion', 'solar_array', 'rcs_delta_v', 'apo_raise', 'delta_v_budget', 'equal_stage', 'period_to_sma', 'ballistic_drag', 'horizon_range', 'antenna_beamwidth', 'battery', 'angular_diameter', 'diffraction', 'thermal_rad', 'drag_force', 'reaction_wheel', 'along_track', 'ground_track', 'eclipse_beta', 'hohmann_time', 'orbital_energy', 'true_anomaly', 'flyby_speed', 'nodal_period', 'eccentric_anomaly', 'scale_height', 'rendezvous_catchup', 'impulse_budget', 'sso_period', 'mass_ratio_stack', 'critical_inclination', 'relative_period', 'energy_vinf', 'geo_light_time', 'payload_fraction', 'specific_angular_momentum', 'escape_margin', 'spherical_distance', 'elevation_azimuth', 'vector_angle', 'helio_hohmann', 'patched_conic_depart', 'surface_access', 'orbit_3d', 'isentropic_nozzle', 'characteristic_velocity_cstar', 'throat_area_sizing', 'rocket_thrust_chamber', 'mixture_ratio', 'tank_ullage', 'blowdown_tank', 'propellant_density_impulse', 'cold_gas_thrust', 'ion_thruster_efficiency', 'hall_thruster_isp', 'gnss_pseudorange', 'gnss_geometry_gdop', 'laser_link_budget', 'laser_pointing_jitter', 'laser_time_of_flight', 'impedance_matching', 'antenna_gain_effective', 'doppler_shift_leo', 'radar_equation', 'rain_attenuation_simple', 'ttc_ebno', 'optical_ber_q', 'gnss_troposphere_delay', 'free_fall_time', 'ballistic_range', 'terminal_velocity', 'parachute_descent', 'coordinated_turn_bank', 'slew_rate_pointing', 'magnetic_torque', 'gravity_gradient_torque', 'rw_momentum_capacity', 'sun_sensor_cone', 'star_tracker_noise', 'constellation_walker', 'coverage_swath', 'revisit_time_simple', 'geo_stationkeeping_dv', 'geo_propellant_budget', 'drag_make_up_dv', 'tisserand_parameter', 'eps_orbit_average', 'relativity_clock_rate', 'gnss_ionosphere_klobuchar', 'optical_gsd', 'solar_sail_accel', 'finite_burn_dv', 'b_plane_impact', 'cr3bp_jacobi', 'orbit_lifetime_rough', 'geo_drift_rate', 'stefan_boltzmann', 'wien_peak', 'thruster_impulse_bit', 'arg_perigee_drift_j2', 'sar_azimuth_resolution', 'radar_range_resolution', 'link_margin', 'aerobraking_pass', 'diffraction_limit', 'panel_eol_power', 'magnetorquer_moment', 'hyperbolic_eccentricity', 'capture_circularize', 'gravity_loss', 'battery_dod', 'umbra_length', 'mean_anomaly_from_e', 'flight_path_angle', 'hoop_stress', 'exponential_density', 'hill_sphere', 'edelbaum_dv', 'repeating_ground_track', 'pointing_budget_rss', 'boiloff_rate', 'residual_dipole_torque', 'solar_flux_distance', 'nyquist_rate', 'data_volume', 'earth_ir_flux', 'molniya_tundra', 'frozen_orbit', 'thrust_to_weight', 'planck_radiance', 'eirp_gt', 'quaternion_euler', 'porkchop_earth_mars', 'conjunction_pc', 'b_plane_target', 'quest_attitude', 'herrick_gibbs', 'lunisolar_rates', 'pump_crank', 'schweighart_sedwick', 'bodies', 'units', 'plotter', 'kepler_propagate', 'lambert', 'rv_elements', 'sgp4', 'look_angles', 'pass_predict'] as const
+export const CATALOG_NAMES = ['list_bodies', 'list_mcp_tools', 'circular_orbit', 'hohmann', 'escape_velocity', 'bielliptic', 'plane_change', 'vis_viva', 'apsides', 'rocket_equation', 'multi_stage', 'j2_drift', 'launch_azimuth', 'sso_inclination', 'dynamic_pressure', 'cw_rendezvous', 'link_budget', 'phasing', 'metabolic_load', 'cabin_atmosphere', 'lioh_scrubber', 'cabin_leak', 'thermal_loop', 'custom_body', 'hyperbolic_c3', 'hohmann_plane', 'propellant_mass', 'ideal_thrust', 'sphere_of_influence', 'synodic_period', 'eclipse_duration', 'light_time', 'solar_pressure', 'circularize', 'geo_radius', 'delta_a_burn', 'plane_change_apo', 'heat_flux', 'coelliptic', 'los_range_rate', 'oberth', 'deorbit', 'mean_motion', 'solar_array', 'rcs_delta_v', 'apo_raise', 'delta_v_budget', 'equal_stage', 'period_to_sma', 'ballistic_drag', 'horizon_range', 'antenna_beamwidth', 'battery', 'angular_diameter', 'diffraction', 'thermal_rad', 'drag_force', 'reaction_wheel', 'along_track', 'ground_track_shift', 'ground_track', 'eclipse_beta', 'hohmann_time', 'orbital_energy', 'true_anomaly', 'flyby_speed', 'nodal_period', 'eccentric_anomaly', 'scale_height', 'rendezvous_catchup', 'impulse_budget', 'sso_period', 'mass_ratio_stack', 'critical_inclination', 'relative_period', 'energy_vinf', 'geo_light_time', 'payload_fraction', 'specific_angular_momentum', 'escape_margin', 'spherical_distance', 'elevation_azimuth', 'vector_angle', 'helio_hohmann', 'patched_conic_depart', 'surface_g_escape', 'orbit_3d', 'isentropic_nozzle', 'characteristic_velocity_cstar', 'throat_area_sizing', 'rocket_thrust_chamber', 'mixture_ratio', 'tank_ullage', 'blowdown_tank', 'propellant_density_impulse', 'cold_gas_thrust', 'ion_thruster_efficiency', 'hall_thruster_isp', 'gnss_pseudorange', 'gnss_geometry_gdop', 'laser_link_budget', 'laser_pointing_jitter', 'laser_time_of_flight', 'impedance_matching', 'antenna_gain_effective', 'doppler_shift_leo', 'radar_equation', 'rain_attenuation_simple', 'ttc_ebno', 'optical_ber_q', 'gnss_troposphere_delay', 'free_fall_time', 'ballistic_range', 'terminal_velocity', 'parachute_descent', 'coordinated_turn_bank', 'slew_rate_pointing', 'magnetic_torque', 'gravity_gradient_torque', 'rw_momentum_capacity', 'sun_sensor_cone', 'star_tracker_noise', 'constellation_walker', 'coverage_swath', 'revisit_time_simple', 'geo_stationkeeping_dv', 'geo_propellant_budget', 'drag_make_up_dv', 'tisserand_parameter', 'eps_orbit_average', 'relativity_clock_rate', 'gnss_ionosphere_klobuchar', 'optical_gsd', 'solar_sail_accel', 'finite_burn_dv', 'b_plane_impact', 'cr3bp_jacobi', 'orbit_lifetime_rough', 'geo_drift_rate', 'stefan_boltzmann', 'wien_peak', 'thruster_impulse_bit', 'arg_perigee_drift_j2', 'sar_azimuth_resolution', 'radar_range_resolution', 'link_margin', 'aerobraking_pass', 'diffraction_limit', 'panel_eol_power', 'magnetorquer_moment', 'hyperbolic_eccentricity', 'capture_circularize', 'gravity_loss', 'battery_dod', 'umbra_length', 'mean_anomaly_from_e', 'flight_path_angle', 'hoop_stress', 'exponential_density', 'hill_sphere', 'edelbaum_dv', 'repeating_ground_track', 'pointing_budget_rss', 'boiloff_rate', 'residual_dipole_torque', 'solar_flux_distance', 'nyquist_rate', 'data_volume', 'earth_ir_flux', 'molniya_tundra', 'frozen_orbit', 'thrust_to_weight', 'planck_radiance', 'eirp_gt', 'quaternion_euler', 'porkchop_earth_mars', 'conjunction_pc', 'b_plane_target', 'quest_attitude', 'herrick_gibbs', 'lunisolar_rates', 'pump_crank', 'schweighart_sedwick', 'bodies', 'units', 'plotter', 'kepler_propagate', 'lambert', 'rv_elements', 'sgp4', 'look_angles', 'pass_predict'] as const
 
 export const MCP_TOOL_DEFS: McpToolDef[] = [
   {
@@ -1028,15 +1029,59 @@ return { beta_kg_m2: beta, dv_per_rev_m_s: dv }
     },
   },
   {
-    name: "ground_track",
-    description: "Ground-track shift per orbit (Earth).",
+    name: "ground_track_shift",
+    description: "Ground-track longitude shift per orbit from Earth rotation: ΔL ≈ −ω_E T (no J2).",
     inputSchema: {
     a_m: z.number(),
     mu: z.number().optional(),
   },
-    sample: {"a_m":6778137},
+    sample: {"a_m":6878137},
     run: (args) => {
-      const s = groundTrackShiftPerOrbit(args.mu ?? EARTH_MU, args.a_m); return s == null ? null : { shift_rad: s }
+      const mu = args.mu ?? EARTH_MU
+      const T = orbitalPeriod(mu, args.a_m)
+      const s = groundTrackShiftPerOrbit(T)
+      return s == null ? null : { period_s: T, shift_rad: s }
+    },
+  },
+  {
+    name: "ground_track",
+    description: "Spherical two-body ground track lat/lon samples (circular Kepler, no J2). Not SGP4.",
+    inputSchema: {
+    altitude_m: z.number(),
+    inclination_rad: z.number().optional(),
+    raan_rad: z.number().optional(),
+    duration_s: z.number().optional(),
+    samples: z.number().optional(),
+    mu: z.number().optional(),
+    radius_m: z.number().optional(),
+  },
+    sample: {"altitude_m":400000,"inclination_rad":0.9005898928,"samples":48},
+    run: (args) => {
+      const mu = args.mu ?? EARTH_MU
+      const radiusM = args.radius_m ?? EARTH_RADIUS
+      const motion = meanMotionFromAltitude(args.altitude_m, mu, radiusM)
+      if (!motion) return null
+      const n = Math.min(120, Math.max(8, Math.floor(args.samples ?? 48)))
+      const durationS = args.duration_s ?? motion.period
+      const pts = keplerGroundTrack({
+        altitudeM: args.altitude_m,
+        inclinationRad: args.inclination_rad ?? 0.9005898928,
+        raanRad: args.raan_rad ?? 0,
+        epoch: new Date('2000-01-01T12:00:00.000Z'),
+        durationS,
+        samples: n,
+        mu,
+        radiusM,
+      })
+      const shift = groundTrackShiftPerOrbit(motion.period)
+      return {
+        propagator: 'spherical-kepler-no-j2',
+        period_s: motion.period,
+        shift_rad: shift,
+        n: pts.length,
+        lat_deg: pts.map((p) => p.lat),
+        lon_deg: pts.map((p) => p.lon),
+      }
     },
   },
   {
@@ -1364,8 +1409,8 @@ return d == null ? null : { distance_m: d }
     },
   },
   {
-    name: "surface_access",
-    description: "Surface g and escape for body radius/μ.",
+    name: "surface_g_escape",
+    description: "Surface g, escape speed, parking circular speed and circ→esc Δv.",
     inputSchema: {
     radius_m: z.number(),
     mu: z.number(),

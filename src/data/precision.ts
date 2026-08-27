@@ -308,10 +308,17 @@ export const TOOL_PRECISION: Record<string, ToolPrecision> = {
     referenceHint: 'CW / relative motion primers',
   },
   'ground-track': {
+    ...SGP4,
+    errorClass:
+      'TLE path: satellite.js SGP4/SDP4, typically km-class after days. Two-body path: spherical Kepler, no J2; longitude shift uses IERS ω_E.',
+    limits: `Lat/lon polyline. TLE = SGP4/SDP4. Two-body = spherical Kepler, no J2, not a full-force model. ${IEEE}`,
+    referenceHint: 'Vallado SGP4-VER CASE A for the TLE sampler; Vallado two-body + IERS ω_E for Kepler',
+  },
+  'ground-track-shift': {
     ...TWO_BODY,
     errorClass: 'Earth rotation only; ignores J2 nodal regression in this tool.',
     limits: `Geometric ground-track shift from Earth rate × period. ${IEEE}`,
-    referenceHint: 'Spherical Earth rotation',
+    referenceHint: 'Spherical Earth rotation; Vallado two-body period',
   },
   phasing: TWO_BODY,
   'cw-rendezvous': {
@@ -430,7 +437,7 @@ export const TOOL_PRECISION: Record<string, ToolPrecision> = {
     limits: `Parking → hyperbola from ideal heliocentric Δv. ${IEEE}`,
     referenceHint: 'Patched-conic departure (educational)',
   },
-  'surface-access': {
+  'surface-g-escape': {
     ...TWO_BODY,
     limits: `Two-body surface g, escape, parking circular. SOI Laplace if parent set. ${IEEE}`,
     referenceHint: 'Vallado / catalog μ,R',

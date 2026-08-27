@@ -720,6 +720,24 @@ export const RF_SCENARIOS: Record<string, Scenario[]> = {
     },
   ],
 
+  'ground-track-shift': [
+    {
+      name: 'iss-altitude',
+      source: 'well-known ISS-class LEO altitude (400 km) ground-track shift per revolution',
+      bag: { mu: 3.986_004_418e14, R: 6_378_137, h: 400_000 },
+    },
+    {
+      name: 'geo-altitude',
+      source: 'well-known GEO altitude, where the period nears a sidereal day (near-zero net drift)',
+      bag: { mu: 3.986_004_418e14, R: 6_378_137, h: 35_786_000 },
+    },
+    {
+      name: 'synthetic',
+      source: 'adversarial synthetic: distinct non-round mu/radius/altitude',
+      bag: { mu: 3.5e14, R: 6_300_000, h: 850_321 },
+    },
+  ],
+
   'eclipse-duration': [
     {
       name: 'iss-altitude',

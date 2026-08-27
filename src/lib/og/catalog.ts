@@ -294,7 +294,8 @@ export const TOOL_OG: Record<string, ToolOgMeta> = {
   'drag-force': { formula: 'F_d = ½ ρ v² C_d A', accent: '#c47a5a', blurb: 'Atmospheric drag force' },
   'reaction-wheel': { formula: 'H = Iω   ·   T = Iα', accent: '#9ec4c8', blurb: 'Reaction wheel momentum' },
   'apo-raise': { formula: 'Δv = v_p − v_c  (raise apo)', accent: '#e8d5a3', blurb: 'Apoapsis raise from circular' },
-  'ground-track': { formula: 'ΔL ≈ −ω_E T per rev', accent: '#5a7ab0', blurb: 'Ground-track longitude shift' },
+  'ground-track': { formula: 'φ(t), λ(t)  ·  SGP4 or Kepler', accent: '#5a7ab0', blurb: 'Ground track lat/lon samples' },
+  'ground-track-shift': { formula: 'ΔL ≈ −ω_E T per rev', accent: '#5a7ab0', blurb: 'Ground-track longitude shift per rev' },
   'along-track': { formula: 'Δy ≈ a ΔM', accent: '#9ec4c8', blurb: 'Along-track separation' },
   'period-match': { formula: 'a³ = μ T²/(4π²)', accent: '#7a9bb8', blurb: 'Orbit from target period' },
   'eclipse-beta': { formula: 't_ecl = t_ecl(β)', accent: '#5a7ab0', blurb: 'Eclipse vs β-angle' },
@@ -341,7 +342,7 @@ export const TOOL_OG: Record<string, ToolOgMeta> = {
     accent: '#c47a5a',
     blurb: 'Patched-conic departure burn',
   },
-  'surface-access': {
+  'surface-g-escape': {
     formula: 'g = μ/R² · v_esc · v_circ(h)',
     accent: '#b0b0b0',
     blurb: 'Surface g, escape, parking orbit',

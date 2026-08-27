@@ -6,6 +6,7 @@ import { ParamsGrid } from '@/components/shared/ParamsGrid'
 import { UiField } from '@/components/shared/UiField'
 import { ResultCard } from '@/components/shared/ResultCard'
 import { CodeExport } from '@/components/shared/CodeExport'
+import { PorkchopPlot } from '@/components/viz/PorkchopPlot'
 import {
   AU,
   EARTH_HELIO_L0,
@@ -155,6 +156,17 @@ export function PorkchopEarthMarsTool() {
             </p>
           </div>
         )
+      }
+      preview={
+        res && res.cells.length > 1 ? (
+          <PorkchopPlot
+            cells={res.cells}
+            best={res.bestDv}
+            title={t('fields.title_porkchop_map')}
+            xLabel={t('fields.porkchop_dep_axis')}
+            yLabel={t('fields.porkchop_tof_axis')}
+          />
+        ) : null
       }
       code={
         <CodeExport
