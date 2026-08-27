@@ -7,7 +7,7 @@
 | Size | **1200 × 630** px (1.91:1) |
 | Safe zone | ~60 px margin; key text in center ~1080×560 |
 | Format | PNG (`image/png`) via `@vercel/og` |
-| File / CDN | Edge-cached `s-maxage=600` |
+| File / CDN | Edge-cached `s-maxage=86400` |
 | Meta | `og:image`, `og:image:width/height/type/alt`, `twitter:card=summary_large_image` |
 
 References: [MyOGImage size guide](https://myogimage.com/blog/og-image-size-meta-tags-complete-guide), [ogimage.gallery SaaS](https://www.ogimage.gallery/category/saas), Meta sharing docs.
@@ -32,9 +32,9 @@ SIDUS adaptation:
 1. **Static tool card**: `/api/og?tool=hohmann`  
    Title · blurb · formula · tags (no metrics).
 
-2. **Dynamic result card**: same query string as the tool page  
+2. **Dynamic result card**: live formula inputs only (not camera / catalog / layout keys).  
    e.g. `/tools/hohmann?h1=200&h2=35786&hu=km&body=earth`  
-   → metrics: Δv total, Δv₁, Δv₂, TOF + context line.
+   → metrics: Δv total, Δv₁, Δv₂, TOF + context line. Visualization tools such as orbital-view use `?tool=orbital-view` only.
 
 3. **Site pages**: `?page=home|tools|resources`
 

@@ -51,12 +51,36 @@ describe('OG payload', () => {
     expect(v!.unit).toBe('km/s')
   })
 
-  it('buildOgImageUrl encodes tool and params', () => {
+  it('buildOgImageUrl encodes tool and formula params', () => {
     const url = buildOgImageUrl('/tools/hohmann', 'h1=200&h2=35786&hu=km')
     expect(url).toContain('/api/og')
     expect(url).toContain('tool=hohmann')
     expect(url).toContain('h1=200')
     expect(url).toContain('h2=35786')
+    expect(url).toContain('v=6')
+  })
+
+  it('buildOgImageUrl drops orbital-view camera and catalog state', () => {
+    const url = buildOgImageUrl(
+      '/tools/orbital-view',
+      'sky=sun,moon,mercury,venus,mars&alt=1&sats=25544,25545&groups=starlink&tw=1&to=1&ts=1&z=1.5&pitch=12&brg=-40&lng=12.4&lat=41.9&follow=1&sel=25544&scene=globe',
+    )
+    expect(url).toContain('tool=orbital-view')
+    expect(url).not.toContain('sky=')
+    expect(url).not.toContain('sats=')
+    expect(url).not.toContain('groups=')
+    expect(url).not.toContain('pitch=')
+    expect(url).not.toContain('scene=')
+    expect(url).not.toContain('lat=')
+    expect(url).toMatch(/\/api\/og\?tool=orbital-view&v=6$/)
+  })
+
+  it('buildOgImageUrl strips layout chrome keys', () => {
+    const url = buildOgImageUrl('/tools/hohmann', 'h1=200&focus=1&chrome=0&code=0')
+    expect(url).toContain('h1=200')
+    expect(url).not.toContain('focus=')
+    expect(url).not.toContain('chrome=')
+    expect(url).not.toContain('code=')
   })
 
   it('rocket equation dynamic', () => {

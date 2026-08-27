@@ -14,6 +14,7 @@
  */
 import { ImageResponse } from '@vercel/og'
 import { queryFromSearch, resolveOgPayloadStatic } from '../src/lib/og/payload'
+import { satoriSafeText } from '../src/lib/og/text'
 import type { OgPayload } from '../src/lib/og/types'
 import { OG_H, OG_W } from '../src/lib/og/types'
 
@@ -32,7 +33,7 @@ const GRID = '#161616'
 const SURFACE = '#141414'
 
 const CACHE =
-  'public, max-age=60, s-maxage=300, stale-while-revalidate=3600'
+  'public, max-age=300, s-maxage=86400, stale-while-revalidate=604800'
 
 const OG_HEADERS = {
   'Cache-Control': CACHE,
@@ -280,6 +281,22 @@ function kickerFor(kind: OgPayload['kind']): string {
   return 'Tool · SIDUS'
 }
 
+function sanitizePayload(payload: OgPayload): OgPayload {
+  return {
+    ...payload,
+    title: satoriSafeText(payload.title),
+    subtitle: payload.subtitle ? satoriSafeText(payload.subtitle) : payload.subtitle,
+    formula: payload.formula ? satoriSafeText(payload.formula) : payload.formula,
+    context: payload.context ? satoriSafeText(payload.context) : payload.context,
+    metrics: payload.metrics?.map((m) => ({
+      ...m,
+      label: satoriSafeText(m.label),
+      value: satoriSafeText(m.value),
+      unit: m.unit ? satoriSafeText(m.unit) : m.unit,
+    })),
+  }
+}
+
 /**
  * Single Satori-safe layout for all pages.
  * Home/tools previously used TagChips + Fragments → content-length 0 on Edge.
@@ -478,10 +495,12 @@ async function pngResponse(element: JSX.Element): Promise<Response> {
   if (buf.byteLength < 256) {
     throw new Error(`og empty png body (${buf.byteLength} bytes)`)
   }
-  return new Response(buf, {
+  const body = new Uint8Array(buf)
+  return new Response(body, {
     status: 200,
     headers: {
       'Content-Type': 'image/png',
+      'Content-Length': String(body.byteLength),
       ...OG_HEADERS,
     },
   })
@@ -490,7 +509,7 @@ async function pngResponse(element: JSX.Element): Promise<Response> {
 export default async function handler(req: Request) {
   const url = new URL(req.url)
   const q = queryFromSearch(url.searchParams)
-  const payload: OgPayload = resolveOgPayloadStatic(q)
+  const payload: OgPayload = sanitizePayload(resolveOgPayloadStatic(q))
 
   try {
     return await pngResponse(<SidusOgCard payload={payload} />)

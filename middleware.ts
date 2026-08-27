@@ -17,6 +17,7 @@ import { getTool } from './src/data/tools'
 import { resolveSources } from './src/data/sources'
 import { toolOgMeta } from './src/lib/og/catalog'
 import { SITE_ORIGIN } from './src/lib/og/types'
+import { buildOgImageUrl } from './src/lib/og/url'
 
 /** Pure social / unfurl agents — prefer a small HTML card, not the full SPA body. */
 const SOCIAL_RE =
@@ -28,27 +29,6 @@ const SOCIAL_RE =
  */
 const BOT_RE =
   /bot|crawl|spider|slurp|facebookexternalhit|Facebot|Twitterbot|LinkedInBot|WhatsApp|TelegramBot|Discordbot|Slackbot|SkypeUriPreview|vkShare|W3C_Validator|redditbot|Embedly|Quora Link Preview|Showyoubot|outbrain|pinterest|flipboard|tumblr|bitlybot|Applebot|Google-InspectionTool|GPTBot|ChatGPT|ClaudeBot|anthropic|Perplexity|Bytespider|OAI-SearchBot|meta-externalagent|opengraph|OpenGraph|iframely|metatags\.io|metainspector|unfurl|preview\.card|linkexpander|embedly|nuzzel|scoop\.it|baiduspider|yandex|duckduckbot|bingpreview|rogerbot|Valve|isready/i
-
-/** Layout/chrome query keys must not pollute dynamic formula OG images. */
-const OG_STRIP_PARAMS = new Set([
-  'focus',
-  'chrome',
-  'title',
-  'subtitle',
-  'formula',
-  'back',
-  'edit',
-  'tags',
-  'meta',
-  'precision',
-  'sources',
-  'blocks',
-  'params',
-  'results',
-  'preview',
-  'code',
-  'mcp',
-])
 
 /** Site “content revised” signal for Last-Modified (ISO date, midnight UTC). */
 const CONTENT_REVISED = '2026-08-11T00:00:00.000Z'
@@ -125,49 +105,35 @@ type OgCtx = {
 function resolveOgCtx(requestUrl: URL): OgCtx {
   const origin = `${requestUrl.protocol}//${requestUrl.host}`
   const absolute = requestUrl.toString().split('#')[0]
-  const og = new URL('/api/og', origin)
+  const image = buildOgImageUrl(requestUrl.pathname, requestUrl.searchParams, origin)
 
   let title = 'SIDUS: Space Engineering Tools'
   let description =
     'Open-source pure-SI space engineering calculators for orbits, propulsion, satellites, launch, RF, and crew ECLSS.'
 
-  if (requestUrl.pathname === '/' || requestUrl.pathname === '') {
-    og.searchParams.set('page', 'home')
-  } else if (requestUrl.pathname === '/tools') {
-    og.searchParams.set('page', 'tools')
+  if (requestUrl.pathname === '/tools') {
     title = 'Tools · SIDUS'
     description = 'Catalog of pure-SI space engineering calculators.'
   } else if (requestUrl.pathname === '/resources') {
-    og.searchParams.set('page', 'resources')
     title = 'Resources · SIDUS'
     description = 'Public data sources and references used by SIDUS.'
   } else {
     const m = requestUrl.pathname.match(/^\/tools\/([^/]+)\/?$/)
     if (m) {
       const toolId = decodeURIComponent(m[1])
-      og.searchParams.set('tool', toolId)
-      requestUrl.searchParams.forEach((v, k) => {
-        if (k === 'tool' || k === 'page' || OG_STRIP_PARAMS.has(k)) return
-        og.searchParams.set(k, v)
-      })
       const tool = getTool(toolId)
       title = `${tool?.title ?? toolId} · SIDUS`
       description =
         tool?.description ??
         `SIDUS pure-SI calculator: ${toolId}. Educational orbital / propulsion / ECLSS models.`
-    } else {
-      og.searchParams.set('page', 'home')
     }
   }
-
-  // Cache-bust for scrapers that cached empty/failed og:image bodies
-  if (!og.searchParams.has('v')) og.searchParams.set('v', '5')
 
   return {
     title,
     description,
     canonical: absolute,
-    image: og.toString(),
+    image,
   }
 }
 

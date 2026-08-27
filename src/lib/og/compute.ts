@@ -38,10 +38,6 @@ import { toSi } from '../physics/units'
 import { toolOgMeta } from './catalog'
 import type { OgMetric, OgPayload } from './types'
 import { SITE_ORIGIN } from './types'
-import { LAYOUT_PARAM_KEYS } from '../tool-ui-layout'
-
-/** Layout/chrome URL keys never belong on /api/og (live formula image). */
-const OG_STRIP = new Set<string>([...LAYOUT_PARAM_KEYS, 'mcp', 'tool', 'page'])
 
 function num(q: Record<string, string | undefined>, key: string, fallback: number): number {
   const raw = q[key]
@@ -660,33 +656,4 @@ export function resolveOgPayload(
   return resolveOgPayload({ page: 'home' })
 }
 
-/** Absolute og:image URL for a path + search string */
-export function buildOgImageUrl(
-  path: string,
-  search?: string | URLSearchParams,
-  origin = SITE_ORIGIN,
-): string {
-  const u = new URL('/api/og', origin)
-  if (path === '/' || path === '') {
-    u.searchParams.set('page', 'home')
-  } else if (path === '/tools') {
-    u.searchParams.set('page', 'tools')
-  } else if (path === '/resources') {
-    u.searchParams.set('page', 'resources')
-  } else {
-    const m = path.match(/^\/tools\/([^/?#]+)/)
-    if (m) {
-      u.searchParams.set('tool', m[1])
-      const q = queryFromSearch(search ?? '')
-      for (const [k, v] of Object.entries(q)) {
-        if (v == null || OG_STRIP.has(k)) continue
-        u.searchParams.set(k, v)
-      }
-    } else {
-      u.searchParams.set('page', 'home')
-    }
-  }
-  // Bust social-scraper caches after OG pipeline fixes
-  if (!u.searchParams.has('v')) u.searchParams.set('v', '5')
-  return u.toString()
-}
+export { buildOgImageUrl } from './url'
