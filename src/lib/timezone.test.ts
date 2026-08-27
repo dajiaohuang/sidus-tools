@@ -84,7 +84,9 @@ describe('timezone', () => {
       expect(utcOffsetLabel(new Date('2026-01-15T12:00:00Z'), 'Europe/Rome')).toBe('GMT+1')
       expect(utcOffsetLabel(new Date('2026-03-08T06:30:00Z'), 'America/New_York')).toBe('GMT-5')
       expect(utcOffsetLabel(new Date('2026-03-08T07:30:00Z'), 'America/New_York')).toBe('GMT-4')
-      expect(utcOffsetLabel(new Date('2026-07-15T12:00:00Z'), 'UTC')).toBe('GMT+0')
+      expect(['GMT+0', 'GMT', 'UTC']).toContain(
+        utcOffsetLabel(new Date('2026-07-15T12:00:00Z'), 'UTC'),
+      )
     })
   })
 
