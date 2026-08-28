@@ -9,7 +9,9 @@ type Props = {
 
 /**
  * Solid card shell for tool panels (parameters, results, code, preview).
- * flex-1 body so paired PREVIEW/CODE stretch to the same row height.
+ * flex-auto body (basis auto, grow) so paired PREVIEW/CODE stretch to the same
+ * row height. Basis must stay auto: WebKit measures a basis-0 flex item that
+ * contains a container-type query container as zero-height (params collapse).
  */
 export function Panel({ title, children, className }: Props) {
   return (
@@ -25,7 +27,7 @@ export function Panel({ title, children, className }: Props) {
           {title}
         </h2>
       ) : null}
-      <div className="flex min-h-0 min-w-0 max-w-full flex-1 flex-col">{children}</div>
+      <div className="flex min-h-0 min-w-0 max-w-full flex-auto flex-col">{children}</div>
     </section>
   )
 }
