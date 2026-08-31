@@ -21,6 +21,7 @@ import { RF_EXPECTED, UNVERIFIABLE_RF } from './rf'
 import { SYSTEMS_EXPECTED } from './systems'
 import { OPS_EXPECTED, UNVERIFIABLE_OPS } from './ops'
 import { PLANETARY_EXPECTED, UNVERIFIABLE_PLANETARY } from './planetary'
+import { ODC_EXPECTED } from './odc'
 
 export type { ExpectedFn, ToleranceOverride, ToleranceOverrides } from './shared'
 
@@ -30,6 +31,7 @@ export const EXPECTED = {
   ...SYSTEMS_EXPECTED,
   ...OPS_EXPECTED,
   ...PLANETARY_EXPECTED,
+  ...ODC_EXPECTED,
 }
 
 export const UNVERIFIABLE: Readonly<Record<string, string>> = {

@@ -44,4 +44,42 @@ describe('tools catalog quality gates', () => {
       expect(tool.tags).not.toContain('TCS')
     }
   })
+
+  it('ODC wave physics is exported from the barrel and its sources resolve', async () => {
+    const physics = await import('@/lib/physics')
+    for (const name of [
+      'radiatorNetFlux',
+      'nadirPlateViewFactor',
+      'radiatorHeatPump',
+      'odcPowerThermalSizing',
+      'ltanRaanOffsetRad',
+      'betaAngle',
+      'eclipseThresholdBeta',
+      'julianDay',
+      'dawnDuskBetaJd',
+      'dawnDuskBeta',
+      'dawnDuskSeason',
+      'twoPhaseLoop',
+      'TWO_PHASE_FLUIDS',
+      'coldPlateChain',
+      'shieldMassScaling',
+      'shieldKgPerKwVsSize',
+    ]) {
+      expect(name in physics, name).toBe(true)
+    }
+    for (const id of [
+      'starcloud-wp',
+      'turyshev-odc',
+      'suncatcher',
+      'nasa-rp-1121',
+      'nist-webbook',
+      'ices-2015-35',
+      'gilmore',
+      'lienhard',
+      'spenvis-shieldose',
+      'nvidia-hopper',
+    ]) {
+      expect(SOURCES[id]?.url.startsWith('https://'), id).toBe(true)
+    }
+  })
 })

@@ -7,6 +7,7 @@ import { RF_SCENARIOS } from './rf'
 import { SYSTEMS_SCENARIOS } from './systems'
 import { OPS_SCENARIOS } from './ops'
 import { PLANETARY_SCENARIOS } from './planetary'
+import { ODC_SCENARIOS } from './odc'
 import type { Scenario } from '../inputs'
 
 export const SCENARIOS: Record<string, Scenario[]> = {
@@ -15,4 +16,5 @@ export const SCENARIOS: Record<string, Scenario[]> = {
   ...SYSTEMS_SCENARIOS,
   ...OPS_SCENARIOS,
   ...PLANETARY_SCENARIOS,
+  ...ODC_SCENARIOS,
 }

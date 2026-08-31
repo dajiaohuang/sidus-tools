@@ -233,6 +233,17 @@ const PLANETARY_WAVE = [
   'vector-angle',
 ] as const
 
+/** ODC thermal wave (radiator, dawn-dusk SSO, two-phase loop, heat pump, sizing, cold plate, shield). */
+const ODC_WAVE = [
+  'radiator-net-flux',
+  'sso-dawn-dusk',
+  'two-phase-loop',
+  'radiator-heat-pump',
+  'odc-power-thermal-sizing',
+  'cold-plate-dt',
+  'shield-mass-scaling',
+] as const
+
 /** All tool ids currently covered by EXPECTED, across every wave. */
 const COVERED = [
   ...PILOT,
@@ -241,6 +252,7 @@ const COVERED = [
   ...SATELLITE_WAVE,
   ...UTILITIES_WAVE,
   ...PLANETARY_WAVE,
+  ...ODC_WAVE,
 ] as const
 
 /** Languages whose bodies may rename a result through `safeIdent`. */

@@ -157,6 +157,13 @@ import { solarFluxDistanceSnippets } from './tools/solar-flux-distance'
 import { nyquistRateSnippets } from './tools/nyquist-rate'
 import { dataVolumeSnippets } from './tools/data-volume'
 import { earthIrFluxSnippets } from './tools/earth-ir-flux'
+import { radiatorNetFluxSnippets } from './tools/radiator-net-flux'
+import { ssoDawnDuskSnippets } from './tools/sso-dawn-dusk'
+import { twoPhaseLoopSnippets } from './tools/two-phase-loop'
+import { radiatorHeatPumpSnippets } from './tools/radiator-heat-pump'
+import { odcPowerThermalSizingSnippets } from './tools/odc-power-thermal-sizing'
+import { coldPlateDtSnippets } from './tools/cold-plate-dt'
+import { shieldMassScalingSnippets } from './tools/shield-mass-scaling'
 import { molniyaTundraSnippets } from './tools/molniya-tundra'
 import { frozenOrbitSnippets } from './tools/frozen-orbit'
 import { thrustToWeightSnippets } from './tools/thrust-to-weight'
@@ -367,6 +374,13 @@ const MAP: Record<string, FormulaSnippet> = {
   [lunisolarRatesSnippets.formulaId]: lunisolarRatesSnippets,
   [pumpCrankSnippets.formulaId]: pumpCrankSnippets,
   [schweighartSedwickSnippets.formulaId]: schweighartSedwickSnippets,
+  [radiatorNetFluxSnippets.formulaId]: radiatorNetFluxSnippets,
+  [ssoDawnDuskSnippets.formulaId]: ssoDawnDuskSnippets,
+  [twoPhaseLoopSnippets.formulaId]: twoPhaseLoopSnippets,
+  [radiatorHeatPumpSnippets.formulaId]: radiatorHeatPumpSnippets,
+  [odcPowerThermalSizingSnippets.formulaId]: odcPowerThermalSizingSnippets,
+  [coldPlateDtSnippets.formulaId]: coldPlateDtSnippets,
+  [shieldMassScalingSnippets.formulaId]: shieldMassScalingSnippets,
 }
 
 export function getSnippets(formulaId: string): FormulaSnippet | undefined {

@@ -199,6 +199,13 @@ const MAP: Record<string, LazyTool> = {
   'lunisolar-rates': L(() => import('./LunisolarRatesTool').then((m) => ({ default: m.LunisolarRatesTool }))),
   'pump-crank': L(() => import('./PumpCrankTool').then((m) => ({ default: m.PumpCrankTool }))),
   'schweighart-sedwick': L(() => import('./SchweighartSedwickTool').then((m) => ({ default: m.SchweighartSedwickTool }))),
+  'radiator-net-flux': L(() => import('./RadiatorNetFluxTool').then((m) => ({ default: m.RadiatorNetFluxTool }))),
+  'sso-dawn-dusk': L(() => import('./SsoDawnDuskTool').then((m) => ({ default: m.SsoDawnDuskTool }))),
+  'two-phase-loop': L(() => import('./TwoPhaseLoopTool').then((m) => ({ default: m.TwoPhaseLoopTool }))),
+  'radiator-heat-pump': L(() => import('./RadiatorHeatPumpTool').then((m) => ({ default: m.RadiatorHeatPumpTool }))),
+  'odc-power-thermal-sizing': L(() => import('./OdcPowerThermalSizingTool').then((m) => ({ default: m.OdcPowerThermalSizingTool }))),
+  'cold-plate-dt': L(() => import('./ColdPlateDtTool').then((m) => ({ default: m.ColdPlateDtTool }))),
+  'shield-mass-scaling': L(() => import('./ShieldMassScalingTool').then((m) => ({ default: m.ShieldMassScalingTool }))),
 }
 
 type Props = { id: string }

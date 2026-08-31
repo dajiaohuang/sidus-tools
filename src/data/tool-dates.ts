@@ -202,5 +202,12 @@ export const TOOL_DATES: Record<string, ToolDates> = {
   'pump-crank': { created: '2026-08-18', updated: '2026-08-18' },
   'schweighart-sedwick': { created: '2026-08-18', updated: '2026-08-18' },
   'orbital-view': { created: '2026-08-20', updated: '2026-08-20' },
+  'radiator-net-flux': { created: '2026-08-29', updated: '2026-08-29' },
+  'sso-dawn-dusk': { created: '2026-08-29', updated: '2026-08-29' },
+  'two-phase-loop': { created: '2026-08-29', updated: '2026-08-29' },
+  'radiator-heat-pump': { created: '2026-08-29', updated: '2026-08-29' },
+  'odc-power-thermal-sizing': { created: '2026-08-29', updated: '2026-08-29' },
+  'cold-plate-dt': { created: '2026-08-29', updated: '2026-08-29' },
+  'shield-mass-scaling': { created: '2026-08-29', updated: '2026-08-29' },
 }
 

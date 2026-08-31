@@ -167,6 +167,7 @@ SIDUS (Latin *sidus* = constellation) is a non-profit educational project with n
 - [SGP4 / TLE propagate](https://sidus.tools/tools/sgp4): Propagate NORAD TLE with SGP4/SDP4 (via satellite.js, MIT).
 - [Slew time](https://sidus.tools/tools/slew-rate-pointing): Rest-to-rest slew with w_max and a_max.
 - [Solar radiation pressure](https://sidus.tools/tools/solar-pressure): Force and acceleration from SRP: F ~ P0 A C_r (AU/r)2.
+- [Dawn-dusk SSO beta and eclipse season](https://sidus.tools/tools/sso-dawn-dusk): Sun-synchronous inclination, beta-angle from LTAN and date, eclipse threshold beta*, and the days per year with eclipse.
 - [Star tracker noise](https://sidus.tools/tools/star-tracker-noise): sigma~pixel/sqrt(N).
 - [Sun sensor angle](https://sidus.tools/tools/sun-sensor-cone): Angle between body axis and sun vector.
 - [Eb/N0 from C/N0](https://sidus.tools/tools/ttc-ebno): Eb/N0=CN0/Rb for digital links.
@@ -204,6 +205,7 @@ SIDUS (Latin *sidus* = constellation) is a non-profit educational project with n
 - [Ballistic range (flat)](https://sidus.tools/tools/ballistic-range): Vacuum flat-Earth range TOF and apogee.
 - [Battery energy / endurance](https://sidus.tools/tools/battery): Stored energy from Ah.V and run-time at constant load.
 - [Battery depth of discharge](https://sidus.tools/tools/battery-dod): DoD=E_used/E_capacity.
+- [Cold plate junction deltaT](https://sidus.tools/tools/cold-plate-dt): Junction temperature from a resistance chain: R_jc, TIM t/(kA), cold plate 1/(hA) and coolant caloric rise.
 - [Coordinated turn bank](https://sidus.tools/tools/coordinated-turn-bank): tan phi = v^2/(g R).
 - [Custom body (mu from M, R)](https://sidus.tools/tools/custom-body): Build mu = GM from mass and radius: surface g, escape, circular speed, optional SOI vs primary.
 - [Atmospheric drag force](https://sidus.tools/tools/drag-force): F_d = 1/2 rho v2 C_d A and acceleration F/m.
@@ -216,18 +218,23 @@ SIDUS (Latin *sidus* = constellation) is a non-profit educational project with n
 - [Pressure vessel hoop stress](https://sidus.tools/tools/hoop-stress): Thin-wall hoop stress sigma=p r/t.
 - [Light-time delay](https://sidus.tools/tools/light-time): One-way and round-trip RF / light travel time for a given range (deep-space ops).
 - [Nyquist sample rate](https://sidus.tools/tools/nyquist-rate): fs >= 2 f_max sampling theorem.
+- [Orbital data center power and radiator sizing](https://sidus.tools/tools/odc-power-thermal-sizing): IT power to solar array area and side, radiator area from net flux, areal masses and kg per kW.
 - [Orbit 3D view](https://sidus.tools/tools/orbit-3d): Interactive 3D circular orbits and Hohmann-class transfer ellipse (drag to rotate, scroll to zoom).
 - [Live orbital view](https://sidus.tools/tools/orbital-view): Fullscreen globe with the live ISS ground track, day/night terminator and true-altitude orbit view.
 - [Solar panel EOL power](https://sidus.tools/tools/panel-eol-power): P=P0 (1-d)^years degradation.
 - [Parachute descent rate](https://sidus.tools/tools/parachute-descent): Terminal velocity under chute Cd A.
 - [Planck spectral radiance](https://sidus.tools/tools/planck-radiance): Blackbody B_lambda(lambda, T) for thermal and optical payload teaching.
 - [Function plotter](https://sidus.tools/tools/plotter): Plot f(x) offline with SVG: orbital and math presets.
+- [Radiator heat pump trade](https://sidus.tools/tools/radiator-heat-pump): Heat pump raising radiator temperature: COP, rejected heat Q(1+1/COP), radiator area against baseline, extra solar array area.
+- [Radiator net heat flux](https://sidus.tools/tools/radiator-net-flux): Net W/m2 of a flat radiator: Stefan-Boltzmann emission per face minus absorbed sun, albedo and Earth IR (view factor); area per kW.
 - [Relativistic clock rate](https://sidus.tools/tools/relativity-clock-rate): df/f ~ dPhi/c^2 - v^2/(2c^2).
 - [Exponential atmosphere rho(h)](https://sidus.tools/tools/scale-height): rho = rho0 exp(-h/H) density model.
+- [Shield mass per kW vs container size](https://sidus.tools/tools/shield-mass-scaling): Areal density (density x thickness) in kg/m2 and g/cm2, shield mass and kg per kW of a box; mass per kW scales as 1/L. Geometry only, no dose.
 - [Solar array power](https://sidus.tools/tools/solar-array): Array electrical power P = S0 A cos / r_AU2.
 - [Solar flux vs distance](https://sidus.tools/tools/solar-flux-distance): S=S0 (1 AU/r)^2.
 - [Stefan-Boltzmann power](https://sidus.tools/tools/stefan-boltzmann): P=eps A T thermal radiation.
 - [Terminal velocity](https://sidus.tools/tools/terminal-velocity): v=sqrt(2mg/(rho Cd A)).
+- [Two-phase pumped loop](https://sidus.tools/tools/two-phase-loop): Latent-heat mass flow Q/(deltax h_fg) against single-phase Q/(c_p deltaT), volumetric flow and liquid pump power.
 - [Unit converter](https://sidus.tools/tools/units): AU, light-years, parsec, km/s, g and common aerospace units.
 - [Wien peak wavelength](https://sidus.tools/tools/wien-peak): lambda_max=b/T blackbody peak.
 
@@ -250,4 +257,4 @@ SIDUS (Latin *sidus* = constellation) is a non-profit educational project with n
 - https://github.com/massimodeluisa/sidus-tools/blob/main/docs/IMPLEMENTATION_TODO.md
 - https://github.com/massimodeluisa/sidus-tools/blob/main/AGENTS.md
 
-<!-- generated by scripts/generate-llms-txt.ts - 191 tools - 2026-08-26 -->
+<!-- generated by scripts/generate-llms-txt.ts - 198 tools - 2026-08-29 -->
