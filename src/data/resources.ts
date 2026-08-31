@@ -39,21 +39,95 @@ export const RESOURCES: Resource[] = [
     name: 'JPL Horizons',
     org: 'NASA / JPL',
     url: 'https://ssd.jpl.nasa.gov/horizons/',
-    description: 'Solar System ephemerides and body data.',
+    description:
+      'Solar System ephemerides and body data via the web app and the REST API (ssd-api.jpl.nasa.gov/doc/horizons.html). SIDUS cites Horizons for constants; it does not wrap the ephemeris service.',
     tags: ['ephemerides'],
   },
   {
     name: 'NASA SPICE / NAIF',
     org: 'NASA / JPL',
     url: 'https://naif.jpl.nasa.gov/naif/',
-    description: 'SPICE toolkit and kernels for trajectory geometry.',
+    description:
+      'SPICE Toolkit and kernels for trajectory geometry, with WebGeocalc and Cosmographia as the public NAIF interfaces. SIDUS does not embed the Toolkit.',
     tags: ['SPICE'],
+  },
+  {
+    name: 'JPL SSD Tools',
+    org: 'NASA / JPL',
+    url: 'https://ssd.jpl.nasa.gov/tools/',
+    description:
+      'Horizons, small-body database, mission-design tables, orbit viewer, gravity fields, and SSD APIs.',
+    tags: ['ephemerides', 'API', 'asteroids'],
+  },
+  {
+    name: 'CNEOS',
+    org: 'NASA / JPL',
+    url: 'https://cneos.jpl.nasa.gov/',
+    description:
+      'Near-Earth object orbits, Sentry impact monitoring, close approaches, NHATS, and fireball reports.',
+    tags: ['NEO', 'asteroids'],
+  },
+  {
+    name: 'NASA Eyes',
+    org: 'NASA / JPL',
+    url: 'https://science.nasa.gov/eyes/',
+    description:
+      'Browser 3D views of the solar system, NEOs, Earth science, and missions. Visualization, not a Sidus calculator.',
+    tags: ['visualization'],
+  },
+  {
+    name: 'DSN Now',
+    org: 'NASA / JPL',
+    url: 'https://eyes.nasa.gov/apps/dsn-now/',
+    description:
+      'Live Deep Space Network antenna status, spacecraft links, data rates, and light-time.',
+    tags: ['DSN', 'comms'],
+  },
+  {
+    name: 'DESCANSO book series',
+    org: 'NASA / JPL',
+    url: 'https://descanso.jpl.nasa.gov/monograph/mono.html',
+    description:
+      'Free PDFs on deep-space communications, navigation, optical links, and radio science.',
+    tags: ['literature', 'comms'],
+  },
+  {
+    name: 'Basics of Spaceflight',
+    org: 'NASA / JPL (Doody)',
+    url: 'https://science.nasa.gov/learn/basics-of-space-flight/',
+    description: 'Mission-operations tutorial covering the environment, flight paths, and ground systems.',
+    tags: ['education'],
+  },
+  {
+    name: 'NASA Software Catalog',
+    org: 'NASA',
+    url: 'https://software.nasa.gov/',
+    description:
+      'Agency software listing including JPL entries. Many codes need a Software Usage Agreement. Sidus does not wrap them.',
+    tags: ['open-source'],
+  },
+  {
+    name: 'JPL Open Source (GitHub)',
+    org: 'NASA / JPL',
+    url: 'https://github.com/orgs/nasa-jpl/repositories',
+    description:
+      'Public JPL repositories (flight software, DTN, rover kits, Earth science). Not Sidus physics.',
+    tags: ['open-source'],
+  },
+  {
+    name: 'Binary Space SpaceMissions',
+    org: 'Binary Space',
+    url: 'https://www.binary-space.com/spacemissions/',
+    description:
+      'Web 3D solar-system and mission viewer (TLE from CelesTrak, SPICE, CNEOS). Sidus cites it. Sidus does not embed or wrap it.',
+    tags: ['visualization'],
   },
   {
     name: 'CelesTrak™',
     org: 'CelesTrak™',
     url: 'https://celestrak.org/',
-    description: 'TLE sets and satellite catalog utilities.',
+    description:
+      'GP element sets (the stations, Starlink, GNSS, weather and science groups SIDUS queries) plus curated special-event pages such as Artemis I. SIDUS caches and cites; it is not a CelesTrak mirror.',
     tags: ['TLE', 'catalog'],
   },
   {
