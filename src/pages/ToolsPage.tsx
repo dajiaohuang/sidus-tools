@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { ArrowRight, ListFilter, Search } from 'lucide-react'
 import { TOOLS, primaryTag } from '@/data/tools'
 import { parseCatalogTagsParam, serializeCatalogTags } from '@/lib/catalog-tags'
+import { applyCatalogParamsPatch } from '@/lib/catalog-search-params'
 import { tooltipProps } from '@/components/shared/tooltip'
 import { cn } from '@/lib/utils'
 import { SeoHead } from '@/components/site/SeoHead'
@@ -180,25 +181,10 @@ export function ToolsPage() {
 
   const patchParams = useCallback(
     (patch: { q?: string; tags?: string[] | null }) => {
-      setSearchParams(
-        (prev) => {
-          const next = new URLSearchParams(prev)
-          next.delete('cat')
-          next.delete('tag')
-          if ('q' in patch) {
-            const v = (patch.q ?? '').trim()
-            if (v) next.set('q', v)
-            else next.delete('q')
-          }
-          if ('tags' in patch) {
-            const list = patch.tags ?? []
-            if (list.length === 0) next.delete('tags')
-            else next.set('tags', serializeCatalogTags(list))
-          }
-          return next
-        },
-        { replace: true, preventScrollReset: true },
-      )
+      setSearchParams((prev) => applyCatalogParamsPatch(prev, patch), {
+        replace: true,
+        preventScrollReset: true,
+      })
     },
     [setSearchParams],
   )
