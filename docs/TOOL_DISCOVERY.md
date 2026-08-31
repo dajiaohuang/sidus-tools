@@ -222,7 +222,7 @@ Each tool: physics + tests + ToolShell + ParamsGrid + i18n + snippets all langs 
 | P2 | ~12 |
 | **Total backlog ideas** | **~60** (not all will ship) |
 
-Live catalog grew **93 → 175** then **183** (cap 200). Remaining room reserved for user-driven or non-duplicate ideas only.
+Live catalog grew **93 → 175** then **183**, **191**, then **198** with the ODC thermal wave (cap 200). Remaining room reserved for user-driven or non-duplicate ideas only.
 
 ---
 
@@ -247,6 +247,7 @@ Further pure-SI ideas that remain are mostly:
 | C ballistics / ADCS / GEO / mission | **shipped** | free-fall, ballistic, v_term, chute, bank, slew, mag/GG, RW, sun/star, Walker, swath, revisit, GEO SK/prop, drag makeup, Tisserand, EPS, clock, … |
 | Pass 3 | **shipped** | GSD, sail, finite burn, b-plane, Jacobi, lifetime, GEO drift, Stefan, Wien, impulse bit, J2 ω̇, SAR, link margin, aerobrake, diffraction, panel EOL, capture, FPA, … |
 | Pass 4 | **shipped** | hoop stress, exp density, Hill, Edelbaum, RGT, pointing RSS, boiloff, residual dipole, solar flux, Nyquist, data volume, Earth IR |
+| ODC thermal wave | **shipped** | radiator net flux, dawn-dusk β season, two-phase loop, heat pump trade, ODC sizing, cold plate ΔT, shield mass scaling |
 
 
 ---
@@ -270,6 +271,7 @@ Further pure-SI ideas that remain are mostly:
 | 3 | 2026-08-11 | Shipped waves A–C (~44 tools) + pass 3 (~26) |
 | 4 | 2026-08-11 | Final high-value pure-SI (~12); **stop condition** recorded at **175** live tools |
 | 5 | 2026-08-17 | Shipped wave 1+2+3: Molniya/Tundra, frozen e, T/W, Planck, EIRP/G/T, quaternion 3-2-1, Earth–Mars porkchop sketch, conjunction Pc. Live catalog **183 / 200**. |
+| 7 | 2026-08-29 | ODC thermal wave: radiator-net-flux, sso-dawn-dusk, two-phase-loop, radiator-heat-pump, odc-power-thermal-sizing, cold-plate-dt, shield-mass-scaling. Live catalog **198 / 200**. |
 
 ---
 

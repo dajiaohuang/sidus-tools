@@ -44,7 +44,7 @@ export const GODBOLT_TARGETS: Partial<Record<CodeLang, GodboltTarget>> = {
     transform: stripTsTypes,
   },
   rust: { language: 'rust', compiler: 'r1890' },
-  // 0.15+ broke std.io.getStdOut; 0.14.1 still matches our educational print helper
+  // Pinned to the CI toolchain (0.14.1); the wrapper prints via std.debug.print, which every Zig version supports
   zig: { language: 'zig', compiler: 'z0141' },
   fortran: { language: 'fortran', compiler: 'gfortran142' },
   julia: { language: 'julia', compiler: 'julia_1_11_2' },

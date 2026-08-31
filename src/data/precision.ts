@@ -455,6 +455,48 @@ export const TOOL_PRECISION: Record<string, ToolPrecision> = {
     limits: `Ground track, terminator and altitude rendering from a single TLE. Not a tracking service and not flight software. ${IEEE}`,
     referenceHint: 'SGP4 / TEME to geodetic, CelesTrak™ TLE',
   },
+  'radiator-net-flux': {
+    ...EMP,
+    errorClass: 'Lumped view factor and constant environment: tens of percent vs a panel-resolved transient analysis.',
+    limits: `Gray flat plate, lumped Earth view factor F, constant environment. The Earth-IR term uses ε (Kirchhoff) by default; the Starcloud 2024 worked example applies α to Earth IR and is reproduced only with a custom α_ir (633 vs 585 W/m² for its inputs). No self-view, no transient shadowing, no fin efficiency. ${IEEE}`,
+    referenceHint: 'Gilmore, Spacecraft Thermal Control Handbook; Turyshev 2026 eq. 35; NASA RP-1121 coatings',
+  },
+  'sso-dawn-dusk': {
+    ...J2,
+    errorClass: 'β within ~0.05° of a full ephemeris for 1950–2050; eclipse from a cylindrical shadow (minutes-level vs penumbra-resolved).',
+    limits: `Circular orbit, J2 secular SSO inclination, Vallado low-precision Sun (0.01°, 1950–2050), LTAN referenced to the true Sun (equation of time ignored, ≤ 4° in Ω−α), cylindrical shadow, daily samples at 00:00 UTC. ${IEEE}`,
+    referenceHint: 'Vallado β-angle and shadow analysis; SMAD eclipse geometry',
+  },
+  'two-phase-loop': {
+    ...EMP,
+    errorClass: 'Property rows at one reference temperature; real loops vary h_fg, ρ_L and Δp with temperature and quality.',
+    limits: `Saturation properties at one reference temperature (NIST rows), Δx as a uniform quality change, same Δp for both loops, liquid-only pump. No pressure-drop model, no two-phase flow regime. ${IEEE}`,
+    referenceHint: 'NIST Chemistry WebBook; Gilmore pumped loops',
+  },
+  'radiator-heat-pump': {
+    ...EMP,
+    errorClass: 'Ideal-cycle bookkeeping: measured COP or Carnot fraction supplied by the user; compressor mass and facesheet gradients are not modelled.',
+    limits: `W = Q/COP, Q_rej = Q + W, radiator at one temperature with a lumped absorbed environment. COP from a measured value or a Carnot fraction; no compressor mass, no facesheet gradient (ICES-2015-35 §C). ${IEEE}`,
+    referenceHint: 'ICES-2015-35 (NLR/ESA heat pump demonstrator); Gilmore',
+  },
+  'odc-power-thermal-sizing': {
+    ...UTIL,
+    errorClass: 'Linear sizing chain; accuracy follows the user-supplied η, fill, cosθ and net flux.',
+    limits: `Array from S·η·fill·cosθ (fold EOL, PMAD and temperature derating into η and cosθ), radiator from a single net flux, areal masses as constants. ${IEEE}`,
+    referenceHint: 'Starcloud 2024 white paper (5 GW array); Turyshev 2026 Table X',
+  },
+  'cold-plate-dt': {
+    ...EMP,
+    errorClass: 'R_jc and h are user inputs; spreading resistance and boiling are absent (tens of percent on ΔT).',
+    limits: `1-D resistance chain, single-phase liquid, uniform h, mean-fluid reference. No spreading resistance, no boiling, no CHF check. R_jc comes from the vendor datasheet. ${IEEE}`,
+    referenceHint: 'Lienhard, A Heat Transfer Textbook (resistance networks); NVIDIA Hopper whitepaper anchors',
+  },
+  'shield-mass-scaling': {
+    ...UTIL,
+    errorClass: 'Exact geometry; says nothing about dose.',
+    limits: `Geometry only: areal density and mass per kW of a box. No dose, no spectrum, no secondary particles. Read a SHIELDOSE-2 / SPENVIS dose-depth curve at the g/cm² shown. ${IEEE}`,
+    referenceHint: 'Starcloud 2024 shield scaling argument; SPENVIS SHIELDOSE-2 help',
+  },
 }
 
 export function getToolPrecision(toolId: string): ToolPrecision {

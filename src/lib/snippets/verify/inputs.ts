@@ -515,6 +515,20 @@ export const SAMPLE_OVERRIDES: Record<string, LiveCodeValues> = {
   // Shared bag's P0 (solar pressure constant, ~4.56e-6) is far below P1=50, failing this
   // tool's P0>P1 depressurization guard; override with a real cabin-leak pressure pair.
   'cabin-leak': { V: 100, A: 1e-4, P0: 101325, P1: 70000, T: 293.15, Cd: 0.65 },
+  // Radiator free vars (n_sides, S, f_sun, F, albedo, alpha_ir) exist in no shared bag.
+  'radiator-net-flux': { T: 293.15, eps: 0.92, alpha: 0.09, n_sides: 2, S: 1366, f_sun: 1, F: 0.25, albedo: 0.3, Te: 253.15, alpha_ir: 0.09 },
+  // LTAN/JD/omega_sun exist in no shared bag; shared bag's J2/mu/R are reused.
+  'sso-dawn-dusk': { h: 500_000, ltan_h: 18, jd: 2461212.5, mu: 3.986004418e14, R: 6_378_137, J2: 1.08262668e-3, omega_sun: 1.9909865927683785e-7 },
+  // Latent-heat/quality/pump free vars exist in no shared bag.
+  'two-phase-loop': { Q: 1e6, h_fg: 1186.28e3, dx: 1, cp: 4738.9, dT: 10, rho_l: 610.39, dp: 1e5, eta_p: 0.5 },
+  // Heat-pump temperature pair and Carnot fraction exist in no shared bag.
+  'radiator-heat-pump': { Q: 5000, T_c: 318.15, T_h: 373.15, eta_II: 0.39761118969, eps: 0.85, n_sides: 1, q_env: 150, T_base: 318.15, q_pv: 270.468 },
+  // IT power / array / radiator sizing free vars exist in no shared bag.
+  'odc-power-thermal-sizing': { P_it: 5e9, a_oh: 1, S: 1366, eta_cell: 0.22, fill: 0.9, cos_th: 1, q_net: 633.078565, sigma_pv: 1, sigma_rad: 5 },
+  // Cold-plate resistance-chain free vars exist in no shared bag.
+  'cold-plate-dt': { Q: 700, A_die: 814e-6, R_jc: 0.05, t_tim: 50e-6, k_tim: 5, A_tim: 814e-6, h: 3e4, A_wet: 814e-6, mdot: 0.05, cp: 4184, T_in: 293.15 },
+  // Shield-box geometry free vars exist in no shared bag.
+  'shield-mass-scaling': { L: 2, W: 2, H: 2, t: 2e-3, rho: 2700, m_extra: 0, p_v: 5e4 },
 }
 
 /** Live-input bag for a tool: shared SAMPLE merged with its per-tool override. */

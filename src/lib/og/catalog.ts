@@ -837,6 +837,41 @@ export const TOOL_OG: Record<string, ToolOgMeta> = {
     accent: '#b0b0b0',
     blurb: 'J2 relative motion',
   },
+  'radiator-net-flux': {
+    formula: 'q = nεσT⁴ − αS f − F(αaS + α_ir σT_e⁴)',
+    accent: '#b8a55a',
+    blurb: 'Radiator net flux and m² per kW',
+  },
+  'sso-dawn-dusk': {
+    formula: 'β = asin(cos δ sin i sin ΔΩ + sin δ cos i)',
+    accent: '#7a9bb8',
+    blurb: 'Dawn-dusk β and eclipse season',
+  },
+  'two-phase-loop': {
+    formula: 'ṁ = Q / (Δx h_fg)   vs   Q / (c_p ΔT)',
+    accent: '#b8a55a',
+    blurb: 'Two-phase loop mass flow and pump power',
+  },
+  'radiator-heat-pump': {
+    formula: 'Q_rej = Q (1 + 1/COP)   A = Q_rej / (εσT⁴ − q_env)',
+    accent: '#b8a55a',
+    blurb: 'Heat pump radiator trade',
+  },
+  'odc-power-thermal-sizing': {
+    formula: 'A_pv = P/(S η f)   A_rad = P/q_net',
+    accent: '#b8a55a',
+    blurb: 'Orbital data center power and radiator sizing',
+  },
+  'cold-plate-dt': {
+    formula: 'T_j = T_in + ΔT_f/2 + Q ΣR',
+    accent: '#b8a55a',
+    blurb: 'Cold plate junction temperature',
+  },
+  'shield-mass-scaling': {
+    formula: 'kg/kW = 6ρt / (p_v L)',
+    accent: '#b0b0b0',
+    blurb: 'Shield mass per kW vs container size',
+  },
 }
 
 export function toolOgMeta(toolId: string): ToolOgMeta {
