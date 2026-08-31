@@ -22095,6 +22095,35 @@ var SatRecError;
   SatRecError2[SatRecError2["Decayed"] = 6] = "Decayed";
 })(SatRecError || (SatRecError = {}));
 
+// node_modules/satellite.js/dist/sun.js
+function sunPos(jday2) {
+  const tut1 = (jday2 - 2451545) / 36525;
+  const meanlong = (280.46 + 36000.77 * tut1) % 360;
+  let meananomaly = (357.5277233 + 35999.05034 * tut1) * deg2rad % twoPi;
+  if (meananomaly < 0) {
+    meananomaly += twoPi;
+  }
+  const eclplong_raw = (meanlong + 1.914666471 * Math.sin(meananomaly) + 0.019994643 * Math.sin(2 * meananomaly)) % 360 * deg2rad;
+  const obliquity = (23.439291 - 0.0130042 * tut1) * deg2rad;
+  const magr = 1.000140612 - 0.016708617 * Math.cos(meananomaly) - 139589e-9 * Math.cos(2 * meananomaly);
+  const rsun = {
+    x: magr * Math.cos(eclplong_raw),
+    y: magr * Math.cos(obliquity) * Math.sin(eclplong_raw),
+    z: magr * Math.sin(obliquity) * Math.sin(eclplong_raw)
+  };
+  const rtasc_raw = Math.atan(Math.cos(obliquity) * Math.tan(eclplong_raw));
+  let eclplong = eclplong_raw;
+  if (eclplong < 0) {
+    eclplong += twoPi;
+  }
+  let rtasc = rtasc_raw;
+  if (Math.abs(eclplong_raw - rtasc) > pi * 0.5) {
+    rtasc += 0.5 * pi * Math.round((eclplong_raw - rtasc_raw) / (0.5 * pi));
+  }
+  const decl = Math.asin(Math.sin(obliquity) * Math.sin(eclplong_raw));
+  return { rsun, rtasc, decl };
+}
+
 // src/lib/physics/sgp4.ts
 function gmstRad(date4) {
   return gstime(date4);
@@ -22194,6 +22223,10 @@ function ssoInclination(a, mu2 = EARTH_MU, R = EARTH_RADIUS, j22 = EARTH_J2, ome
   const cosI = -(2 / 3 * (a / R) ** 2 * omegaSun) / (n * j22);
   if (!Number.isFinite(cosI) || Math.abs(cosI) > 1) return null;
   return Math.acos(Math.min(1, Math.max(-1, cosI)));
+}
+function ssoPeriod(a, mu2 = EARTH_MU) {
+  if (!(a > 0) || !(mu2 > 0)) return null;
+  return 2 * Math.PI * Math.sqrt(a * a * a / mu2);
 }
 
 // src/lib/physics/cw.ts
@@ -24082,9 +24115,253 @@ var EARTH_ALTITUDE_CHIPS = [
   { label: "GEO 35786 km", m: EARTH_ORBIT_ALT_M.GEO }
 ];
 
+// src/lib/physics/radiator.ts
+function radiatorNetFlux(i) {
+  const sides = i.sides ?? 2;
+  const S = i.solarFlux ?? SOLAR_CONSTANT_1AU;
+  const fSun = i.sunExposure ?? 1;
+  const F = i.viewFactor ?? 0.25;
+  const albedo = i.albedo ?? 0.3;
+  const Te = i.earthTempK ?? 255;
+  const alphaIr = i.irAbsorptivity ?? i.emissivity;
+  const sigma = i.sigma ?? STEFAN_BOLTZMANN;
+  if (!(i.tempK > 0) || !(i.emissivity > 0) || i.emissivity > 1) return null;
+  if (!(i.absorptivity >= 0) || i.absorptivity > 1) return null;
+  if (sides !== 1 && sides !== 2) return null;
+  if (!(S > 0) || !(fSun >= 0) || fSun > 1 || !(F >= 0) || F > 1) return null;
+  if (!(albedo >= 0) || albedo > 1 || !(Te > 0)) return null;
+  if (!(alphaIr >= 0) || alphaIr > 1 || !(sigma > 0)) return null;
+  const qEmit = sides * i.emissivity * sigma * i.tempK ** 4;
+  const qSun = i.absorptivity * S * fSun;
+  const qAlbedo = F * i.absorptivity * albedo * S;
+  const qIr = F * alphaIr * sigma * Te ** 4;
+  const qNet = qEmit - qSun - qAlbedo - qIr;
+  const tFloorK = ((qSun + qAlbedo + qIr) / (sides * i.emissivity * sigma)) ** 0.25;
+  return { qEmit, qSun, qAlbedo, qIr, qNet, areaPerKw: qNet > 0 ? 1e3 / qNet : null, tFloorK };
+}
+function radiatorHeatPump(i) {
+  const sides = i.sides ?? 1;
+  const qEnv = i.qEnv ?? 0;
+  const tBase = i.tBaseK ?? i.tColdK;
+  const pv = i.pvPowerDensity ?? 0;
+  const sigma = i.sigma ?? STEFAN_BOLTZMANN;
+  if (!(i.q > 0) || !(i.tColdK > 0) || !(i.tHotK > i.tColdK)) return null;
+  if (!(i.emissivity > 0) || i.emissivity > 1 || sides !== 1 && sides !== 2) return null;
+  if (!(qEnv >= 0) || !(tBase > 0) || !(pv >= 0) || !(sigma > 0)) return null;
+  const copCarnot = i.tColdK / (i.tHotK - i.tColdK);
+  let cop;
+  if (i.cop != null) {
+    if (!(i.cop > 0)) return null;
+    cop = i.cop;
+  } else if (i.carnotFraction != null) {
+    if (!(i.carnotFraction > 0) || i.carnotFraction > 1) return null;
+    cop = i.carnotFraction * copCarnot;
+  } else {
+    return null;
+  }
+  const carnotFraction = cop / copCarnot;
+  const work = i.q / cop;
+  const qRej = i.q + work;
+  const qNetBase = sides * i.emissivity * sigma * tBase ** 4 - qEnv;
+  const qNetHp = sides * i.emissivity * sigma * i.tHotK ** 4 - qEnv;
+  const aBase = qNetBase > 0 ? i.q / qNetBase : null;
+  const aHp = qNetHp > 0 ? qRej / qNetHp : null;
+  const areaSaved = aBase != null && aHp != null ? aBase - aHp : null;
+  const areaReduction = areaSaved != null && aBase != null ? areaSaved / aBase : null;
+  const extraPvArea = pv > 0 ? work / pv : null;
+  const netAreaSaved = areaSaved != null && extraPvArea != null ? areaSaved - extraPvArea : null;
+  return {
+    copCarnot,
+    cop,
+    carnotFraction,
+    work,
+    qRej,
+    qNetBase,
+    qNetHp,
+    aBase,
+    aHp,
+    areaSaved,
+    areaReduction,
+    extraPvArea,
+    netAreaSaved,
+    overhead: work / i.q
+  };
+}
+function odcPowerThermalSizing(i) {
+  const overhead = i.overhead ?? 1;
+  const S = i.solarFlux ?? SOLAR_CONSTANT_1AU;
+  const cosTheta = i.cosTheta ?? 1;
+  const pvA = i.pvArealMass ?? 0;
+  const radA = i.radArealMass ?? 0;
+  if (!(i.pIt > 0) || !(overhead > 0) || !(S > 0)) return null;
+  if (!(i.cellEff > 0) || i.cellEff > 1 || !(i.fillFactor > 0) || i.fillFactor > 1) return null;
+  if (!(cosTheta > 0) || cosTheta > 1 || !(i.qNet > 0) || !(pvA >= 0) || !(radA >= 0)) return null;
+  const pTot = overhead * i.pIt;
+  const pvPowerDensity = S * i.cellEff * i.fillFactor * cosTheta;
+  const aPv = pTot / pvPowerDensity;
+  const aRad = pTot / i.qNet;
+  const kw = i.pIt / 1e3;
+  const mPv = pvA > 0 ? pvA * aPv : null;
+  const mRad = radA > 0 ? radA * aRad : null;
+  const kgPerKwPv = mPv != null ? mPv / kw : null;
+  const kgPerKwRad = mRad != null ? mRad / kw : null;
+  const kgPerKwTotal = kgPerKwPv != null || kgPerKwRad != null ? (kgPerKwPv ?? 0) + (kgPerKwRad ?? 0) : null;
+  return {
+    pTot,
+    pvPowerDensity,
+    aPv,
+    pvSide: Math.sqrt(aPv),
+    aRad,
+    areaRatio: aRad / aPv,
+    mPv,
+    mRad,
+    kgPerKwPv,
+    kgPerKwRad,
+    kgPerKwTotal
+  };
+}
+
+// src/lib/physics/dawn-dusk.ts
+var DEG3 = Math.PI / 180;
+function ltanRaanOffsetRad(ltanHours) {
+  if (!Number.isFinite(ltanHours) || ltanHours < 0 || ltanHours >= 24) return null;
+  return (ltanHours - 12) * 15 * DEG3;
+}
+function betaAngle(inclRad, raanMinusSunRaRad, sunDeclRad) {
+  const s = Math.cos(sunDeclRad) * Math.sin(inclRad) * Math.sin(raanMinusSunRaRad) + Math.sin(sunDeclRad) * Math.cos(inclRad);
+  return Math.asin(Math.min(1, Math.max(-1, s)));
+}
+function eclipseThresholdBeta(a, bodyR = EARTH_RADIUS) {
+  if (!(bodyR > 0) || !(a > bodyR)) return null;
+  return Math.asin(bodyR / a);
+}
+function julianDay(date4) {
+  return jday(date4);
+}
+function dawnDuskBetaJd(opts) {
+  const mu2 = opts.mu ?? EARTH_MU;
+  const R = opts.R ?? EARTH_RADIUS;
+  const j22 = opts.j2 ?? EARTH_J2;
+  const omegaSun = opts.omegaSun ?? OMEGA_SUN;
+  if (!(opts.altitudeM >= 0) || !Number.isFinite(opts.jd)) return null;
+  const dOmega = ltanRaanOffsetRad(opts.ltanHours);
+  if (dOmega == null) return null;
+  const a = R + opts.altitudeM;
+  const inclRad = ssoInclination(a, mu2, R, j22, omegaSun);
+  const periodS = ssoPeriod(a, mu2);
+  const betaStarRad = eclipseThresholdBeta(a, R);
+  if (inclRad == null || periodS == null || betaStarRad == null) return null;
+  const sunDeclRad = sunPos(opts.jd).decl;
+  const betaRad = betaAngle(inclRad, dOmega, sunDeclRad);
+  const eclipseS = eclipseWithBeta(a, R, betaRad, periodS) ?? 0;
+  return {
+    a,
+    inclRad,
+    periodS,
+    sunDeclRad,
+    raanMinusSunRaRad: dOmega,
+    betaRad,
+    betaStarRad,
+    eclipseS,
+    eclipseFraction: eclipseS / periodS
+  };
+}
+function dawnDuskBeta(opts) {
+  if (Number.isNaN(opts.date.getTime())) return null;
+  const { date: date4, ...rest } = opts;
+  return dawnDuskBetaJd({ ...rest, jd: julianDay(date4) });
+}
+function dawnDuskSeason(opts) {
+  if (!Number.isInteger(opts.year)) return null;
+  const { year, ...rest } = opts;
+  const samples = [];
+  let betaMinAbsRad = Number.POSITIVE_INFINITY;
+  let betaMaxAbsRad = 0;
+  let eclipseDays = 0;
+  let firstEclipseDoy = null;
+  let lastEclipseDoy = null;
+  let maxEclipseS = 0;
+  for (let k = 0; k < 365; k++) {
+    const doy = k + 1;
+    const b = dawnDuskBeta({ ...rest, date: new Date(Date.UTC(year, 0, doy)) });
+    if (!b) return null;
+    const abs = Math.abs(b.betaRad);
+    betaMinAbsRad = Math.min(betaMinAbsRad, abs);
+    betaMaxAbsRad = Math.max(betaMaxAbsRad, abs);
+    if (b.eclipseS > 0) {
+      eclipseDays++;
+      firstEclipseDoy ??= doy;
+      lastEclipseDoy = doy;
+      maxEclipseS = Math.max(maxEclipseS, b.eclipseS);
+    }
+    samples.push({ doy, betaRad: b.betaRad, eclipseS: b.eclipseS });
+  }
+  return { betaMinAbsRad, betaMaxAbsRad, eclipseDays, firstEclipseDoy, lastEclipseDoy, maxEclipseS, samples };
+}
+
+// src/lib/physics/two-phase.ts
+function twoPhaseLoop(i) {
+  const dx = i.qualityChange ?? 1;
+  if (!(i.q > 0) || !(i.hfg > 0) || !(dx > 0) || dx > 1) return null;
+  if (!(i.cp > 0) || !(i.deltaT > 0) || !(i.rhoL > 0) || !(i.pressureDrop >= 0)) return null;
+  if (!(i.pumpEff > 0) || i.pumpEff > 1) return null;
+  const mdotTwoPhase = i.q / (dx * i.hfg);
+  const mdotSinglePhase = i.q / (i.cp * i.deltaT);
+  const pump = (mdot) => mdot * i.pressureDrop / (i.rhoL * i.pumpEff);
+  return {
+    mdotTwoPhase,
+    mdotSinglePhase,
+    flowRatio: mdotSinglePhase / mdotTwoPhase,
+    volFlowTwoPhase: mdotTwoPhase / i.rhoL,
+    volFlowSinglePhase: mdotSinglePhase / i.rhoL,
+    pumpPowerTwoPhase: pump(mdotTwoPhase),
+    pumpPowerSinglePhase: pump(mdotSinglePhase)
+  };
+}
+
+// src/lib/physics/cold-plate.ts
+function coldPlateChain(i) {
+  const aTim = i.timArea ?? i.dieArea;
+  const aWet = i.wettedArea ?? i.dieArea;
+  if (!(i.q > 0) || !(i.dieArea > 0) || !(i.rJc >= 0)) return null;
+  if (!(i.timThickness > 0) || !(i.timK > 0) || !(aTim > 0)) return null;
+  if (!(i.hCoolant > 0) || !(aWet > 0) || !(i.mdot > 0) || !(i.cp > 0) || !(i.tInK > 0)) return null;
+  const rTim = i.timThickness / (i.timK * aTim);
+  const rConv = 1 / (i.hCoolant * aWet);
+  const rTotal = i.rJc + rTim + rConv;
+  const dTFluid = i.q / (i.mdot * i.cp);
+  const tFluidMeanK = i.tInK + dTFluid / 2;
+  const tWallK = tFluidMeanK + i.q * rConv;
+  const tCaseK = tWallK + i.q * rTim;
+  const tJunctionK = tCaseK + i.q * i.rJc;
+  return { heatFluxDie: i.q / i.dieArea, rTim, rConv, rTotal, dTFluid, tFluidMeanK, tWallK, tCaseK, tJunctionK };
+}
+
+// src/lib/physics/shield-geometry.ts
+function shieldMassScaling(i) {
+  const rho = i.density ?? 2700;
+  const extra = i.extraArealMass ?? 0;
+  if (!(i.length > 0) || !(i.width > 0) || !(i.height > 0) || !(i.thickness > 0)) return null;
+  if (!(rho > 0) || !(extra >= 0) || !(i.powerDensity > 0)) return null;
+  const surfaceArea = 2 * (i.length * i.width + i.length * i.height + i.width * i.height);
+  const volume = i.length * i.width * i.height;
+  const arealDensity = rho * i.thickness + extra;
+  const shieldMass = arealDensity * surfaceArea;
+  const power = i.powerDensity * volume;
+  return {
+    surfaceArea,
+    volume,
+    arealDensity,
+    arealDensityGcm2: arealDensity / 10,
+    shieldMass,
+    power,
+    kgPerKw: shieldMass / (power / 1e3)
+  };
+}
+
 // mcp/full-catalog.ts
 var SIDUS_MCP_DISCLAIMER = "Educational pure-SI model (SIDUS). Not flight software. No affiliation with NASA, ESA, or SpaceX.";
-var CATALOG_NAMES = ["list_bodies", "list_mcp_tools", "circular_orbit", "hohmann", "escape_velocity", "bielliptic", "plane_change", "vis_viva", "apsides", "rocket_equation", "multi_stage", "j2_drift", "launch_azimuth", "sso_inclination", "dynamic_pressure", "cw_rendezvous", "link_budget", "phasing", "metabolic_load", "cabin_atmosphere", "lioh_scrubber", "cabin_leak", "thermal_loop", "custom_body", "hyperbolic_c3", "hohmann_plane", "propellant_mass", "ideal_thrust", "sphere_of_influence", "synodic_period", "eclipse_duration", "light_time", "solar_pressure", "circularize", "geo_radius", "delta_a_burn", "plane_change_apo", "heat_flux", "coelliptic", "los_range_rate", "oberth", "deorbit", "mean_motion", "solar_array", "rcs_delta_v", "apo_raise", "delta_v_budget", "equal_stage", "period_to_sma", "ballistic_drag", "horizon_range", "antenna_beamwidth", "battery", "angular_diameter", "diffraction", "thermal_rad", "drag_force", "reaction_wheel", "along_track", "ground_track_shift", "ground_track", "eclipse_beta", "hohmann_time", "orbital_energy", "true_anomaly", "flyby_speed", "nodal_period", "eccentric_anomaly", "scale_height", "rendezvous_catchup", "impulse_budget", "sso_period", "mass_ratio_stack", "critical_inclination", "relative_period", "energy_vinf", "geo_light_time", "payload_fraction", "specific_angular_momentum", "escape_margin", "spherical_distance", "elevation_azimuth", "vector_angle", "helio_hohmann", "patched_conic_depart", "surface_g_escape", "orbit_3d", "isentropic_nozzle", "characteristic_velocity_cstar", "throat_area_sizing", "rocket_thrust_chamber", "mixture_ratio", "tank_ullage", "blowdown_tank", "propellant_density_impulse", "cold_gas_thrust", "ion_thruster_efficiency", "hall_thruster_isp", "gnss_pseudorange", "gnss_geometry_gdop", "laser_link_budget", "laser_pointing_jitter", "laser_time_of_flight", "impedance_matching", "antenna_gain_effective", "doppler_shift_leo", "radar_equation", "rain_attenuation_simple", "ttc_ebno", "optical_ber_q", "gnss_troposphere_delay", "free_fall_time", "ballistic_range", "terminal_velocity", "parachute_descent", "coordinated_turn_bank", "slew_rate_pointing", "magnetic_torque", "gravity_gradient_torque", "rw_momentum_capacity", "sun_sensor_cone", "star_tracker_noise", "constellation_walker", "coverage_swath", "revisit_time_simple", "geo_stationkeeping_dv", "geo_propellant_budget", "drag_make_up_dv", "tisserand_parameter", "eps_orbit_average", "relativity_clock_rate", "gnss_ionosphere_klobuchar", "optical_gsd", "solar_sail_accel", "finite_burn_dv", "b_plane_impact", "cr3bp_jacobi", "orbit_lifetime_rough", "geo_drift_rate", "stefan_boltzmann", "wien_peak", "thruster_impulse_bit", "arg_perigee_drift_j2", "sar_azimuth_resolution", "radar_range_resolution", "link_margin", "aerobraking_pass", "diffraction_limit", "panel_eol_power", "magnetorquer_moment", "hyperbolic_eccentricity", "capture_circularize", "gravity_loss", "battery_dod", "umbra_length", "mean_anomaly_from_e", "flight_path_angle", "hoop_stress", "exponential_density", "hill_sphere", "edelbaum_dv", "repeating_ground_track", "pointing_budget_rss", "boiloff_rate", "residual_dipole_torque", "solar_flux_distance", "nyquist_rate", "data_volume", "earth_ir_flux", "molniya_tundra", "frozen_orbit", "thrust_to_weight", "planck_radiance", "eirp_gt", "quaternion_euler", "porkchop_earth_mars", "conjunction_pc", "b_plane_target", "quest_attitude", "herrick_gibbs", "lunisolar_rates", "pump_crank", "schweighart_sedwick", "bodies", "units", "plotter", "kepler_propagate", "lambert", "rv_elements", "sgp4", "look_angles", "pass_predict"];
+var CATALOG_NAMES = ["list_bodies", "list_mcp_tools", "circular_orbit", "hohmann", "escape_velocity", "bielliptic", "plane_change", "vis_viva", "apsides", "rocket_equation", "multi_stage", "j2_drift", "launch_azimuth", "sso_inclination", "dynamic_pressure", "cw_rendezvous", "link_budget", "phasing", "metabolic_load", "cabin_atmosphere", "lioh_scrubber", "cabin_leak", "thermal_loop", "custom_body", "hyperbolic_c3", "hohmann_plane", "propellant_mass", "ideal_thrust", "sphere_of_influence", "synodic_period", "eclipse_duration", "light_time", "solar_pressure", "circularize", "geo_radius", "delta_a_burn", "plane_change_apo", "heat_flux", "coelliptic", "los_range_rate", "oberth", "deorbit", "mean_motion", "solar_array", "rcs_delta_v", "apo_raise", "delta_v_budget", "equal_stage", "period_to_sma", "ballistic_drag", "horizon_range", "antenna_beamwidth", "battery", "angular_diameter", "diffraction", "thermal_rad", "drag_force", "reaction_wheel", "along_track", "ground_track_shift", "ground_track", "eclipse_beta", "hohmann_time", "orbital_energy", "true_anomaly", "flyby_speed", "nodal_period", "eccentric_anomaly", "scale_height", "rendezvous_catchup", "impulse_budget", "sso_period", "mass_ratio_stack", "critical_inclination", "relative_period", "energy_vinf", "geo_light_time", "payload_fraction", "specific_angular_momentum", "escape_margin", "spherical_distance", "elevation_azimuth", "vector_angle", "helio_hohmann", "patched_conic_depart", "surface_g_escape", "orbit_3d", "isentropic_nozzle", "characteristic_velocity_cstar", "throat_area_sizing", "rocket_thrust_chamber", "mixture_ratio", "tank_ullage", "blowdown_tank", "propellant_density_impulse", "cold_gas_thrust", "ion_thruster_efficiency", "hall_thruster_isp", "gnss_pseudorange", "gnss_geometry_gdop", "laser_link_budget", "laser_pointing_jitter", "laser_time_of_flight", "impedance_matching", "antenna_gain_effective", "doppler_shift_leo", "radar_equation", "rain_attenuation_simple", "ttc_ebno", "optical_ber_q", "gnss_troposphere_delay", "free_fall_time", "ballistic_range", "terminal_velocity", "parachute_descent", "coordinated_turn_bank", "slew_rate_pointing", "magnetic_torque", "gravity_gradient_torque", "rw_momentum_capacity", "sun_sensor_cone", "star_tracker_noise", "constellation_walker", "coverage_swath", "revisit_time_simple", "geo_stationkeeping_dv", "geo_propellant_budget", "drag_make_up_dv", "tisserand_parameter", "eps_orbit_average", "relativity_clock_rate", "gnss_ionosphere_klobuchar", "optical_gsd", "solar_sail_accel", "finite_burn_dv", "b_plane_impact", "cr3bp_jacobi", "orbit_lifetime_rough", "geo_drift_rate", "stefan_boltzmann", "wien_peak", "thruster_impulse_bit", "arg_perigee_drift_j2", "sar_azimuth_resolution", "radar_range_resolution", "link_margin", "aerobraking_pass", "diffraction_limit", "panel_eol_power", "magnetorquer_moment", "hyperbolic_eccentricity", "capture_circularize", "gravity_loss", "battery_dod", "umbra_length", "mean_anomaly_from_e", "flight_path_angle", "hoop_stress", "exponential_density", "hill_sphere", "edelbaum_dv", "repeating_ground_track", "pointing_budget_rss", "boiloff_rate", "residual_dipole_torque", "solar_flux_distance", "nyquist_rate", "data_volume", "earth_ir_flux", "molniya_tundra", "frozen_orbit", "thrust_to_weight", "planck_radiance", "eirp_gt", "quaternion_euler", "porkchop_earth_mars", "conjunction_pc", "b_plane_target", "quest_attitude", "herrick_gibbs", "lunisolar_rates", "pump_crank", "schweighart_sedwick", "bodies", "units", "plotter", "kepler_propagate", "lambert", "rv_elements", "sgp4", "look_angles", "pass_predict", "radiator_net_flux", "sso_dawn_dusk", "two_phase_loop", "radiator_heat_pump", "odc_power_thermal_sizing", "cold_plate_dt", "shield_mass_scaling"];
 var MCP_TOOL_DEFS = [
   {
     name: "list_bodies",
@@ -26971,6 +27248,150 @@ var MCP_TOOL_DEFS = [
     sample: { "period_s": 5600, "visible_frac": 0.1 },
     run: (args) => {
       return { period_s: args.period_s, rough_pass_s: args.period_s * (args.visible_frac ?? 0.1), note: "Full AOS/LOS search in UI pass-predict tool" };
+    }
+  },
+  {
+    name: "radiator_net_flux",
+    description: "Radiator net heat flux in Earth orbit: n eps sigma T^4 minus sun, albedo and Earth IR (view factor); m2 per kW.",
+    inputSchema: {
+      temp_k: number2(),
+      emissivity: number2(),
+      absorptivity: number2(),
+      sides: number2().optional(),
+      solar_flux_w_m2: number2().optional(),
+      sun_exposure: number2().optional(),
+      view_factor: number2().optional(),
+      albedo: number2().optional(),
+      earth_temp_k: number2().optional(),
+      ir_absorptivity: number2().optional()
+    },
+    sample: { "temp_k": 293.15, "emissivity": 0.92, "absorptivity": 0.09, "sides": 2, "solar_flux_w_m2": 1366, "sun_exposure": 1, "view_factor": 0.25, "albedo": 0.3, "earth_temp_k": 253.15 },
+    run: (args) => {
+      const r = radiatorNetFlux({ tempK: args.temp_k, emissivity: args.emissivity, absorptivity: args.absorptivity, sides: args.sides === 1 ? 1 : 2, solarFlux: args.solar_flux_w_m2, sunExposure: args.sun_exposure, viewFactor: args.view_factor, albedo: args.albedo, earthTempK: args.earth_temp_k, irAbsorptivity: args.ir_absorptivity });
+      return r == null ? null : { q_emit_w_m2: r.qEmit, q_sun_w_m2: r.qSun, q_albedo_w_m2: r.qAlbedo, q_ir_w_m2: r.qIr, q_net_w_m2: r.qNet, area_m2_per_kw: r.areaPerKw, t_floor_k: r.tFloorK };
+    }
+  },
+  {
+    name: "sso_dawn_dusk",
+    description: "Dawn-dusk SSO: inclination, beta angle from LTAN and epoch, beta*, eclipse; optional yearly season.",
+    inputSchema: {
+      altitude_km: number2(),
+      ltan_hours: number2(),
+      epoch_iso: string2().optional(),
+      season_year: number2().optional()
+    },
+    sample: { "altitude_km": 500, "ltan_hours": 18, "epoch_iso": "2026-06-21T00:00:00Z", "season_year": 2026 },
+    run: (args) => {
+      const date4 = args.epoch_iso ? new Date(args.epoch_iso) : /* @__PURE__ */ new Date();
+      const r = dawnDuskBeta({ altitudeM: args.altitude_km * 1e3, ltanHours: args.ltan_hours, date: date4 });
+      if (!r) return null;
+      const deg = 180 / Math.PI;
+      const out = { inclination_deg: r.inclRad * deg, period_s: r.periodS, sun_declination_deg: r.sunDeclRad * deg, beta_deg: r.betaRad * deg, beta_star_deg: r.betaStarRad * deg, eclipse_s: r.eclipseS, eclipse_fraction: r.eclipseFraction };
+      if (args.season_year != null) {
+        const s = dawnDuskSeason({ altitudeM: args.altitude_km * 1e3, ltanHours: args.ltan_hours, year: args.season_year });
+        if (s) out.season = { beta_min_abs_deg: s.betaMinAbsRad * deg, beta_max_abs_deg: s.betaMaxAbsRad * deg, eclipse_days: s.eclipseDays, first_doy: s.firstEclipseDoy, last_doy: s.lastEclipseDoy, max_eclipse_s: s.maxEclipseS };
+      }
+      return out;
+    }
+  },
+  {
+    name: "two_phase_loop",
+    description: "Two-phase pumped loop mass flow Q/(dx h_fg) vs single-phase Q/(cp dT) and liquid pump power.",
+    inputSchema: {
+      q_w: number2(),
+      hfg_j_kg: number2(),
+      quality_change: number2().optional(),
+      cp_j_kg_k: number2(),
+      delta_t_k: number2(),
+      rho_l_kg_m3: number2(),
+      pressure_drop_pa: number2(),
+      pump_eff: number2()
+    },
+    sample: { "q_w": 1e6, "hfg_j_kg": 1186280, "quality_change": 1, "cp_j_kg_k": 4738.9, "delta_t_k": 10, "rho_l_kg_m3": 610.39, "pressure_drop_pa": 1e5, "pump_eff": 0.5 },
+    run: (args) => {
+      const r = twoPhaseLoop({ q: args.q_w, hfg: args.hfg_j_kg, qualityChange: args.quality_change, cp: args.cp_j_kg_k, deltaT: args.delta_t_k, rhoL: args.rho_l_kg_m3, pressureDrop: args.pressure_drop_pa, pumpEff: args.pump_eff });
+      return r == null ? null : { mdot_two_phase_kg_s: r.mdotTwoPhase, mdot_single_phase_kg_s: r.mdotSinglePhase, flow_ratio: r.flowRatio, vol_flow_two_phase_m3_s: r.volFlowTwoPhase, pump_power_two_phase_w: r.pumpPowerTwoPhase, pump_power_single_phase_w: r.pumpPowerSinglePhase };
+    }
+  },
+  {
+    name: "radiator_heat_pump",
+    description: "Heat pump raising radiator temperature: COP, W, Q_rej, radiator area vs baseline, extra PV area.",
+    inputSchema: {
+      q_w: number2(),
+      t_cold_k: number2(),
+      t_hot_k: number2(),
+      cop: number2().optional(),
+      carnot_fraction: number2().optional(),
+      emissivity: number2(),
+      sides: number2().optional(),
+      q_env_w_m2: number2().optional(),
+      t_base_k: number2().optional(),
+      pv_power_density_w_m2: number2().optional()
+    },
+    sample: { "q_w": 5e3, "t_cold_k": 318.15, "t_hot_k": 373.15, "cop": 2.3, "emissivity": 0.85, "sides": 1, "q_env_w_m2": 150, "pv_power_density_w_m2": 270.468 },
+    run: (args) => {
+      const r = radiatorHeatPump({ q: args.q_w, tColdK: args.t_cold_k, tHotK: args.t_hot_k, cop: args.cop, carnotFraction: args.carnot_fraction, emissivity: args.emissivity, sides: args.sides === 2 ? 2 : 1, qEnv: args.q_env_w_m2, tBaseK: args.t_base_k, pvPowerDensity: args.pv_power_density_w_m2 });
+      return r == null ? null : { cop_carnot: r.copCarnot, cop: r.cop, carnot_fraction: r.carnotFraction, work_w: r.work, q_rej_w: r.qRej, q_net_base_w_m2: r.qNetBase, q_net_hp_w_m2: r.qNetHp, area_base_m2: r.aBase, area_hp_m2: r.aHp, area_saved_m2: r.areaSaved, area_reduction: r.areaReduction, extra_pv_area_m2: r.extraPvArea, net_area_saved_m2: r.netAreaSaved, overhead: r.overhead };
+    }
+  },
+  {
+    name: "odc_power_thermal_sizing",
+    description: "Orbital data center sizing: IT power to array area and side, radiator area from net flux, kg/kW.",
+    inputSchema: {
+      p_it_w: number2(),
+      overhead: number2().optional(),
+      solar_flux_w_m2: number2().optional(),
+      cell_eff: number2(),
+      fill_factor: number2(),
+      cos_theta: number2().optional(),
+      q_net_w_m2: number2(),
+      pv_areal_mass_kg_m2: number2().optional(),
+      rad_areal_mass_kg_m2: number2().optional()
+    },
+    sample: { "p_it_w": 5e9, "overhead": 1, "solar_flux_w_m2": 1366, "cell_eff": 0.22, "fill_factor": 0.9, "q_net_w_m2": 633.078565 },
+    run: (args) => {
+      const r = odcPowerThermalSizing({ pIt: args.p_it_w, overhead: args.overhead, solarFlux: args.solar_flux_w_m2, cellEff: args.cell_eff, fillFactor: args.fill_factor, cosTheta: args.cos_theta, qNet: args.q_net_w_m2, pvArealMass: args.pv_areal_mass_kg_m2, radArealMass: args.rad_areal_mass_kg_m2 });
+      return r == null ? null : { p_tot_w: r.pTot, pv_power_density_w_m2: r.pvPowerDensity, area_pv_m2: r.aPv, pv_side_m: r.pvSide, area_rad_m2: r.aRad, area_ratio: r.areaRatio, mass_pv_kg: r.mPv, mass_rad_kg: r.mRad, kg_per_kw_pv: r.kgPerKwPv, kg_per_kw_rad: r.kgPerKwRad, kg_per_kw_total: r.kgPerKwTotal };
+    }
+  },
+  {
+    name: "cold_plate_dt",
+    description: "Cold-plate junction temperature from a resistance chain (R_jc, TIM, cold plate, coolant rise).",
+    inputSchema: {
+      q_w: number2(),
+      die_area_m2: number2(),
+      r_jc_k_w: number2(),
+      tim_thickness_m: number2(),
+      tim_k_w_m_k: number2(),
+      tim_area_m2: number2().optional(),
+      h_w_m2_k: number2(),
+      wetted_area_m2: number2().optional(),
+      mdot_kg_s: number2(),
+      cp_j_kg_k: number2(),
+      t_in_k: number2()
+    },
+    sample: { "q_w": 700, "die_area_m2": 814e-6, "r_jc_k_w": 0.05, "tim_thickness_m": 5e-5, "tim_k_w_m_k": 5, "h_w_m2_k": 3e4, "mdot_kg_s": 0.05, "cp_j_kg_k": 4184, "t_in_k": 293.15 },
+    run: (args) => {
+      const r = coldPlateChain({ q: args.q_w, dieArea: args.die_area_m2, rJc: args.r_jc_k_w, timThickness: args.tim_thickness_m, timK: args.tim_k_w_m_k, timArea: args.tim_area_m2, hCoolant: args.h_w_m2_k, wettedArea: args.wetted_area_m2, mdot: args.mdot_kg_s, cp: args.cp_j_kg_k, tInK: args.t_in_k });
+      return r == null ? null : { heat_flux_die_w_m2: r.heatFluxDie, r_tim_k_w: r.rTim, r_conv_k_w: r.rConv, r_total_k_w: r.rTotal, dt_fluid_k: r.dTFluid, t_wall_k: r.tWallK, t_case_k: r.tCaseK, t_junction_k: r.tJunctionK };
+    }
+  },
+  {
+    name: "shield_mass_scaling",
+    description: "Shield areal density, mass and kg per kW of a box container. Geometry only, no dose.",
+    inputSchema: {
+      length_m: number2(),
+      width_m: number2(),
+      height_m: number2(),
+      thickness_m: number2(),
+      density_kg_m3: number2().optional(),
+      extra_areal_mass_kg_m2: number2().optional(),
+      power_density_w_m3: number2()
+    },
+    sample: { "length_m": 2, "width_m": 2, "height_m": 2, "thickness_m": 2e-3, "density_kg_m3": 2700, "power_density_w_m3": 5e4 },
+    run: (args) => {
+      const r = shieldMassScaling({ length: args.length_m, width: args.width_m, height: args.height_m, thickness: args.thickness_m, density: args.density_kg_m3, extraArealMass: args.extra_areal_mass_kg_m2, powerDensity: args.power_density_w_m3 });
+      return r == null ? null : { surface_area_m2: r.surfaceArea, volume_m3: r.volume, areal_density_kg_m2: r.arealDensity, areal_density_g_cm2: r.arealDensityGcm2, shield_mass_kg: r.shieldMass, power_w: r.power, kg_per_kw: r.kgPerKw };
     }
   }
 ];
