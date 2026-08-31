@@ -1185,10 +1185,13 @@ function printLines(
     case 'rust':
       return finalNames.map((n) => `println!("${n} = {:?}", ${n});`)
     case 'zig':
-      return [
-        'const stdout = std.io.getStdOut().writer();',
-        ...finalNames.map((n) => `try stdout.print("${n} = {d}\\n", .{${n}});`),
-      ]
+      /**
+       * std.debug.print (stderr) instead of std.io.getStdOut: getStdOut was
+       * removed in 0.15 and std.io no longer exists in 0.16, while
+       * std.debug.print is stable across 0.14 and 0.15+. The verifier reads
+       * both stdout and stderr for zig to match.
+       */
+      return finalNames.map((n) => `std.debug.print("${n} = {d}\\n", .{${n}});`)
     case 'fortran':
       return finalNames.map((n) => `print *, '${n} = ', ${n}`)
     default:

@@ -599,7 +599,12 @@ function runScenario(
     return { scenario: scenario.name, status: 'fail-run', detail: tail(`${stderr}${run.stdout ?? ''}`) }
   }
 
-  const printed = parsePrinted(run.stdout ?? '')
+  // Zig prints via std.debug.print (stderr; stable across 0.14 and 0.15+), so
+  // read both streams for zig while every other language keeps stdout only.
+  const printed =
+    lang === 'zig'
+      ? parsePrinted(`${run.stdout ?? ''}\n${stderr}`)
+      : parsePrinted(run.stdout ?? '')
   const tol = TOLERANCE[lang] ?? DEFAULT_TOLERANCE
   const cmp = compareResults(toolId, scenario.name, lang, expected, printed, injected, tol)
   if ('status' in cmp) {
