@@ -223,7 +223,7 @@ const TOOLS_RAW: ToolMeta[] = [
     tags: ['orbital', 'reference'],
     formulaId: 'bodies',
     status: 'live',
-    sourceIds: ['jpl-horizons', 'iau', 'vallado'],
+    sourceIds: ['jpl-horizons', 'jpl-de440', 'iau', 'vallado'],
   },
   {
     id: 'launch-azimuth',
@@ -351,7 +351,7 @@ const TOOLS_RAW: ToolMeta[] = [
     tags: ['orbital', 'reference', 'mission-design'],
     formulaId: 'custom-body',
     status: 'live',
-    sourceIds: ['jpl-horizons', 'iau', 'vallado'],
+    sourceIds: ['jpl-horizons', 'jpl-de440', 'iau', 'vallado'],
   },
   {
     id: 'hyperbolic-c3',
@@ -1106,7 +1106,7 @@ const TOOLS_RAW: ToolMeta[] = [
     tags: ["propulsion","engines"],
     formulaId: 'ion-thruster-efficiency',
     status: 'live' as const,
-    sourceIds: ["nasa-grc", "curtis"],
+    sourceIds: ["nasa-grc", "curtis", "descanso-ep"],
   },
   {
     id: 'hall-thruster-isp',
@@ -1116,7 +1116,7 @@ const TOOLS_RAW: ToolMeta[] = [
     tags: ["propulsion","engines"],
     formulaId: 'hall-thruster-isp',
     status: 'live' as const,
-    sourceIds: ["nasa-grc", "curtis"],
+    sourceIds: ["nasa-grc", "curtis", "descanso-ep"],
   },
   {
     id: 'gnss-pseudorange',
@@ -1146,7 +1146,7 @@ const TOOLS_RAW: ToolMeta[] = [
     tags: ["comms","optical","laser"],
     formulaId: 'laser-link-budget',
     status: 'live' as const,
-    sourceIds: ["nasa-grc", "curtis"],
+    sourceIds: ["nasa-grc", "curtis", "descanso-optical"],
   },
   {
     id: 'laser-pointing-jitter',
@@ -1156,7 +1156,7 @@ const TOOLS_RAW: ToolMeta[] = [
     tags: ["pointing","laser","GNC"],
     formulaId: 'laser-pointing-jitter',
     status: 'live' as const,
-    sourceIds: ["nasa-grc", "curtis"],
+    sourceIds: ["nasa-grc", "curtis", "descanso-optical"],
   },
   {
     id: 'laser-time-of-flight',
@@ -1166,7 +1166,7 @@ const TOOLS_RAW: ToolMeta[] = [
     tags: ["satellite","laser","operations"],
     formulaId: 'laser-time-of-flight',
     status: 'live' as const,
-    sourceIds: ["vallado", "curtis"],
+    sourceIds: ["vallado", "curtis", "descanso-optical"],
   },
   {
     id: 'impedance-matching',

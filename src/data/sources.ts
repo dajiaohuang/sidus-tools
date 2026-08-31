@@ -240,6 +240,27 @@ export const SOURCES: Record<string, SourceRef> = {
     url: 'https://resources.nvidia.com/en-us-tensor-core/gtc22-whitepaper-hopper',
     note: 'GH100 die 814 mm² and H100 SXM 700 W anchors for the cold-plate preset. No affiliation.',
   },
+  'jpl-de440': {
+    id: 'jpl-de440',
+    name: 'JPL Planetary and Lunar Ephemerides DE440 and DE441',
+    org: 'NASA / JPL (Park et al., AJ 2021)',
+    url: 'https://ssd.jpl.nasa.gov/doc/de440_de441.html',
+    note: 'DE440/DE441 fit documentation. Sidus body constants are educational catalog values, not a DE441 reader.',
+  },
+  'descanso-ep': {
+    id: 'descanso-ep',
+    name: 'Fundamentals of Electric Propulsion: Ion and Hall Thrusters',
+    org: 'NASA / JPL DESCANSO (Goebel, Katz, Mikellides)',
+    url: 'https://descanso.jpl.nasa.gov/SciTechBook/SciTechBook.html',
+    note: 'JPL Space Science and Technology series. Educational ion/Hall models in SIDUS are independent SI sketches, not a thruster map.',
+  },
+  'descanso-optical': {
+    id: 'descanso-optical',
+    name: 'Deep Space Optical Communications',
+    org: 'NASA / JPL DESCANSO (Hemmati, ed.)',
+    url: 'https://descanso.jpl.nasa.gov/monograph/series7_chapter.html',
+    note: 'Optical deep-space link context for educational Friis-style tools.',
+  },
 }
 
 export function resolveSources(ids?: string[]): SourceRef[] {
