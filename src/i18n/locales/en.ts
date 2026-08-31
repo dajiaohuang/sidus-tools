@@ -227,6 +227,23 @@ export const en = {
     subtitle:
       'Links to open agency datasets and documentation for missions, telemetry, and orbital analysis.',
   },
+  scenes: {
+    kicker: 'Scenes',
+    title: 'Ready-made views',
+    subtitle:
+      'Bookmarks that open the live orbital view with a CelesTrak™ group already loaded. Same two-hour cache, no extra polling.',
+    open: 'Open in orbital view',
+    cite: 'Source',
+    stations_title: 'Space stations',
+    stations_blurb: 'The ISS, Tiangong and the other objects in the CelesTrak™ stations group.',
+    gnss_title: 'GNSS',
+    gnss_blurb: 'GPS, GLONASS, Galileo and BeiDou operational constellations.',
+    starlink_title: 'Starlink',
+    starlink_blurb: 'The whole Starlink shell, propagated in a worker.',
+    weather_science_title: 'Weather and science',
+    weather_science_blurb:
+      'Meteorological and science satellites in the CelesTrak™ weather and science groups.',
+  },
   footer: {
     kicker: '[ STATUS · NOMINAL ]',
     cta_title: 'Mission math, browser-native.',

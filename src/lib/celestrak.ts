@@ -54,6 +54,18 @@ export const CELESTRAK_GROUPS = {
 
 export type CelestrakGroupId = keyof typeof CELESTRAK_GROUPS
 
+/**
+ * The single parser for the `groups` URL parameter shared by the swarm and
+ * the scene deep links. An unknown group id is dropped rather than kept: the
+ * id set is ours, and a stale or hand-edited link must not turn into a request.
+ */
+export function parseGroupIds(raw: string): CelestrakGroupId[] {
+  return raw
+    .split(',')
+    .map((id) => id.trim())
+    .filter((id): id is CelestrakGroupId => id in CELESTRAK_GROUPS)
+}
+
 /** Dated copies for when the live endpoint is silent. */
 const TLE_SNAPSHOTS: Partial<Record<CelestrakGroupId, string>> = {
   stations: stationsSnap,

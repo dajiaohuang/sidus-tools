@@ -230,6 +230,21 @@ export const ko: TMessages = {
     subtitle:
       '미션, 텔레메트리, 궤도 분석을 위한 기관 공개 데이터셋과 문서 링크.',
   },
+  scenes: {
+    kicker: '장면',
+    title: '준비된 뷰',
+    subtitle: 'CelesTrak™ 그룹이 이미 로드된 상태로 실시간 궤도 뷰를 여는 북마크입니다. 동일한 2시간 캐시를 사용하며 추가 폴링은 없습니다.',
+    open: '궤도 뷰에서 열기',
+    cite: '출처',
+    stations_title: '우주 정거장',
+    stations_blurb: 'ISS, Tiangong 및 CelesTrak™ stations 그룹의 다른 객체들.',
+    gnss_title: 'GNSS',
+    gnss_blurb: 'GPS, GLONASS, Galileo, BeiDou 운용 성좌.',
+    starlink_title: 'Starlink',
+    starlink_blurb: 'Starlink 전체 셀을 워커에서 전파.',
+    weather_science_title: '기상 및 과학',
+    weather_science_blurb: 'CelesTrak™ weather 및 science 그룹의 기상·과학 위성.',
+  },
   footer: {
     kicker: '[ STATUS · NOMINAL ]',
     cta_title: '미션 수학, 브라우저 네이티브.',

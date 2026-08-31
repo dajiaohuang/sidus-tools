@@ -231,6 +231,21 @@ export const ja: TMessages = {
     subtitle:
       'ミッション、テレメトリ、軌道解析向けの機関オープンデータセットとドキュメントへのリンク。',
   },
+  scenes: {
+    kicker: 'シーン',
+    title: 'すぐ使えるビュー',
+    subtitle: 'CelesTrak™ のグループを読み込み済みの状態でライブ軌道ビューを開くブックマーク。キャッシュは同じ2時間で、追加のポーリングはありません。',
+    open: '軌道ビューで開く',
+    cite: '出典',
+    stations_title: '宇宙ステーション',
+    stations_blurb: 'ISS、Tiangong、および CelesTrak™ の stations グループに含まれるその他の物体。',
+    gnss_title: 'GNSS',
+    gnss_blurb: 'GPS、GLONASS、Galileo、BeiDou の運用中コンステレーション。',
+    starlink_title: 'Starlink',
+    starlink_blurb: 'Starlink シェル全体を worker 内で伝播。',
+    weather_science_title: '気象と科学',
+    weather_science_blurb: 'CelesTrak™ の weather および science グループの気象・科学衛星。',
+  },
   footer: {
     kicker: '[ STATUS · NOMINAL ]',
     cta_title: 'ミッション数学、ブラウザネイティブ。',

@@ -231,6 +231,21 @@ export const es: TMessages = {
     subtitle:
       'Enlaces a conjuntos de datos y documentación de agencias para misiones, telemetría y análisis orbital.',
   },
+  scenes: {
+    kicker: 'Escenas',
+    title: 'Vistas listas para usar',
+    subtitle: 'Marcadores que abren la vista orbital en vivo con un grupo CelesTrak™ ya cargado. Misma caché de dos horas, sin sondeo adicional.',
+    open: 'Abrir en la vista orbital',
+    cite: 'Fuente',
+    stations_title: 'Estaciones espaciales',
+    stations_blurb: 'La ISS, la Tiangong y los demás objetos del grupo CelesTrak™ stations.',
+    gnss_title: 'GNSS',
+    gnss_blurb: 'Constelaciones operativas GPS, GLONASS, Galileo y BeiDou.',
+    starlink_title: 'Starlink',
+    starlink_blurb: 'Toda la constelación Starlink, propagada en un worker.',
+    weather_science_title: 'Meteorología y ciencia',
+    weather_science_blurb: 'Satélites meteorológicos y científicos de los grupos CelesTrak™ weather y science.',
+  },
   footer: {
     kicker: '[ STATUS · NOMINAL ]',
     cta_title: 'Matemáticas de misión, nativas del navegador.',

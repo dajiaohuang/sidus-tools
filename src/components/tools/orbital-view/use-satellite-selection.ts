@@ -17,6 +17,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   CELESTRAK_GROUPS,
   fetchCelestrakGroup,
+  parseGroupIds,
   searchCelestrak,
   tleText,
   type CelestrakGroupId,
@@ -289,12 +290,7 @@ export function useSatelliteSelection(options: {
       sats === SATS_NONE
         ? []
         : sats.split(',').map((id) => id.trim()).filter((id) => /^\d+$/.test(id))
-    /* An unknown group id in a link is dropped rather than fetched: the id set
-       is ours, and a stale or hand-edited link must not turn into a request. */
-    const wantedGroups = groups
-      .split(',')
-      .map((id) => id.trim())
-      .filter((id): id is CelestrakGroupId => id in CELESTRAK_GROUPS)
+    const wantedGroups = parseGroupIds(groups)
     void (async () => {
       setFetchingTle(true)
       try {

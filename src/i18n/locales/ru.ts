@@ -231,6 +231,21 @@ export const ru: TMessages = {
     subtitle:
       'Ссылки на открытые наборы данных и документацию агентств для миссий, телеметрии и орбитального анализа.',
   },
+  scenes: {
+    kicker: 'Сцены',
+    title: 'Готовые виды',
+    subtitle: 'Закладки, открывающие орбитальный вид в реальном времени с уже загруженной группой CelesTrak™. Тот же двухчасовой кеш, без дополнительных опросов.',
+    open: 'Открыть в орбитальном виде',
+    cite: 'Источник',
+    stations_title: 'Космические станции',
+    stations_blurb: 'ISS, Tiangong и другие объекты группы CelesTrak™ stations.',
+    gnss_title: 'GNSS',
+    gnss_blurb: 'Действующие группировки GPS, GLONASS, Galileo и BeiDou.',
+    starlink_title: 'Starlink',
+    starlink_blurb: 'Вся группировка Starlink, рассчитываемая в воркере.',
+    weather_science_title: 'Погода и наука',
+    weather_science_blurb: 'Метеорологические и научные спутники групп CelesTrak™ weather и science.',
+  },
   footer: {
     kicker: '[ STATUS · NOMINAL ]',
     cta_title: 'Миссионная математика, нативно в браузере.',
