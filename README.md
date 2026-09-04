@@ -1,6 +1,6 @@
 <p align="center">
   <a href="https://sidus.tools">
-    <img src="https://sidus.tools/assets/logo-512.png" width="112" height="112" alt="SIDUS" />
+    <img src="public/assets/logo-512.png" width="112" height="112" alt="SIDUS" />
   </a>
 </p>
 
@@ -12,26 +12,26 @@
 </p>
 
 <p align="center">
-  <a href="https://sidus.tools"><img src="https://img.shields.io/badge/Live-sidus.tools-0B1B2B?style=flat-square&logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0id2hpdGUiPjxjaXJjbGUgY3g9IjEyIiBjeT0iMTIiIHI9IjQiLz48L3N2Zz4=" alt="Live site" /></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="License: MIT" /></a>
+  <a href="https://skills.sh/massimodeluisa/sidus-tools"><img src="https://skills.sh/b/massimodeluisa/sidus-tools" alt="skills.sh" /></a>
+  <a href="https://sidus.tools"><img src="https://img.shields.io/badge/Live-sidus.tools-0B1B2B?style=flat-square" alt="Live site" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-green?style=flat-square" alt="MIT License" /></a>
   <a href="https://isready.ai"><img src="https://isready.ai/badge/sidus.tools" alt="AI readiness" /></a>
-  <a href="https://agentskills.io"><img src="https://img.shields.io/badge/Agent_Skills-standard-orange?style=flat-square" alt="Agent Skills format" /></a>
-  <a href="skills/sidus/SKILL.md"><img src="https://img.shields.io/badge/skill-sidus-0a0a0a?style=flat-square" alt="SIDUS skill" /></a>
+  <a href="https://agentskills.io"><img src="https://img.shields.io/badge/Format-Agent_Skills-orange?style=flat-square" alt="Agent Skills format" /></a>
   <a href="https://modelcontextprotocol.io"><img src="https://img.shields.io/badge/MCP-public_URL-111827?style=flat-square" alt="MCP" /></a>
   <a href="https://www.typescriptlang.org/"><img src="https://img.shields.io/badge/TypeScript-5.9-3178C6?style=flat-square&logo=typescript&logoColor=white" alt="TypeScript" /></a>
   <a href="https://react.dev/"><img src="https://img.shields.io/badge/React-19-61DAFB?style=flat-square&logo=react&logoColor=black" alt="React 19" /></a>
 </p>
 
 <p align="center">
-  <a href="https://sidus.tools"><strong>sidus.tools</strong></a>
-  ·
-  <a href="#agent-skill">Agent skill</a>
-  ·
-  <a href="#mcp-no-install">MCP</a>
-  ·
-  <a href="#develop">Develop</a>
-  ·
+  <a href="#quick-start">Install</a> ·
+  <a href="#agent-skill">Agent skill</a> ·
+  <a href="#mcp-no-install">MCP</a> ·
+  <a href="#develop">Develop</a> ·
   <a href="#documentation">Docs</a>
+</p>
+
+<p align="center">
+  <img src="public/og-default.png" alt="SIDUS: open-source space engineering tools" width="800" />
 </p>
 
 ---
@@ -207,20 +207,17 @@ Homepage-dark cards (safe zone, large type, mono formula):
 
 Details: [`docs/OG_IMAGES.md`](docs/OG_IMAGES.md).
 
+## Author
+
+<p>
+  <a href="https://x.com/massimodeluisa"><img src="https://img.shields.io/badge/@massimodeluisa-000000?style=flat-square&logo=x" alt="X" /></a>
+  <a href="https://github.com/massimodeluisa"><img src="https://img.shields.io/badge/GitHub-massimodeluisa-181717?style=flat-square&logo=github" alt="GitHub" /></a>
+</p>
+
+**Massimo De Luisa**: [massimo.deluisa.bio](https://massimo.deluisa.bio)
+
 ## License
 
-[MIT](LICENSE) — free to use, modify, and share.
+MIT, see [LICENSE](LICENSE).
 
-**Disclaimer:** Educational pure-SI models. **No affiliation** with NASA, ESA, SpaceX, Roscosmos, CNSA, JAXA, ISRO, ASI, DLR, CNES, KARI, AEB, or any other agency or company. Not flight software. Provided as-is without warranty.
-
----
-
-<p align="center">
-  <a href="https://sidus.tools">sidus.tools</a>
-  ·
-  <a href="https://github.com/massimodeluisa">GitHub</a>
-  ·
-  <a href="https://x.com/massimodeluisa">X</a>
-  ·
-  <a href="https://massimo.deluisa.bio">massimo.deluisa.bio</a>
-</p>
+SIDUS is independent and has no affiliation with NASA, ESA, SpaceX, Roscosmos, CNSA, JAXA, ISRO, ASI, DLR, CNES, KARI, AEB, or any other agency or company.
