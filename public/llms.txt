@@ -96,7 +96,7 @@ SIDUS (Latin *sidus* = constellation) is a non-profit educational project with n
 - [Characteristic velocity c*](https://sidus.tools/tools/characteristic-velocity-cstar): c*=pc At/mdot and ideal c* from chamber thermo.
 - [Cold-gas thrust](https://sidus.tools/tools/cold-gas-thrust): F=mdot*ve for ACS thrusters.
 - [deltav mission budget](https://sidus.tools/tools/delta-v-budget): Sum multi-phase deltav (ascent, plane, transfer, capture, ...) into a single budget.
-- [Edelbaum low-thrust delta-v](https://sidus.tools/tools/edelbaum-dv): Combined plane change and circular transfer.
+- [Edelbaum low-thrust delta-v](https://sidus.tools/tools/edelbaum-dv): Combined plane change and circular-to-circular transfer. Not a spiral-to-escape deltav.
 - [Equal-stage mass ratio](https://sidus.tools/tools/equal-stage): Ideal equal stages: deltav per stage and required m0/m_f for a total deltav budget.
 - [Finite burn deltav](https://sidus.tools/tools/finite-burn-dv): Rocket-equation deltav for constant burn.
 - [GEO propellant budget](https://sidus.tools/tools/geo-propellant-budget): Propellant for multi-year stationkeeping.
@@ -104,8 +104,9 @@ SIDUS (Latin *sidus* = constellation) is a non-profit educational project with n
 - [Hall thruster ve/Isp](https://sidus.tools/tools/hall-thruster-isp): Ideal ion ve from Vd and ion mass.
 - [Ideal thrust / mass flow](https://sidus.tools/tools/ideal-thrust): F = ve or from F and Isp; burn time for a propellant load (vacuum ideal).
 - [Impulse-bit budget](https://sidus.tools/tools/impulse-budget): Total impulse and deltav from many min-pulse RCS firings.
-- [Ion thruster efficiency](https://sidus.tools/tools/ion-thruster-efficiency): eta=T^2/(2 mdot P).
+- [Ion thruster efficiency](https://sidus.tools/tools/ion-thruster-efficiency): = T2/(2 P), ve = T/, and optional vehicle alpha = P/m_dry.
 - [Isentropic nozzle](https://sidus.tools/tools/isentropic-nozzle): Ideal nozzle Me, Ae/At, ve, Isp from R Tc pe/pc.
+- [Low-thrust escape spiral](https://sidus.tools/tools/low-thrust-escape): Continuous tangential thrust from a circular orbit to E = 0 costs about v_circ. Impulsive escape is (sqrt(2) - 1) v_circ.
 - [Stage stack mass ratio](https://sidus.tools/tools/mass-ratio-stack): Ideal gross mass from stage mass ratio R and N stages.
 - [Mixture ratio O/F](https://sidus.tools/tools/mixture-ratio): Oxidizer-to-fuel ratio and total mass flow.
 - [Multi-stage deltav budget](https://sidus.tools/tools/multi-stage): Staged rocket mass and deltav accounting.
@@ -122,13 +123,15 @@ SIDUS (Latin *sidus* = constellation) is a non-profit educational project with n
 - [Thruster impulse bit](https://sidus.tools/tools/thruster-impulse-bit): I_bit=F.t_on ACS pulse.
 
 ### Satellite ops
+- [Allan range-rate sigma](https://sidus.tools/tools/allan-range-rate): White-frequency-noise range-rate sigma_v = sqrt(2) c sigma_y from a clock Allan deviation.
 - [Antenna beamwidth](https://sidus.tools/tools/antenna-beamwidth): Approximate half-power beamwidth ~ k lambda/D for parabolic dishes.
 - [Antenna gain and Ae](https://sidus.tools/tools/antenna-gain-effective): Ae=G*lambda^2/(4*pi).
 - [Conjunction collision probability](https://sidus.tools/tools/conjunction-pc): Educational 2-D Chan or Foster Pc from miss, covariance and hard-body radii.
 - [Downlink data volume](https://sidus.tools/tools/data-volume): V=R*T_contact*eta bits.
 - [Diffraction resolution / GSD](https://sidus.tools/tools/diffraction): ~ 1.22 lambda/D and ground sample distance at range.
 - [Diffraction limit angle](https://sidus.tools/tools/diffraction-limit): ~1.22 lambda/D aperture limit.
-- [Doppler shift](https://sidus.tools/tools/doppler-shift-leo): fd=f0*vr/c.
+- [Doppler shift](https://sidus.tools/tools/doppler-shift-leo): One-way fd = f0 vr/c, two-way 2 fd, and range-rate error from a clock offset.
+- [DSN array SNR gain](https://sidus.tools/tools/dsn-array-gain): Coherent combining of N identical antennas: SNR scales as N (10 log10 N dB).
 - [Eclipse vs beta-angle](https://sidus.tools/tools/eclipse-beta): Eclipse duration vs orbit beta-angle (sun elevation from plane).
 - [Eclipse duration (circular)](https://sidus.tools/tools/eclipse-duration): Order-of-magnitude umbra time for circular orbit (cylindrical shadow, coplanar worst case).
 - [EIRP and G/T](https://sidus.tools/tools/eirp-gt): EIRP = P G and receive figure of merit G/T.
@@ -216,7 +219,7 @@ SIDUS (Latin *sidus* = constellation) is a non-profit educational project with n
 - [Free-fall time](https://sidus.tools/tools/free-fall-time): t=sqrt(2h/g) and impact speed under constant g.
 - [Sutton-Graves heat flux](https://sidus.tools/tools/heat-flux): Stagnation-point convective heat flux q sqrt(rho/R_n) v3: entry heating order of magnitude.
 - [Pressure vessel hoop stress](https://sidus.tools/tools/hoop-stress): Thin-wall hoop stress sigma=p r/t.
-- [Light-time delay](https://sidus.tools/tools/light-time): One-way and round-trip RF / light travel time for a given range (deep-space ops).
+- [Light-time delay](https://sidus.tools/tools/light-time): One-way and round-trip RF / light travel time for a given range (deep-space ops). DSN two-way range is the RTLT.
 - [Nyquist sample rate](https://sidus.tools/tools/nyquist-rate): fs >= 2 f_max sampling theorem.
 - [Orbital data center power and radiator sizing](https://sidus.tools/tools/odc-power-thermal-sizing): IT power to solar array area and side, radiator area from net flux, areal masses and kg per kW.
 - [Orbit 3D view](https://sidus.tools/tools/orbit-3d): Interactive 3D circular orbits and Hohmann-class transfer ellipse (drag to rotate, scroll to zoom).
@@ -257,4 +260,4 @@ SIDUS (Latin *sidus* = constellation) is a non-profit educational project with n
 - https://github.com/massimodeluisa/sidus-tools/blob/main/docs/IMPLEMENTATION_TODO.md
 - https://github.com/massimodeluisa/sidus-tools/blob/main/AGENTS.md
 
-<!-- generated by scripts/generate-llms-txt.ts - 198 tools - 2026-08-29 -->
+<!-- generated by scripts/generate-llms-txt.ts - 201 tools - 2026-09-04 -->

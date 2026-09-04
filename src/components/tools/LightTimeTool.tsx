@@ -35,7 +35,7 @@ export function LightTimeTool() {
             min={0}
             onValueChange={(range) => setP({ range })}
             onUnitChange={(ru, range) => setP({ ru, range })}
-            hint={t('fields.hint_light_time')}
+            hint={t('fields.hint_dsn_range')}
           />
         </ParamsGrid>
       }
@@ -62,6 +62,14 @@ export function LightTimeTool() {
             <ResultCard
               label={t('fields.range')}
               si={res.r}
+              category="length"
+              unitId="au"
+              unitIds={TOOL_UNIT_SETS.length}
+              digits={6}
+            />
+            <ResultCard
+              label={t('fields.two_way_path')}
+              si={2 * res.r}
               category="length"
               unitId="au"
               unitIds={TOOL_UNIT_SETS.length}

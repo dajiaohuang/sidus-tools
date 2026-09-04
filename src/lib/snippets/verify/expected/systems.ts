@@ -32,6 +32,7 @@ import {
   idealThrust,
   impulseBit,
   ionThrusterEfficiency,
+  lowThrustEscapeSpiral,
   isaAtmosphere,
   isentropicExitVelocity,
   isentropicNozzle,
@@ -404,6 +405,17 @@ export const SYSTEMS_EXPECTED: Record<string, ExpectedFn> = {
     const di = num(bag, 'di')
     const out: Record<string, number> = {}
     put(out, ['dv'], edelbaumDv(v1, v2, di))
+    return out
+  },
+
+  'low-thrust-escape': (bag) => {
+    const got = lowThrustEscapeSpiral(num(bag, 'mu'), num(bag, 'r'))
+    const out: Record<string, number> = {}
+    if (got) {
+      put(out, ['v_circ'], got.vCirc)
+      put(out, ['dv_spiral'], got.dvSpiral)
+      put(out, ['dv_imp'], got.dvImpulsive)
+    }
     return out
   },
 

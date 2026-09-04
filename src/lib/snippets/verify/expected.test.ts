@@ -123,6 +123,7 @@ const PROPULSION_WAVE = [
   'throat-area-sizing',
   'thrust-to-weight',
   'thruster-impulse-bit',
+  'low-thrust-escape',
 ] as const
 
 /**
@@ -135,7 +136,9 @@ const SATELLITE_WAVE = [
   'data-volume',
   'diffraction',
   'diffraction-limit',
+  'allan-range-rate',
   'doppler-shift-leo',
+  'dsn-array-gain',
   'eclipse-beta',
   'eclipse-duration',
   'eirp-gt',

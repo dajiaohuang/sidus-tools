@@ -92,6 +92,38 @@ export const RESOURCES: Resource[] = [
     tags: ['literature', 'comms'],
   },
   {
+    name: 'DESCANSO vol. 1 (radiometric tracking)',
+    org: 'NASA / JPL (Thornton, Border)',
+    url: 'https://descanso.jpl.nasa.gov/monograph/series1/Descanso1_all.pdf',
+    description:
+      'Two-way DSN range, Doppler, clock instability, and ΔVLBI. SIDUS cites it for educational SI, not as a tracking system.',
+    tags: ['literature', 'comms', 'DSN'],
+  },
+  {
+    name: 'DESCANSO vol. 5 (antenna arraying)',
+    org: 'NASA / JPL (Rogstad, Mileant, Pham)',
+    url: 'https://descanso.jpl.nasa.gov/monograph/series5/Descanso_Mono5_full.pdf',
+    description:
+      'DSN antenna arraying. The SIDUS array-gain sketch is N identical coherent antennas, not a combiner.',
+    tags: ['literature', 'comms', 'DSN'],
+  },
+  {
+    name: 'Fermi Explorer calculator',
+    org: 'The Fermi Explorer Mission (MIT)',
+    url: 'https://fermiexplorer.github.io/',
+    description:
+      'First-order Alpha Centauri ion-propulsion feasibility calculator (perihelion-pumped SEP and exploratory architectures). SIDUS cites it. SIDUS does not wrap or clone it.',
+    tags: ['propulsion', 'mission-design'],
+  },
+  {
+    name: 'Fermi Explorer mission',
+    org: 'The Fermi Explorer Mission',
+    url: 'https://www.fermiexplorer.org/',
+    description:
+      'Public mission page for a small solar-electric precursor toward Alpha Centauri. Not a SIDUS calculator.',
+    tags: ['mission-design'],
+  },
+  {
     name: 'Basics of Spaceflight',
     org: 'NASA / JPL (Doody)',
     url: 'https://science.nasa.gov/learn/basics-of-space-flight/',

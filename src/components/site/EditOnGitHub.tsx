@@ -147,6 +147,9 @@ export function toolSourcePath(toolId: string): string {
     'pump-crank': 'src/components/tools/PumpCrankTool.tsx',
     'schweighart-sedwick': 'src/components/tools/SchweighartSedwickTool.tsx',
     'orbital-view': 'src/components/tools/OrbitalViewTool.tsx',
+    'low-thrust-escape': 'src/components/tools/LowThrustEscapeTool.tsx',
+    'dsn-array-gain': 'src/components/tools/DsnArrayGainTool.tsx',
+    'allan-range-rate': 'src/components/tools/AllanRangeRateTool.tsx',
   }
   return MAP[toolId] ?? 'src/data/tools.ts'
 }

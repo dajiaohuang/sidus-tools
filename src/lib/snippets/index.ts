@@ -178,6 +178,9 @@ import { herrickGibbsSnippets } from './tools/herrick-gibbs'
 import { lunisolarRatesSnippets } from './tools/lunisolar-rates'
 import { pumpCrankSnippets } from './tools/pump-crank'
 import { schweighartSedwickSnippets } from './tools/schweighart-sedwick'
+import { lowThrustEscapeSnippets } from './tools/low-thrust-escape'
+import { dsnArrayGainSnippets } from './tools/dsn-array-gain'
+import { allanRangeRateSnippets } from './tools/allan-range-rate'
 
 export * from './types'
 export * from './live-values'
@@ -381,6 +384,9 @@ const MAP: Record<string, FormulaSnippet> = {
   [odcPowerThermalSizingSnippets.formulaId]: odcPowerThermalSizingSnippets,
   [coldPlateDtSnippets.formulaId]: coldPlateDtSnippets,
   [shieldMassScalingSnippets.formulaId]: shieldMassScalingSnippets,
+  [lowThrustEscapeSnippets.formulaId]: lowThrustEscapeSnippets,
+  [dsnArrayGainSnippets.formulaId]: dsnArrayGainSnippets,
+  [allanRangeRateSnippets.formulaId]: allanRangeRateSnippets,
 }
 
 export function getSnippets(formulaId: string): FormulaSnippet | undefined {

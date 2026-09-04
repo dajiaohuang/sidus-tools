@@ -529,6 +529,9 @@ export const SAMPLE_OVERRIDES: Record<string, LiveCodeValues> = {
   'cold-plate-dt': { Q: 700, A_die: 814e-6, R_jc: 0.05, t_tim: 50e-6, k_tim: 5, A_tim: 814e-6, h: 3e4, A_wet: 814e-6, mdot: 0.05, cp: 4184, T_in: 293.15 },
   // Shield-box geometry free vars exist in no shared bag.
   'shield-mass-scaling': { L: 2, W: 2, H: 2, t: 2e-3, rho: 2700, m_extra: 0, p_v: 5e4 },
+  'dsn-array-gain': { n: 4 },
+  'allan-range-rate': { sy: 1e-13 },
+  'low-thrust-escape': { mu: 3.986004418e14, r: 6_778_137 },
 }
 
 /** Live-input bag for a tool: shared SAMPLE merged with its per-tool override. */

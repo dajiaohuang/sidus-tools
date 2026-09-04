@@ -228,6 +228,42 @@ export const RF_SCENARIOS: Record<string, Scenario[]> = {
     },
   ],
 
+  'dsn-array-gain': [
+    {
+      name: 'four-identical',
+      source: 'four identical antennas, Goldstone-class educational N',
+      bag: { n: 4 },
+    },
+    {
+      name: 'two-identical',
+      source: 'two-antenna coherent pair',
+      bag: { n: 2 },
+    },
+    {
+      name: 'synthetic',
+      source: 'adversarial synthetic: non-integer N still in the identical-antenna identity',
+      bag: { n: 3.7 },
+    },
+  ],
+
+  'allan-range-rate': [
+    {
+      name: 'crystal-1e-13',
+      source: 'Thornton & Border space-qualified crystal order, 1e-13',
+      bag: { sy: 1e-13 },
+    },
+    {
+      name: 'maser-1e-15',
+      source: 'hydrogen-maser order Allan deviation',
+      bag: { sy: 1e-15 },
+    },
+    {
+      name: 'synthetic',
+      source: 'adversarial synthetic: distinct non-round sigma_y',
+      bag: { sy: 2.47e-14 },
+    },
+  ],
+
   'doppler-shift-leo': [
     {
       name: 'sband-approaching',

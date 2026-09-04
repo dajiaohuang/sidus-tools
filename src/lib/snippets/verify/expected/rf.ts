@@ -9,7 +9,9 @@ import {
   dataVolumeBits,
   diffractionLimitAngle,
   diffractionResolution,
+  allanRangeRateSigma,
   dopplerShiftHz,
+  dsnArraySnrGain,
   ebN0FromCn0,
   eclipseWithBeta,
   effectiveAperture,
@@ -197,6 +199,22 @@ export const RF_EXPECTED: Record<string, ExpectedFn> = {
   'doppler-shift-leo': (bag) => {
     const out: Record<string, number> = {}
     put(out, ['fd'], dopplerShiftHz(num(bag, 'f0'), num(bag, 'vr')))
+    return out
+  },
+
+  'dsn-array-gain': (bag) => {
+    const g = dsnArraySnrGain(num(bag, 'n'))
+    const out: Record<string, number> = {}
+    if (g) {
+      put(out, ['gain_lin'], g.gainLin)
+      put(out, ['gain_db'], g.gainDb)
+    }
+    return out
+  },
+
+  'allan-range-rate': (bag) => {
+    const out: Record<string, number> = {}
+    put(out, ['sigma_v'], allanRangeRateSigma(num(bag, 'sy')))
     return out
   },
 

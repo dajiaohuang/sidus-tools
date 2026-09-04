@@ -261,6 +261,20 @@ export const SOURCES: Record<string, SourceRef> = {
     url: 'https://descanso.jpl.nasa.gov/monograph/series7_chapter.html',
     note: 'Optical deep-space link context for educational Friis-style tools.',
   },
+  'descanso-tracking': {
+    id: 'descanso-tracking',
+    name: 'Radiometric Tracking Techniques for Deep-Space Navigation',
+    org: 'NASA / JPL DESCANSO (Thornton, Border)',
+    url: 'https://descanso.jpl.nasa.gov/monograph/series1/Descanso1_all.pdf',
+    note: 'DSN two-way range, Doppler, and clock-to-range-rate. Educational SI, not a tracking system.',
+  },
+  'descanso-arraying': {
+    id: 'descanso-arraying',
+    name: 'Antenna Arraying Techniques in the Deep Space Network',
+    org: 'NASA / JPL DESCANSO (Rogstad, Mileant, Pham)',
+    url: 'https://descanso.jpl.nasa.gov/monograph/series5/Descanso_Mono5_full.pdf',
+    note: 'Coherent array SNR for identical antennas scales as N. Not a DSN combiner.',
+  },
 }
 
 export function resolveSources(ids?: string[]): SourceRef[] {

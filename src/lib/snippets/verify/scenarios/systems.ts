@@ -574,6 +574,24 @@ export const SYSTEMS_SCENARIOS: Record<string, Scenario[]> = {
     },
   ],
 
+  'low-thrust-escape': [
+    {
+      name: 'leo-400km',
+      source: 'circular 400 km Earth parking orbit',
+      bag: { mu: 3.986004418e14, r: 6_378_137 + 400_000 },
+    },
+    {
+      name: 'gto-perigee',
+      source: 'GTO-class perigee radius educational parking',
+      bag: { mu: 3.986004418e14, r: 6_578_137 },
+    },
+    {
+      name: 'synthetic',
+      source: 'adversarial synthetic: distinct non-round mu/r',
+      bag: { mu: 4.012e14, r: 7_021_440 },
+    },
+  ],
+
   'edelbaum-dv': [
     {
       name: 'leo-to-geo-plane-change',

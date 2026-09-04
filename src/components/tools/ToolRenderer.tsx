@@ -206,6 +206,9 @@ const MAP: Record<string, LazyTool> = {
   'odc-power-thermal-sizing': L(() => import('./OdcPowerThermalSizingTool').then((m) => ({ default: m.OdcPowerThermalSizingTool }))),
   'cold-plate-dt': L(() => import('./ColdPlateDtTool').then((m) => ({ default: m.ColdPlateDtTool }))),
   'shield-mass-scaling': L(() => import('./ShieldMassScalingTool').then((m) => ({ default: m.ShieldMassScalingTool }))),
+  'low-thrust-escape': L(() => import('./LowThrustEscapeTool').then((m) => ({ default: m.LowThrustEscapeTool }))),
+  'dsn-array-gain': L(() => import('./DsnArrayGainTool').then((m) => ({ default: m.DsnArrayGainTool }))),
+  'allan-range-rate': L(() => import('./AllanRangeRateTool').then((m) => ({ default: m.AllanRangeRateTool }))),
 }
 
 type Props = { id: string }

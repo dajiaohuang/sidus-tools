@@ -94,7 +94,13 @@ export const TOOL_PRECISION: Record<string, ToolPrecision> = {
   'hoop-stress': TWO_BODY,
   'exponential-density': TWO_BODY,
   'hill-sphere': TWO_BODY,
-  'edelbaum-dv': TWO_BODY,
+  'edelbaum-dv': {
+    modelClass: 'two-body-exact',
+    errorClass:
+      'Edelbaum combined circular transfer plus plane change. Not a spiral-to-escape Δv (that is v_circ) and not a 1/r² solar-electric campaign.',
+    limits: `Low-thrust circular-to-circular with a plane change. ${IEEE}`,
+    referenceHint: 'Edelbaum 1961; Vallado low-thrust chapter',
+  },
   'repeating-ground-track': TWO_BODY,
   'pointing-budget-rss': TWO_BODY,
   'boiloff-rate': TWO_BODY,
@@ -176,7 +182,13 @@ export const TOOL_PRECISION: Record<string, ToolPrecision> = {
   'blowdown-tank': TWO_BODY,
   'propellant-density-impulse': TWO_BODY,
   'cold-gas-thrust': TWO_BODY,
-  'ion-thruster-efficiency': TWO_BODY,
+  'ion-thruster-efficiency': {
+    modelClass: 'two-body-exact',
+    errorClass:
+      'η = T²/(2 ṁ P) is the jet-power identity. α = P/m_dry is a mass-closure floor, not an engineered bus.',
+    limits: `Ideal ion thruster figures of merit. No plume, grid, or PPU map. ${IEEE}`,
+    referenceHint: 'Goebel / Katz DESCANSO EP; jet power T ve / 2',
+  },
   'hall-thruster-isp': TWO_BODY,
   'gnss-pseudorange': TWO_BODY,
   'gnss-geometry-gdop': TWO_BODY,
@@ -185,7 +197,13 @@ export const TOOL_PRECISION: Record<string, ToolPrecision> = {
   'laser-time-of-flight': TWO_BODY,
   'impedance-matching': TWO_BODY,
   'antenna-gain-effective': TWO_BODY,
-  'doppler-shift-leo': TWO_BODY,
+  'doppler-shift-leo': {
+    modelClass: 'rf-friis',
+    errorClass:
+      'First-order fd = f0 vr/c. Two-way is 2 fd. Clock error is Δρ̇ = c Δf/f. No transponder turnaround, media, or station model.',
+    limits: `Topocentric radial Doppler teaching model. ${IEEE}`,
+    referenceHint: 'Thornton & Border DESCANSO vol. 1; Vallado Doppler',
+  },
   'radar-equation': TWO_BODY,
   'rain-attenuation-simple': TWO_BODY,
   'ttc-ebno': TWO_BODY,
@@ -357,7 +375,13 @@ export const TOOL_PRECISION: Record<string, ToolPrecision> = {
     limits: `Spherical body geometric radio horizon. ${IEEE}`,
     referenceHint: 'Spherical Earth geometry',
   },
-  'light-time': UTIL,
+  'light-time': {
+    modelClass: 'utility',
+    errorClass:
+      'Vacuum one-way t = r/c and RTLT = 2t. DSN two-way range is the RTLT. No media, station delay, or turnaround.',
+    limits: `Geometric light time. ${IEEE}`,
+    referenceHint: 'BIPM SI c; Thornton & Border DESCANSO vol. 1 ranging',
+  },
   'geo-light-time': UTIL,
   'solar-pressure': EMP,
   'solar-array': EMP,
@@ -496,6 +520,27 @@ export const TOOL_PRECISION: Record<string, ToolPrecision> = {
     errorClass: 'Exact geometry; says nothing about dose.',
     limits: `Geometry only: areal density and mass per kW of a box. No dose, no spectrum, no secondary particles. Read a SHIELDOSE-2 / SPENVIS dose-depth curve at the g/cm² shown. ${IEEE}`,
     referenceHint: 'Starcloud 2024 shield scaling argument; SPENVIS SHIELDOSE-2 help',
+  },
+  'low-thrust-escape': {
+    modelClass: 'two-body-exact',
+    errorClass:
+      'Continuous tangential thrust to E = 0 costs v_circ. Impulsive escape from the same circle is (√2 − 1) v_circ. No 1/r² fade, no GNC, no perihelion-pumping campaign.',
+    limits: `Two-body circular parking orbit. ${IEEE}`,
+    referenceHint: 'Edelbaum/Beletsky spiral-to-escape; Vallado vis-viva',
+  },
+  'dsn-array-gain': {
+    modelClass: 'rf-friis',
+    errorClass:
+      'Identical antennas, perfect coherent combining: SNR × N. Real DSN arraying has correlator, delay, and weather losses.',
+    limits: `N-antenna SNR sketch. Not a DSN combiner. ${IEEE}`,
+    referenceHint: 'Rogstad, Mileant, Pham DESCANSO vol. 5',
+  },
+  'allan-range-rate': {
+    modelClass: 'rf-friis',
+    errorClass:
+      'White-frequency-noise band only: σ_v = √2 c σ_y. Thornton & Border quote this when the count time is shorter than the RTLT. Flicker and dead-time forms differ.',
+    limits: `Clock-to-range-rate teaching model. ${IEEE}`,
+    referenceHint: 'Thornton & Border DESCANSO vol. 1; BIPM Allan variance',
   },
 }
 

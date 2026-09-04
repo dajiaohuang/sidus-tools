@@ -37,7 +37,7 @@ export function EdelbaumDvTool() {
         <ParamsGrid>
           <UiUnitField label={t('fields.disc_v1_2')} category="velocity" unitIds={TOOL_UNIT_SETS.velocity} unitId={p.v1u} value={p.v1} min={0} onValueChange={(v1)=>setP({v1})} onUnitChange={(v1u,v1)=>setP({v1u,v1})} />
           <UiUnitField label={t('fields.disc_v2_2')} category="velocity" unitIds={TOOL_UNIT_SETS.velocity} unitId={p.v2u} value={p.v2} min={0} onValueChange={(v2)=>setP({v2})} onUnitChange={(v2u,v2)=>setP({v2u,v2})} />
-          <UiUnitField label={t('fields.disc_di_2')} category="angle" unitIds={TOOL_UNIT_SETS.angle} unitId={p.diu} value={p.di} min={0} onValueChange={(di)=>setP({di})} onUnitChange={(diu,di)=>setP({diu,di})} />
+          <UiUnitField label={t('fields.disc_di_2')} category="angle" unitIds={TOOL_UNIT_SETS.angle} unitId={p.diu} value={p.di} min={0} onValueChange={(di)=>setP({di})} onUnitChange={(diu,di)=>setP({diu,di})} hint={t('fields.hint_edelbaum')} />
         </ParamsGrid>
       }
       results={

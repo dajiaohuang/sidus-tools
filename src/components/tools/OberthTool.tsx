@@ -7,7 +7,8 @@ import { UiField } from '@/components/shared/UiField'
 import { UiUnitField } from '@/components/shared/UiUnitField'
 import { ResultCard } from '@/components/shared/ResultCard'
 import { CodeExport } from '@/components/shared/CodeExport'
-import { BODIES, getBody, oberthCompare, TOOL_UNIT_SETS, toSi } from '@/lib/physics'
+import { BODIES, getBody, oberthCompare, solarFluxAtDistance, TOOL_UNIT_SETS, toSi } from '@/lib/physics'
+import { formatNumber } from '@/lib/physics/format'
 import { numParam, strParam, useToolSearchParams } from '@/lib/use-tool-search-params'
 
 // Classic GTO-class ellipse: rp≈6678 km, ra≈42164 km → a≈24421 km, e≈0.73
@@ -18,6 +19,8 @@ const SCHEMA = {
   e: numParam(0.73, { min: 0, max: 0.999 }),
   dv: numParam(1, { min: 0 }),
   dvu: strParam('kmps', TOOL_UNIT_SETS.velocity),
+  rh: numParam(1, { min: 0.001 }),
+  rhu: strParam('au', TOOL_UNIT_SETS.length),
 } as const
 
 export function OberthTool() {
@@ -26,7 +29,13 @@ export function OberthTool() {
   const body = getBody(p.body)
   const a = toSi(p.a, p.au)
   const dv = toSi(p.dv, p.dvu)
-  const res = useMemo(() => oberthCompare(body.mu, a, p.e, dv), [body.mu, a, p.e, dv])
+  const rh = toSi(p.rh, p.rhu)
+  const res = useMemo(() => {
+    const o = oberthCompare(body.mu, a, p.e, dv)
+    const s = solarFluxAtDistance(rh)
+    if (!o || s == null) return null
+    return { ...o, fluxRatio: s / 1361 }
+  }, [body.mu, a, p.e, dv, rh])
   return (
     <ToolShell
       parameters={<ParamsGrid>
@@ -34,6 +43,7 @@ export function OberthTool() {
         <UiUnitField label={t('fields.semi_major_a')} category="length" unitIds={TOOL_UNIT_SETS.length} unitId={p.au} value={p.a} min={0.001} onValueChange={(a) => setP({ a })} onUnitChange={(au, a) => setP({ au, a })} />
         <UiField label={t('fields.e')} type="number" value={p.e} min={0} max={0.999} step={0.01} onChange={(e) => setP({ e: Number(e.target.value) })} />
         <UiUnitField label={t('fields.impulsive_v')} category="velocity" unitIds={TOOL_UNIT_SETS.velocity} unitId={p.dvu} value={p.dv} min={0} onValueChange={(dv) => setP({ dv })} onUnitChange={(dvu, dv) => setP({ dvu, dv })} />
+        <UiUnitField label={t('fields.heliocentric_r')} category="length" unitIds={TOOL_UNIT_SETS.length} unitId={p.rhu} value={p.rh} min={0.001} onValueChange={(rh) => setP({ rh })} onUnitChange={(rhu, rh) => setP({ rhu, rh })} hint={t('fields.hint_oberth_flux')} />
       </ParamsGrid>}
       results={res ? <div className="sidus-results">
         <ResultCard label={t('fields.at_peri')} si={res.dEp} category="specificEnergy" unitId="MJpkg" unitIds={TOOL_UNIT_SETS.specificEnergy} digits={4} accent />
@@ -41,6 +51,7 @@ export function OberthTool() {
         <ResultCard label={t('fields.oberth_advantage')} si={res.advantage} category="specificEnergy" unitId="MJpkg" unitIds={TOOL_UNIT_SETS.specificEnergy} digits={4} />
         <ResultCard label={t('fields.v_p')} si={res.vp} category="velocity" unitId="kmps" unitIds={TOOL_UNIT_SETS.velocity} digits={4} />
         <ResultCard label={t('fields.v_a')} si={res.va} category="velocity" unitId="kmps" unitIds={TOOL_UNIT_SETS.velocity} digits={4} />
+        <ResultCard label={t('fields.solar_flux_ratio')} value={formatNumber(res.fluxRatio, 4)} />
       </div> : <p className="font-mono text-sm text-muted">{t('fields.need_ellipse_e_dv')}</p>}
       code={<CodeExport formulaId="oberth" values={{ a, dv, mu: body.mu, e: p.e, body: p.body }} />}
     />

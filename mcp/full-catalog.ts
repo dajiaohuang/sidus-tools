@@ -209,6 +209,9 @@ import {
   twoPhaseLoop,
   coldPlateChain,
   shieldMassScaling,
+  lowThrustEscapeSpiral,
+  dsnArraySnrGain,
+  allanRangeRateSigma,
 } from '../src/lib/physics/index'
 
 export const SIDUS_MCP_DISCLAIMER =
@@ -224,7 +227,7 @@ export type McpToolDef = {
   run: (args: McpArgs) => unknown
 }
 
-export const CATALOG_NAMES = ['list_bodies', 'list_mcp_tools', 'circular_orbit', 'hohmann', 'escape_velocity', 'bielliptic', 'plane_change', 'vis_viva', 'apsides', 'rocket_equation', 'multi_stage', 'j2_drift', 'launch_azimuth', 'sso_inclination', 'dynamic_pressure', 'cw_rendezvous', 'link_budget', 'phasing', 'metabolic_load', 'cabin_atmosphere', 'lioh_scrubber', 'cabin_leak', 'thermal_loop', 'custom_body', 'hyperbolic_c3', 'hohmann_plane', 'propellant_mass', 'ideal_thrust', 'sphere_of_influence', 'synodic_period', 'eclipse_duration', 'light_time', 'solar_pressure', 'circularize', 'geo_radius', 'delta_a_burn', 'plane_change_apo', 'heat_flux', 'coelliptic', 'los_range_rate', 'oberth', 'deorbit', 'mean_motion', 'solar_array', 'rcs_delta_v', 'apo_raise', 'delta_v_budget', 'equal_stage', 'period_to_sma', 'ballistic_drag', 'horizon_range', 'antenna_beamwidth', 'battery', 'angular_diameter', 'diffraction', 'thermal_rad', 'drag_force', 'reaction_wheel', 'along_track', 'ground_track_shift', 'ground_track', 'eclipse_beta', 'hohmann_time', 'orbital_energy', 'true_anomaly', 'flyby_speed', 'nodal_period', 'eccentric_anomaly', 'scale_height', 'rendezvous_catchup', 'impulse_budget', 'sso_period', 'mass_ratio_stack', 'critical_inclination', 'relative_period', 'energy_vinf', 'geo_light_time', 'payload_fraction', 'specific_angular_momentum', 'escape_margin', 'spherical_distance', 'elevation_azimuth', 'vector_angle', 'helio_hohmann', 'patched_conic_depart', 'surface_g_escape', 'orbit_3d', 'isentropic_nozzle', 'characteristic_velocity_cstar', 'throat_area_sizing', 'rocket_thrust_chamber', 'mixture_ratio', 'tank_ullage', 'blowdown_tank', 'propellant_density_impulse', 'cold_gas_thrust', 'ion_thruster_efficiency', 'hall_thruster_isp', 'gnss_pseudorange', 'gnss_geometry_gdop', 'laser_link_budget', 'laser_pointing_jitter', 'laser_time_of_flight', 'impedance_matching', 'antenna_gain_effective', 'doppler_shift_leo', 'radar_equation', 'rain_attenuation_simple', 'ttc_ebno', 'optical_ber_q', 'gnss_troposphere_delay', 'free_fall_time', 'ballistic_range', 'terminal_velocity', 'parachute_descent', 'coordinated_turn_bank', 'slew_rate_pointing', 'magnetic_torque', 'gravity_gradient_torque', 'rw_momentum_capacity', 'sun_sensor_cone', 'star_tracker_noise', 'constellation_walker', 'coverage_swath', 'revisit_time_simple', 'geo_stationkeeping_dv', 'geo_propellant_budget', 'drag_make_up_dv', 'tisserand_parameter', 'eps_orbit_average', 'relativity_clock_rate', 'gnss_ionosphere_klobuchar', 'optical_gsd', 'solar_sail_accel', 'finite_burn_dv', 'b_plane_impact', 'cr3bp_jacobi', 'orbit_lifetime_rough', 'geo_drift_rate', 'stefan_boltzmann', 'wien_peak', 'thruster_impulse_bit', 'arg_perigee_drift_j2', 'sar_azimuth_resolution', 'radar_range_resolution', 'link_margin', 'aerobraking_pass', 'diffraction_limit', 'panel_eol_power', 'magnetorquer_moment', 'hyperbolic_eccentricity', 'capture_circularize', 'gravity_loss', 'battery_dod', 'umbra_length', 'mean_anomaly_from_e', 'flight_path_angle', 'hoop_stress', 'exponential_density', 'hill_sphere', 'edelbaum_dv', 'repeating_ground_track', 'pointing_budget_rss', 'boiloff_rate', 'residual_dipole_torque', 'solar_flux_distance', 'nyquist_rate', 'data_volume', 'earth_ir_flux', 'molniya_tundra', 'frozen_orbit', 'thrust_to_weight', 'planck_radiance', 'eirp_gt', 'quaternion_euler', 'porkchop_earth_mars', 'conjunction_pc', 'b_plane_target', 'quest_attitude', 'herrick_gibbs', 'lunisolar_rates', 'pump_crank', 'schweighart_sedwick', 'bodies', 'units', 'plotter', 'kepler_propagate', 'lambert', 'rv_elements', 'sgp4', 'look_angles', 'pass_predict', 'radiator_net_flux', 'sso_dawn_dusk', 'two_phase_loop', 'radiator_heat_pump', 'odc_power_thermal_sizing', 'cold_plate_dt', 'shield_mass_scaling'] as const
+export const CATALOG_NAMES = ['list_bodies', 'list_mcp_tools', 'circular_orbit', 'hohmann', 'escape_velocity', 'bielliptic', 'plane_change', 'vis_viva', 'apsides', 'rocket_equation', 'multi_stage', 'j2_drift', 'launch_azimuth', 'sso_inclination', 'dynamic_pressure', 'cw_rendezvous', 'link_budget', 'phasing', 'metabolic_load', 'cabin_atmosphere', 'lioh_scrubber', 'cabin_leak', 'thermal_loop', 'custom_body', 'hyperbolic_c3', 'hohmann_plane', 'propellant_mass', 'ideal_thrust', 'sphere_of_influence', 'synodic_period', 'eclipse_duration', 'light_time', 'solar_pressure', 'circularize', 'geo_radius', 'delta_a_burn', 'plane_change_apo', 'heat_flux', 'coelliptic', 'los_range_rate', 'oberth', 'deorbit', 'mean_motion', 'solar_array', 'rcs_delta_v', 'apo_raise', 'delta_v_budget', 'equal_stage', 'period_to_sma', 'ballistic_drag', 'horizon_range', 'antenna_beamwidth', 'battery', 'angular_diameter', 'diffraction', 'thermal_rad', 'drag_force', 'reaction_wheel', 'along_track', 'ground_track_shift', 'ground_track', 'eclipse_beta', 'hohmann_time', 'orbital_energy', 'true_anomaly', 'flyby_speed', 'nodal_period', 'eccentric_anomaly', 'scale_height', 'rendezvous_catchup', 'impulse_budget', 'sso_period', 'mass_ratio_stack', 'critical_inclination', 'relative_period', 'energy_vinf', 'geo_light_time', 'payload_fraction', 'specific_angular_momentum', 'escape_margin', 'spherical_distance', 'elevation_azimuth', 'vector_angle', 'helio_hohmann', 'patched_conic_depart', 'surface_g_escape', 'orbit_3d', 'isentropic_nozzle', 'characteristic_velocity_cstar', 'throat_area_sizing', 'rocket_thrust_chamber', 'mixture_ratio', 'tank_ullage', 'blowdown_tank', 'propellant_density_impulse', 'cold_gas_thrust', 'ion_thruster_efficiency', 'hall_thruster_isp', 'gnss_pseudorange', 'gnss_geometry_gdop', 'laser_link_budget', 'laser_pointing_jitter', 'laser_time_of_flight', 'impedance_matching', 'antenna_gain_effective', 'doppler_shift_leo', 'radar_equation', 'rain_attenuation_simple', 'ttc_ebno', 'optical_ber_q', 'gnss_troposphere_delay', 'free_fall_time', 'ballistic_range', 'terminal_velocity', 'parachute_descent', 'coordinated_turn_bank', 'slew_rate_pointing', 'magnetic_torque', 'gravity_gradient_torque', 'rw_momentum_capacity', 'sun_sensor_cone', 'star_tracker_noise', 'constellation_walker', 'coverage_swath', 'revisit_time_simple', 'geo_stationkeeping_dv', 'geo_propellant_budget', 'drag_make_up_dv', 'tisserand_parameter', 'eps_orbit_average', 'relativity_clock_rate', 'gnss_ionosphere_klobuchar', 'optical_gsd', 'solar_sail_accel', 'finite_burn_dv', 'b_plane_impact', 'cr3bp_jacobi', 'orbit_lifetime_rough', 'geo_drift_rate', 'stefan_boltzmann', 'wien_peak', 'thruster_impulse_bit', 'arg_perigee_drift_j2', 'sar_azimuth_resolution', 'radar_range_resolution', 'link_margin', 'aerobraking_pass', 'diffraction_limit', 'panel_eol_power', 'magnetorquer_moment', 'hyperbolic_eccentricity', 'capture_circularize', 'gravity_loss', 'battery_dod', 'umbra_length', 'mean_anomaly_from_e', 'flight_path_angle', 'hoop_stress', 'exponential_density', 'hill_sphere', 'edelbaum_dv', 'repeating_ground_track', 'pointing_budget_rss', 'boiloff_rate', 'residual_dipole_torque', 'solar_flux_distance', 'nyquist_rate', 'data_volume', 'earth_ir_flux', 'molniya_tundra', 'frozen_orbit', 'thrust_to_weight', 'planck_radiance', 'eirp_gt', 'quaternion_euler', 'porkchop_earth_mars', 'conjunction_pc', 'b_plane_target', 'quest_attitude', 'herrick_gibbs', 'lunisolar_rates', 'pump_crank', 'schweighart_sedwick', 'bodies', 'units', 'plotter', 'kepler_propagate', 'lambert', 'rv_elements', 'sgp4', 'look_angles', 'pass_predict', 'radiator_net_flux', 'sso_dawn_dusk', 'two_phase_loop', 'radiator_heat_pump', 'odc_power_thermal_sizing', 'cold_plate_dt', 'shield_mass_scaling', 'low_thrust_escape', 'dsn_array_gain', 'allan_range_rate'] as const
 
 export const MCP_TOOL_DEFS: McpToolDef[] = [
   {
@@ -3093,6 +3096,43 @@ return { elev_rad: el, slant_m: slant, note: 'Educational; full TLE look-angles 
     run: (args) => {
       const r = shieldMassScaling({ length: args.length_m, width: args.width_m, height: args.height_m, thickness: args.thickness_m, density: args.density_kg_m3, extraArealMass: args.extra_areal_mass_kg_m2, powerDensity: args.power_density_w_m3 })
       return r == null ? null : { surface_area_m2: r.surfaceArea, volume_m3: r.volume, areal_density_kg_m2: r.arealDensity, areal_density_g_cm2: r.arealDensityGcm2, shield_mass_kg: r.shieldMass, power_w: r.power, kg_per_kw: r.kgPerKw }
+    },
+  },
+  {
+    name: "low_thrust_escape",
+    description: "Spiral-to-escape Δv from a circular parking orbit. Continuous tangential thrust to E = 0 is v_circ; impulsive escape is (√2−1) v_circ.",
+    inputSchema: {
+      mu: z.number().optional(),
+      r_m: z.number(),
+    },
+    sample: { r_m: 6_778_137 },
+    run: (args) => {
+      const r = lowThrustEscapeSpiral(args.mu ?? 3.986004418e14, args.r_m)
+      return r == null ? null : { v_circ_m_s: r.vCirc, dv_spiral_m_s: r.dvSpiral, dv_impulsive_m_s: r.dvImpulsive }
+    },
+  },
+  {
+    name: "dsn_array_gain",
+    description: "Coherent SNR gain for N identical antennas. Educational; not a DSN combiner.",
+    inputSchema: {
+      n: z.number(),
+    },
+    sample: { n: 4 },
+    run: (args) => {
+      const g = dsnArraySnrGain(args.n)
+      return g == null ? null : { n: g.n, gain_lin: g.gainLin, gain_db: g.gainDb }
+    },
+  },
+  {
+    name: "allan_range_rate",
+    description: "White-frequency-noise range-rate sigma from Allan deviation. σ_v = √2 c σ_y.",
+    inputSchema: {
+      sigma_y: z.number(),
+    },
+    sample: { sigma_y: 1e-13 },
+    run: (args) => {
+      const s = allanRangeRateSigma(args.sigma_y)
+      return s == null ? null : { sigma_v_m_s: s }
     },
   },
 ]

@@ -403,9 +403,9 @@ export const TOOL_OG: Record<string, ToolOgMeta> = {
     blurb: "Cold-gas thruster force",
   },
   'ion-thruster-efficiency': {
-    formula: "η = T² / (2 ṁ P)",
+    formula: "η = T² / (2 ṁ P)   α = P/m_dry",
     accent: '#e8d5a3',
-    blurb: "Ion thruster efficiency",
+    blurb: "Ion thruster efficiency and α",
   },
   'hall-thruster-isp': {
     formula: "ve = √(2 q V / m_ion) · Isp = ve/g₀",
@@ -448,9 +448,9 @@ export const TOOL_OG: Record<string, ToolOgMeta> = {
     blurb: "Effective aperture from gain",
   },
   'doppler-shift-leo': {
-    formula: "fd = f0 · vr / c",
+    formula: "fd = f0 vr / c   fd2 = 2 fd",
     accent: '#c47a5a',
-    blurb: "Radial Doppler shift",
+    blurb: "One-way and two-way Doppler",
   },
   'radar-equation': {
     formula: "Pr = Pt G² λ² σ / ((4π)³ R⁴)",
@@ -725,7 +725,7 @@ export const TOOL_OG: Record<string, ToolOgMeta> = {
   'edelbaum-dv': {
     formula: "Δv = √(v₁² + v₂² − 2 v₁ v₂ cos(π Δi / 2))",
     accent: '#e8d5a3',
-    blurb: "Low-thrust Edelbaum Δv",
+    blurb: "Edelbaum circular transfer, not spiral-escape",
   },
   'repeating-ground-track': {
     formula: "T = n_days · 86400 / k",
@@ -871,6 +871,21 @@ export const TOOL_OG: Record<string, ToolOgMeta> = {
     formula: 'kg/kW = 6ρt / (p_v L)',
     accent: '#b0b0b0',
     blurb: 'Shield mass per kW vs container size',
+  },
+  'low-thrust-escape': {
+    formula: 'Δv_spiral = √(μ/r)   Δv_imp = (√2−1) v_c',
+    accent: '#e8d5a3',
+    blurb: 'Low-thrust spiral to escape',
+  },
+  'dsn-array-gain': {
+    formula: 'G = N   G_dB = 10 log₁₀ N',
+    accent: '#7a9bb8',
+    blurb: 'Coherent array SNR gain',
+  },
+  'allan-range-rate': {
+    formula: 'σ_v = √2 c σ_y',
+    accent: '#c47a5a',
+    blurb: 'Clock Allan deviation to range-rate',
   },
 }
 
