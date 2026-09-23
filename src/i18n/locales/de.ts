@@ -205,6 +205,8 @@ export const de: TMessages = {
         rf_friis: 'RF Freiraum (Friis)',
         empirical_const: 'Empirisches Konstantenmodell',
         utility: 'Hilfsmittel / Umrechnung',
+        closed_form: 'Geschlossene Berechnung',
+        unclassified: 'Noch nicht klassifiziert',
       },
     },
   },

@@ -204,6 +204,8 @@ export const ko: TMessages = {
         rf_friis: 'RF 자유공간 (Friis)',
         empirical_const: '경험 상수 모델',
         utility: '유틸리티 / 변환',
+        closed_form: '폐형식 계산',
+        unclassified: '아직 분류되지 않음',
       },
     },
   },

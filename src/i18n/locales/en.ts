@@ -201,6 +201,8 @@ export const en = {
         rf_friis: 'RF free-space (Friis)',
         empirical_const: 'Empirical constant model',
         utility: 'Utility / conversion',
+        closed_form: 'Closed-form calculation',
+        unclassified: 'Not yet classified',
       },
     },
   },

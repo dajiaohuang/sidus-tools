@@ -12,6 +12,8 @@ export type PrecisionClass =
   | 'rf-friis'
   | 'empirical-const'
   | 'utility'
+  | 'closed-form'
+  | 'unclassified'
 
 export type ToolPrecision = {
   /** Model / numerical class */
@@ -25,7 +27,7 @@ export type ToolPrecision = {
 }
 
 const IEEE =
-  'IEEE-754 double (~15-16 decimal digits). Results are educational, not flight-certified ephemerides.'
+  'IEEE-754 double (~15-16 decimal digits); floating-point precision alone does not bound input or model error.'
 
 const TWO_BODY: ToolPrecision = {
   modelClass: 'two-body-exact',
@@ -76,6 +78,21 @@ const UTIL: ToolPrecision = {
   referenceHint: 'BIPM SI Brochure',
 }
 
+const CLOSED_FORM: ToolPrecision = {
+  modelClass: 'closed-form',
+  errorClass:
+    'Floating-point error is condition-dependent; an analytic formula does not imply a universal model-accuracy bound.',
+  limits: `Closed-form algebraic relation. Tool-specific assumptions and input domain govern physical validity; this class does not imply orbital dynamics. ${IEEE}`,
+  referenceHint: 'Tool-specific equation and sources listed for the calculator',
+}
+
+const UNCLASSIFIED: ToolPrecision = {
+  modelClass: 'unclassified',
+  errorClass: 'No audited numerical or scientific error bound is available for this tool.',
+  limits: 'Precision metadata is unavailable; do not infer model assumptions from this placeholder.',
+  referenceHint: 'No validated reference assigned',
+}
+
 const SGP4: ToolPrecision = {
   modelClass: 'two-body-series',
   errorClass: 'SGP4/SDP4 vs precise OD: typically km-class after days for LEO TLEs; TEME frame caveats apply.',
@@ -84,14 +101,14 @@ const SGP4: ToolPrecision = {
 }
 
 /** Default when tool id missing */
-export const DEFAULT_PRECISION: ToolPrecision = TWO_BODY
+export const DEFAULT_PRECISION: ToolPrecision = UNCLASSIFIED
 
 /**
  * Explicit precision map. Every live tool id should resolve (test enforces).
  * Unknown ids fall back to DEFAULT_PRECISION.
  */
 export const TOOL_PRECISION: Record<string, ToolPrecision> = {
-  'hoop-stress': TWO_BODY,
+  'hoop-stress': CLOSED_FORM,
   'exponential-density': TWO_BODY,
   'hill-sphere': TWO_BODY,
   'edelbaum-dv': {
@@ -102,19 +119,19 @@ export const TOOL_PRECISION: Record<string, ToolPrecision> = {
     referenceHint: 'Edelbaum 1961; Vallado low-thrust chapter',
   },
   'repeating-ground-track': TWO_BODY,
-  'pointing-budget-rss': TWO_BODY,
+  'pointing-budget-rss': CLOSED_FORM,
   'boiloff-rate': TWO_BODY,
   'residual-dipole-torque': TWO_BODY,
   'solar-flux-distance': TWO_BODY,
-  'nyquist-rate': TWO_BODY,
-  'data-volume': TWO_BODY,
+  'nyquist-rate': CLOSED_FORM,
+  'data-volume': CLOSED_FORM,
   'earth-ir-flux': TWO_BODY,
   'molniya-tundra': J2,
   'frozen-orbit': J2,
   'thrust-to-weight': TWO_BODY,
-  'planck-radiance': TWO_BODY,
+  'planck-radiance': CLOSED_FORM,
   'eirp-gt': TWO_BODY,
-  'quaternion-euler': TWO_BODY,
+  'quaternion-euler': CLOSED_FORM,
   'porkchop-earth-mars': {
     modelClass: 'two-body-exact',
     errorClass:

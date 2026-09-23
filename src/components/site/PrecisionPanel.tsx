@@ -15,6 +15,8 @@ const CLASS_KEY: Record<PrecisionClass, string> = {
   'rf-friis': 'rf_friis',
   'empirical-const': 'empirical_const',
   utility: 'utility',
+  'closed-form': 'closed_form',
+  unclassified: 'unclassified',
 }
 
 /**

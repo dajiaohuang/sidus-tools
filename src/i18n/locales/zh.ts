@@ -201,6 +201,8 @@ export const zh: TMessages = {
         rf_friis: '射频自由空间（Friis）',
         empirical_const: '经验常数模型',
         utility: '工具 / 单位换算',
+        closed_form: '闭式计算',
+        unclassified: '尚未分类',
       },
     },
   },

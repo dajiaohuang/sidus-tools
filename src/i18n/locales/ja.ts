@@ -205,6 +205,8 @@ export const ja: TMessages = {
         rf_friis: 'RF 自由空間（Friis）',
         empirical_const: '経験定数モデル',
         utility: 'ユーティリティ / 換算',
+        closed_form: '閉形式計算',
+        unclassified: '未分類',
       },
     },
   },

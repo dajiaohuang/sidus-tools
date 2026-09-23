@@ -205,6 +205,8 @@ export const es: TMessages = {
         rf_friis: 'RF espacio libre (Friis)',
         empirical_const: 'Modelo de constantes empíricas',
         utility: 'Utilidad / conversión',
+        closed_form: 'Cálculo en forma cerrada',
+        unclassified: 'Sin clasificar todavía',
       },
     },
   },

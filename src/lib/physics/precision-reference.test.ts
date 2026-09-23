@@ -246,4 +246,25 @@ describe('precision metadata coverage', () => {
       expect(p.errorClass.length).toBeGreaterThan(5)
     }
   })
+
+  it('does not describe non-orbital calculations as exact two-body dynamics', () => {
+    const examples = [
+      'hoop-stress',
+      'planck-radiance',
+      'nyquist-rate',
+      'quaternion-euler',
+      'pointing-budget-rss',
+      'data-volume',
+    ]
+
+    for (const id of examples) {
+      const precision = getToolPrecision(id)
+      expect(precision.modelClass, id).toBe('closed-form')
+      expect(precision.limits, id).not.toContain('spherical central mass')
+    }
+  })
+
+  it('does not claim a two-body model for an unknown tool id', () => {
+    expect(getToolPrecision('not-a-real-tool').modelClass).toBe('unclassified')
+  })
 })

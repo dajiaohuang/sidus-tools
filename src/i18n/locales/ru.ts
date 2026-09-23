@@ -205,6 +205,8 @@ export const ru: TMessages = {
         rf_friis: 'РЧ свободное пространство (Friis)',
         empirical_const: 'Эмпирические константы',
         utility: 'Утилита / преобразование',
+        closed_form: 'Расчёт в замкнутой форме',
+        unclassified: 'Пока не классифицировано',
       },
     },
   },
