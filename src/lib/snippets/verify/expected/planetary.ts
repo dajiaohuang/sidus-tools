@@ -52,12 +52,18 @@ export const PLANETARY_EXPECTED: Record<string, ExpectedFn> = {
   'cabin-atmosphere': (bag) => {
     const V = num(bag, 'V')
     const T = num(bag, 'T')
-    const atm = cabinFromMasses(V, T, { o2: num(bag, 'm_O2'), n2: num(bag, 'm_N2'), co2: num(bag, 'm_CO2') })
+    const atm = cabinFromMasses(V, T, {
+      o2: num(bag, 'm_O2'),
+      n2: num(bag, 'm_N2'),
+      co2: num(bag, 'm_CO2'),
+      h2o: num(bag, 'm_H2O'),
+    })
     const out: Record<string, number> = {}
     if (!atm) return out
     put(out, ['P', 'p'], atm.pTotalPa)
     put(out, ['ppO2', 'pp_o2'], atm.ppO2Pa)
     put(out, ['ppCO2', 'pp_co2'], atm.ppCO2Pa)
+    put(out, ['ppH2O', 'pp_h2o'], atm.ppH2OPa)
     put(out, ['ppCO2_mmHg', 'pp_co2_mmhg'], paToMmHg(atm.ppCO2Pa))
     return out
   },
