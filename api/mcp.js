@@ -22426,12 +22426,15 @@ function cabinFromMasses(V, T, masses) {
   };
 }
 function cabinMassesFromComposition(V, T, pTotalPa, dryO2Frac, ppCO2Pa = 0, rh = 0) {
+  if (![V, T, pTotalPa, dryO2Frac, ppCO2Pa, rh].every(Number.isFinite)) return null;
   if (!(V > 0) || !(T > 0) || !(pTotalPa > 0)) return null;
   if (dryO2Frac < 0 || dryO2Frac > 1) return null;
+  if (ppCO2Pa < 0 || rh < 0 || rh > 1) return null;
   const Tc = T - 273.15;
   const pSat = 610.94 * Math.exp(17.625 * Tc / (Tc + 243.04));
-  const ppH2O = Math.min(pTotalPa * 0.5, Math.max(0, rh) * pSat);
-  const pDry = Math.max(0, pTotalPa - ppH2O - Math.max(0, ppCO2Pa));
+  const ppH2O = rh * pSat;
+  const pDry = pTotalPa - ppH2O - ppCO2Pa;
+  if (!(pDry >= 0)) return null;
   const ppO2 = dryO2Frac * pDry;
   const ppN2 = (1 - dryO2Frac) * pDry;
   const n = (p) => p * V / (R_UNIV * T);
@@ -24668,8 +24671,8 @@ var MCP_TOOL_DEFS = [
       temp_k: number2(),
       pressure_pa: number2(),
       dry_o2_frac: number2(),
-      pp_co2_pa: number2(),
-      relative_humidity: number2()
+      pp_co2_pa: number2().min(0),
+      relative_humidity: number2().min(0).max(1)
     },
     sample: { "volume_m3": 100, "temp_k": 293.15, "pressure_pa": 101325, "dry_o2_frac": 0.21, "pp_co2_pa": 400, "relative_humidity": 0.4 },
     run: (args) => {
