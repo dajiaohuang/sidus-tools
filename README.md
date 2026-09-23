@@ -42,7 +42,7 @@ No accounts. No GPU. No affiliation with any space agency or company. **100% ope
 
 ## Why SIDUS
 
-- **~175 pure-SI calculators** — Hohmann, Lambert, SGP4, link budget, cabin atmosphere, rocket equation, and many more.
+- **201 pure-SI calculators** — Hohmann, Lambert, SGP4, link budget, cabin atmosphere, rocket equation, and many more.
 - **Shared UI, zero duplication** — every tool is `ToolShell` + shared field/result components.
 - **10 languages** — English, Italian, German, French, Spanish, Russian, Chinese, Japanese, Korean, Portuguese (space-agency coverage).
 - **Multi-language code export** — C, C++, Rust, Zig, Python, JS/TS, MATLAB, Julia, Fortran, LaTeX.

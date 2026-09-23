@@ -59,7 +59,7 @@ cd sidus-tools && npm install && npm run mcp
 
 ## Catalog highlights
 
-Roughly 175 live calculators. High-traffic domains:
+201 live calculators. High-traffic domains:
 
 - **Orbital** — circular orbit, Hohmann, bielliptic, plane change, vis-viva, Kepler, Lambert, R-V ↔ elements, apsides, SGP4, look angles, pass predict, J2 drift, GEO, deorbit, eclipse, SOI, Oberth
 - **Propulsion** — rocket equation, multi-stage, propellant mass, ideal thrust, nozzles / c*, electric thrusters

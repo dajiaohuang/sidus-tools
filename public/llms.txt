@@ -48,7 +48,7 @@ SIDUS (Latin *sidus* = constellation) is a non-profit educational project with n
 - [Energy -> v_inf / C3](https://sidus.tools/tools/energy-vinf): Specific energy at (r,v) to hyperbolic excess and C3 if unbound.
 - [Escape velocity](https://sidus.tools/tools/escape): Minimum speed to leave the gravitational well from a given radius.
 - [Circular -> escape deltav](https://sidus.tools/tools/escape-margin): deltav from circular speed to local escape (sqrt2-1)v_c.
-- [Flight-path angle](https://sidus.tools/tools/flight-path-angle): tan = e sin nu / (1+e cos nu).
+- [Flight-path angle](https://sidus.tools/tools/flight-path-angle): tan phi = e sin nu / (1+e cos nu).
 - [Flyby periapsis speed](https://sidus.tools/tools/flyby-speed): v_p = sqrt(v_inf2 + v_esc2) at flyby periapsis.
 - [J2/J3 frozen eccentricity](https://sidus.tools/tools/frozen-orbit): First-order frozen eccentricity from J2, J3, SMA and inclination.
 - [GEO drift rate](https://sidus.tools/tools/geo-drift-rate): Longitude drift from a vs a_GEO.
@@ -63,7 +63,7 @@ SIDUS (Latin *sidus* = constellation) is a non-profit educational project with n
 - [Lambert solver](https://sidus.tools/tools/lambert): r1, r2, TOF -> transfer orbit and required deltav (Apollo-inspired targeting).
 - [Launch azimuth](https://sidus.tools/tools/launch-azimuth): Inertial launch azimuth from site latitude to target inclination + Earth-rotation boost.
 - [LOS range & range-rate](https://sidus.tools/tools/los-range-rate): rho and rho from relative position and velocity vectors (RPO / docking sensors class).
-- [Lunisolar averaged rates](https://sidus.tools/tools/lunisolar-rates): Doubly-averaged third-body and omega with optional i, e, plus Kozai .
+- [Lunisolar averaged rates](https://sidus.tools/tools/lunisolar-rates): Doubly-averaged third-body Omega and omega with optional i, e, plus Kozai Theta.
 - [Mean anomaly from E](https://sidus.tools/tools/mean-anomaly-from-e): M=E-e sin E.
 - [Mean motion](https://sidus.tools/tools/mean-motion): n, period and circular speed from altitude: ops cadence baseline.
 - [Molniya / Tundra orbit](https://sidus.tools/tools/molniya-tundra): Critical inclination, period, eccentricity and apogee dwell for HEO class orbits.
@@ -124,12 +124,12 @@ SIDUS (Latin *sidus* = constellation) is a non-profit educational project with n
 
 ### Satellite ops
 - [Allan range-rate sigma](https://sidus.tools/tools/allan-range-rate): White-frequency-noise range-rate sigma_v = sqrt(2) c sigma_y from a clock Allan deviation.
-- [Antenna beamwidth](https://sidus.tools/tools/antenna-beamwidth): Approximate half-power beamwidth ~ k lambda/D for parabolic dishes.
+- [Antenna beamwidth](https://sidus.tools/tools/antenna-beamwidth): Approximate half-power beamwidth theta ~ k lambda/D for parabolic dishes.
 - [Antenna gain and Ae](https://sidus.tools/tools/antenna-gain-effective): Ae=G*lambda^2/(4*pi).
 - [Conjunction collision probability](https://sidus.tools/tools/conjunction-pc): Educational 2-D Chan or Foster Pc from miss, covariance and hard-body radii.
 - [Downlink data volume](https://sidus.tools/tools/data-volume): V=R*T_contact*eta bits.
-- [Diffraction resolution / GSD](https://sidus.tools/tools/diffraction): ~ 1.22 lambda/D and ground sample distance at range.
-- [Diffraction limit angle](https://sidus.tools/tools/diffraction-limit): ~1.22 lambda/D aperture limit.
+- [Diffraction resolution / GSD](https://sidus.tools/tools/diffraction): theta ~ 1.22 lambda/D and ground sample distance at range.
+- [Diffraction limit angle](https://sidus.tools/tools/diffraction-limit): theta~1.22 lambda/D aperture limit.
 - [Doppler shift](https://sidus.tools/tools/doppler-shift-leo): One-way fd = f0 vr/c, two-way 2 fd, and range-rate error from a clock offset.
 - [DSN array SNR gain](https://sidus.tools/tools/dsn-array-gain): Coherent combining of N identical antennas: SNR scales as N (10 log10 N dB).
 - [Eclipse vs beta-angle](https://sidus.tools/tools/eclipse-beta): Eclipse duration vs orbit beta-angle (sun elevation from plane).
@@ -144,7 +144,7 @@ SIDUS (Latin *sidus* = constellation) is a non-profit educational project with n
 - [Ground track](https://sidus.tools/tools/ground-track): Lat/lon samples of a satellite ground track on an equirectangular map (SGP4 or spherical Kepler).
 - [Ground-track shift / rev](https://sidus.tools/tools/ground-track-shift): Earth-rotation longitude shift per orbit and revs/day (no J2).
 - [Horizon slant range](https://sidus.tools/tools/horizon-range): Geometric radio horizon distance from altitude (spherical body, no refraction).
-- [Impedance /VSWR](https://sidus.tools/tools/impedance-matching): Reflection coefficient, VSWR, return loss.
+- [Impedance Gamma/VSWR](https://sidus.tools/tools/impedance-matching): Reflection coefficient, VSWR, return loss.
 - [J2 nodal precession](https://sidus.tools/tools/j2-drift): RAAN drift rate due to Earth oblateness (J2).
 - [Optical link budget](https://sidus.tools/tools/laser-link-budget): Free-space optical Pr with gains and losses.
 - [Laser pointing jitter](https://sidus.tools/tools/laser-pointing-jitter): Spot radius R*theta.
@@ -161,12 +161,12 @@ SIDUS (Latin *sidus* = constellation) is a non-profit educational project with n
 - [Quaternion / Euler 3-2-1](https://sidus.tools/tools/quaternion-euler): Aerospace yaw-pitch-roll, quaternion and DCM of a rotation.
 - [TRIAD / QUEST attitude](https://sidus.tools/tools/quest-attitude): Two-vector TRIAD and Davenport QUEST quaternion.
 - [Radar equation](https://sidus.tools/tools/radar-equation): Monostatic Pr from Pt G lambda RCS range.
-- [Radar range resolution](https://sidus.tools/tools/radar-range-resolution): _r=c/(2 B).
+- [Radar range resolution](https://sidus.tools/tools/radar-range-resolution): delta_r=c/(2 B).
 - [Rain attenuation (toy)](https://sidus.tools/tools/rain-attenuation-simple): A=k R^alpha L educational.
 - [Reaction wheel H / torque](https://sidus.tools/tools/reaction-wheel): Angular momentum H=Iomega and torque T=Ialpha for ADCS sizing class.
 - [Residual dipole torque](https://sidus.tools/tools/residual-dipole-torque): tau=m_res B disturbance.
 - [RW momentum](https://sidus.tools/tools/rw-momentum-capacity): h=I*w.
-- [SAR azimuth resolution](https://sidus.tools/tools/sar-azimuth-resolution): _az~lambda/(2 _syn) educational.
+- [SAR azimuth resolution](https://sidus.tools/tools/sar-azimuth-resolution): delta_az~lambda/(2 theta_syn) educational.
 - [SGP4 / TLE propagate](https://sidus.tools/tools/sgp4): Propagate NORAD TLE with SGP4/SDP4 (via satellite.js, MIT).
 - [Slew time](https://sidus.tools/tools/slew-rate-pointing): Rest-to-rest slew with w_max and a_max.
 - [Solar radiation pressure](https://sidus.tools/tools/solar-pressure): Force and acceleration from SRP: F ~ P0 A C_r (AU/r)2.
@@ -189,7 +189,7 @@ SIDUS (Latin *sidus* = constellation) is a non-profit educational project with n
 - [Vector angle](https://sidus.tools/tools/vector-angle): Angle between two 3D direction vectors: cone angle, boresight, sun aspect teaching.
 
 ### Planetary / interplanetary
-- [B-plane impact parameter](https://sidus.tools/tools/b-plane-impact): b=(mu/vinf2)/tan(/2) educational.
+- [B-plane impact parameter](https://sidus.tools/tools/b-plane-impact): b=(mu/vinf2)/tan(delta/2) educational.
 - [B-plane targeting](https://sidus.tools/tools/b-plane-target): S,T,R triad, impact parameter and B.T / B.R aiming point.
 - [Capture circularize deltav](https://sidus.tools/tools/capture-circularize): deltav=vp_hyp-v_circ at periapsis.
 - [Heliocentric Hohmann](https://sidus.tools/tools/helio-hohmann): Coplanar circular Sun-centered Hohmann between two planetary SMAs: heliocentric deltav, TOF, phase angle, synodic window.
@@ -233,9 +233,9 @@ SIDUS (Latin *sidus* = constellation) is a non-profit educational project with n
 - [Relativistic clock rate](https://sidus.tools/tools/relativity-clock-rate): df/f ~ dPhi/c^2 - v^2/(2c^2).
 - [Exponential atmosphere rho(h)](https://sidus.tools/tools/scale-height): rho = rho0 exp(-h/H) density model.
 - [Shield mass per kW vs container size](https://sidus.tools/tools/shield-mass-scaling): Areal density (density x thickness) in kg/m2 and g/cm2, shield mass and kg per kW of a box; mass per kW scales as 1/L. Geometry only, no dose.
-- [Solar array power](https://sidus.tools/tools/solar-array): Array electrical power P = S0 A cos / r_AU2.
+- [Solar array power](https://sidus.tools/tools/solar-array): Array electrical power P = S0 A costheta / r_AU2.
 - [Solar flux vs distance](https://sidus.tools/tools/solar-flux-distance): S=S0 (1 AU/r)^2.
-- [Stefan-Boltzmann power](https://sidus.tools/tools/stefan-boltzmann): P=eps A T thermal radiation.
+- [Stefan-Boltzmann power](https://sidus.tools/tools/stefan-boltzmann): P=eps sigma A T thermal radiation.
 - [Terminal velocity](https://sidus.tools/tools/terminal-velocity): v=sqrt(2mg/(rho Cd A)).
 - [Two-phase pumped loop](https://sidus.tools/tools/two-phase-loop): Latent-heat mass flow Q/(deltax h_fg) against single-phase Q/(c_p deltaT), volumetric flow and liquid pump power.
 - [Unit converter](https://sidus.tools/tools/units): AU, light-years, parsec, km/s, g and common aerospace units.
@@ -260,4 +260,4 @@ SIDUS (Latin *sidus* = constellation) is a non-profit educational project with n
 - https://github.com/massimodeluisa/sidus-tools/blob/main/docs/IMPLEMENTATION_TODO.md
 - https://github.com/massimodeluisa/sidus-tools/blob/main/AGENTS.md
 
-<!-- generated by scripts/generate-llms-txt.ts - 201 tools - 2026-09-04 -->
+<!-- generated by scripts/generate-llms-txt.ts - 201 tools - 2026-09-23 -->
