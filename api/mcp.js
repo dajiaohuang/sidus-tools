@@ -24151,7 +24151,7 @@ function radiatorHeatPump(i) {
   const copCarnot = i.tColdK / (i.tHotK - i.tColdK);
   let cop;
   if (i.cop != null) {
-    if (!(i.cop > 0)) return null;
+    if (!(i.cop > 0) || i.cop > copCarnot) return null;
     cop = i.cop;
   } else if (i.carnotFraction != null) {
     if (!(i.carnotFraction > 0) || i.carnotFraction > 1) return null;

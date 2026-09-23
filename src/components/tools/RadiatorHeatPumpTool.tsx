@@ -230,20 +230,22 @@ export function RadiatorHeatPumpTool() {
         )
       }
       code={
-        <CodeExport
-          formulaId="radiator-heat-pump"
-          values={{
-            Q,
-            T_c: tcK,
-            T_h: thK,
-            eta_II: res ? res.carnotFraction : p.eta,
-            eps: p.eps,
-            n_sides: sides,
-            q_env: p.qenv,
-            T_base: tBaseK,
-            q_pv: p.qpv,
-          }}
-        />
+        res ? (
+          <CodeExport
+            formulaId="radiator-heat-pump"
+            values={{
+              Q,
+              T_c: tcK,
+              T_h: thK,
+              eta_II: res.carnotFraction,
+              eps: p.eps,
+              n_sides: sides,
+              q_env: p.qenv,
+              T_base: tBaseK,
+              q_pv: p.qpv,
+            }}
+          />
+        ) : null
       }
     />
   )
