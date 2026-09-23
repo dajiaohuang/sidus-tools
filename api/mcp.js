@@ -22754,7 +22754,9 @@ function groundTrackShiftPerOrbit(periodS, omegaEarth = EARTH_ROTATION_RATE) {
   return -omegaEarth * periodS;
 }
 function eclipseWithBeta(a, bodyR, betaRad, periodS) {
-  if (!(a > bodyR) || !(periodS > 0)) return null;
+  if (!(a > bodyR) || !(periodS > 0) || !Number.isFinite(betaRad) || Math.abs(betaRad) > Math.PI / 2) {
+    return null;
+  }
   const cosb = Math.cos(betaRad);
   if (Math.abs(cosb) < 1e-6) return 0;
   const arg = Math.sqrt(1 - (bodyR / a) ** 2) / cosb;
@@ -25297,7 +25299,7 @@ var MCP_TOOL_DEFS = [
     description: "Eclipse with beta angle.",
     inputSchema: {
       a_m: number2(),
-      beta_deg: number2(),
+      beta_deg: number2().min(-90).max(90),
       body_radius_m: number2().optional(),
       mu: number2().optional()
     },

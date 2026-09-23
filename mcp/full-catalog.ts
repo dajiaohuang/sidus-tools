@@ -1104,7 +1104,7 @@ return { beta_kg_m2: beta, dv_per_rev_m_s: dv }
     description: "Eclipse with beta angle.",
     inputSchema: {
     a_m: z.number(),
-    beta_deg: z.number(),
+    beta_deg: z.number().min(-90).max(90),
     body_radius_m: z.number().optional(),
     mu: z.number().optional(),
   },
