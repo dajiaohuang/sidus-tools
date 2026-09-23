@@ -143,6 +143,9 @@ export function elementsToRv(
   const cnu = Math.cos(nu)
   const snu = Math.sin(nu)
   const denom = 1 + e * cnu
+  // A hyperbola occupies only the branch where the conic radius is positive.
+  // A negative denominator is the empty mirrored branch, not a negative radius.
+  if (e >= 1 && !(denom > 0)) return null
   if (Math.abs(denom) < EPS) return null
 
   const r_pqw: Vec3 = [(p * cnu) / denom, (p * snu) / denom, 0]

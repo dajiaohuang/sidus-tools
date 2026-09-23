@@ -91,6 +91,36 @@ describe('Cartesian / classical elements conversion', () => {
     expect(state!.v[1]).toBeCloseTo(v[1], 6)
     expect(state!.v[2]).toBeCloseTo(v[2], 6)
   })
+
+  const hyperbola = { a: -10_000_000, e: 1.5, i: 0, raan: 0, argp: 0 }
+
+  it.each([140, 180, 220])('rejects hyperbolic true anomaly %i outside the physical branch', (nuDeg) => {
+    expect(elementsToRv({ ...hyperbola, nu: (nuDeg * Math.PI) / 180 }, EARTH_MU)).toBeNull()
+  })
+
+  it.each([120, 240])('preserves hyperbolic invariants at valid true anomaly %i deg', (nuDeg) => {
+    const state = elementsToRv(
+      { ...hyperbola, nu: (nuDeg * Math.PI) / 180 },
+      EARTH_MU,
+    )
+    expect(state).not.toBeNull()
+
+    const radius = Math.hypot(...state!.r)
+    const speedSquared = state!.v.reduce((sum, component) => sum + component * component, 0)
+    const energy = speedSquared / 2 - EARTH_MU / radius
+    const h = [
+      state!.r[1] * state!.v[2] - state!.r[2] * state!.v[1],
+      state!.r[2] * state!.v[0] - state!.r[0] * state!.v[2],
+      state!.r[0] * state!.v[1] - state!.r[1] * state!.v[0],
+    ]
+    const hSquared = h.reduce((sum, component) => sum + component * component, 0)
+    const p = Math.abs(hyperbola.a) * (hyperbola.e * hyperbola.e - 1)
+    const expectedEnergy = -EARTH_MU / (2 * hyperbola.a)
+    const expectedHSquared = EARTH_MU * p
+
+    expect(Math.abs(energy - expectedEnergy) / expectedEnergy).toBeLessThan(1e-12)
+    expect(Math.abs(hSquared - expectedHSquared) / expectedHSquared).toBeLessThan(1e-12)
+  })
 })
 
 describe('ECLSS', () => {
