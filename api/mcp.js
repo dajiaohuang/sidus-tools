@@ -21948,6 +21948,7 @@ function lambertSolve(mu2, r1, r2, tof, shortWay = true) {
   let y = 0;
   let C2 = 0.5;
   let S = 1 / 6;
+  let converged = false;
   for (let iter = 0; iter < maxIter; iter++) {
     C2 = stumpffC(z);
     S = stumpffS(z);
@@ -21956,11 +21957,11 @@ function lambertSolve(mu2, r1, r2, tof, shortWay = true) {
       z += 0.1;
       continue;
     }
-    const chi = Math.sqrt(y / C2);
-    const dt = (chi * chi * chi * S + A * Math.sqrt(y)) / Math.sqrt(mu2);
+    const chi2 = Math.sqrt(y / C2);
+    const dt = (chi2 * chi2 * chi2 * S + A * Math.sqrt(y)) / Math.sqrt(mu2);
     let dtdz;
     if (Math.abs(z) > 1e-6) {
-      dtdz = (chi * chi * chi * (0.5 / z) * (C2 - 3 * S / (2 * C2)) + 0.75 * (S / C2) * A * Math.sqrt(y) / C2 + A * (0.5 / Math.sqrt(y))) / Math.sqrt(mu2);
+      dtdz = (chi2 * chi2 * chi2 * (0.5 / z) * (C2 - 3 * S / (2 * C2)) + 0.75 * (S / C2) * A * Math.sqrt(y) / C2 + A * (0.5 / Math.sqrt(y))) / Math.sqrt(mu2);
       const dz2 = 1e-4;
       const Cp = stumpffC(z + dz2);
       const Sp = stumpffS(z + dz2);
@@ -21976,13 +21977,22 @@ function lambertSolve(mu2, r1, r2, tof, shortWay = true) {
     }
     if (!Number.isFinite(dtdz) || Math.abs(dtdz) < 1e-18) break;
     const dz = (tof - dt) / dtdz;
+    if (!Number.isFinite(dz)) break;
     z += dz;
-    if (Math.abs(dz) < tol) break;
+    if (Math.abs(dz) < tol) {
+      converged = true;
+      break;
+    }
   }
+  if (!converged) return null;
   C2 = stumpffC(z);
   S = stumpffS(z);
   y = r1n + r2n + A * (z * S - 1) / Math.sqrt(C2);
   if (!(y > 0)) return null;
+  const chi = Math.sqrt(y / C2);
+  const solvedTof = (chi * chi * chi * S + A * Math.sqrt(y)) / Math.sqrt(mu2);
+  const tofTolerance = Math.max(1e-8, tol * Math.max(1, tof));
+  if (!Number.isFinite(solvedTof) || Math.abs(solvedTof - tof) > tofTolerance) return null;
   const f = 1 - y / r1n;
   const g = A * Math.sqrt(y / mu2);
   const gdot = 1 - y / r2n;
@@ -21999,6 +22009,10 @@ function lambertSolve(mu2, r1, r2, tof, shortWay = true) {
   const v1n = vnorm(v1);
   const energy = v1n * v1n / 2 - mu2 / r1n;
   const a = Math.abs(energy) > 1e-16 ? -mu2 / (2 * energy) : Infinity;
+  if (a > 0) {
+    const period = 2 * Math.PI * Math.sqrt(a * a * a / mu2);
+    if (tof >= period) return null;
+  }
   const hvec = [
     r1[1] * v1[2] - r1[2] * v1[1],
     r1[2] * v1[0] - r1[0] * v1[2],
