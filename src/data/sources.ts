@@ -96,7 +96,7 @@ export const SOURCES: Record<string, SourceRef> = {
     id: 'nasa-std-3001',
     name: 'NASA-STD-3001 (Human Spaceflight standards overview)',
     org: 'NASA',
-    url: 'https://www.nasa.gov/ohp/standards/',
+    url: 'https://www.nasa.gov/ochmo/human-spaceflight-and-aviation-standards/',
     note: 'Human-system standards context (ppO₂ / atmosphere). SIDUS flags are educational. They are not flight-rule substitutes.',
   },
   'nasa-cara': {
@@ -153,7 +153,7 @@ export const SOURCES: Record<string, SourceRef> = {
     id: 'wertz',
     name: 'Space Mission Engineering: The New SMAD',
     org: 'Wertz, Everett, Puschell (eds.)',
-    url: 'https://www.microcosmpress.com/smad/',
+    url: 'https://smad.com/courses/',
     note: 'Mission engineering handbook: RF links, constellations, and ops framing.',
   },
   'space-track': {
