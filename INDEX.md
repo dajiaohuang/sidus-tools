@@ -26,11 +26,9 @@ Site: **https://sidus.tools** · Repo:
 
 | Doc | Purpose |
 |-----|---------|
-| [docs/ENGINEERING_TOOLS_SURVEY.md](./docs/ENGINEERING_TOOLS_SURVEY.md) | Survey of engineering tools |
-| [docs/AGENCY_OPEN_SOURCE_SURVEY.md](./docs/AGENCY_OPEN_SOURCE_SURVEY.md) | Agency open-source landscape |
-| [docs/IMPLEMENTATION_TODO.md](./docs/IMPLEMENTATION_TODO.md) | Implementation backlog |
+| [docs/TOOL_DISCOVERY.md](./docs/TOOL_DISCOVERY.md) | Tool discovery scope and backlog |
 | [docs/OG_IMAGES.md](./docs/OG_IMAGES.md) | Open Graph image pipeline |
-| [docs/godbolt-matrix/](./docs/godbolt-matrix/) | Latest Godbolt compile matrix reports |
+| `docs/godbolt-matrix/` (CI artifact) | Latest Godbolt compile matrix reports |
 | [src/lib/snippets/QUALITY.md](./src/lib/snippets/QUALITY.md) | Multi-lang snippet quality standard |
 | [src/lib/physics/golden/README.md](./src/lib/physics/golden/README.md) | Golden physics cases |
 | [mcp/README.md](./mcp/README.md) | MCP server (public URL + stdio) |
