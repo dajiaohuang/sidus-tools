@@ -32,11 +32,6 @@ export function isentropicNozzle(opts: {
   const Me2 = (2 / gm1) * ((pe_pc) ** (-gm1 / g) - 1)
   if (!(Me2 > 0)) return null
   const Me = Math.sqrt(Me2)
-  const term =
-    ((g + 1) / 2) ** (-(g + 1) / (2 * gm1)) *
-    (1 / pe_pc) ** (1 / g) *
-    (1 / Me) *
-    (1 + (gm1 / 2) * Me2) ** ((g + 1) / (2 * gm1))
   // Standard Ae/At formula:
   // Ae/At = (1/Me) * [(1 + (γ-1)/2 Me²)/((γ+1)/2)]^((γ+1)/(2(γ-1)))
   const areaRatio =
@@ -53,8 +48,7 @@ export function isentropicNozzle(opts: {
         Math.pow(2 / (g + 1), (g + 1) / gm1) *
         (1 - pe_pc ** (gm1 / g)),
     ) +
-    (pe_pc === 0 ? 0 : 0) // pe/pc * Ae/At term omitted when pe=0; caller may add
-  void term
+    pe_pc * areaRatio
   return { areaRatio, Me, cfIdeal: Number.isFinite(cfIdeal) ? cfIdeal : 0 }
 }
 
