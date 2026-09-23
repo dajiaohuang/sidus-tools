@@ -38,6 +38,13 @@ function asciiSafe(s: string): string {
     .replace(/\u03c1/g, 'rho') // ρ
     .replace(/\u03bb/g, 'lambda') // λ
     .replace(/\u03b2/g, 'beta') // β
+    .replace(/\u03b8/g, 'theta') // θ
+    .replace(/\u03b4/g, 'delta') // δ
+    .replace(/\u03c3/g, 'sigma') // σ
+    .replace(/\u03c6|\u03d5/g, 'phi') // φ / ϕ
+    .replace(/\u0393/g, 'Gamma') // Γ
+    .replace(/\u03a9/g, 'Omega') // Ω
+    .replace(/\u0398/g, 'Theta') // Θ
     .replace(/\u03bd/g, 'nu') // ν
     .replace(/\u03c9/g, 'omega') // ω
     .replace(/\u03b5/g, 'eps') // ε
