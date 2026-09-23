@@ -1,12 +1,12 @@
 import type { FormulaSnippet } from './types'
 
 /**
- * Dynamic pressure + ISA troposphere (educational 0-11 km core).
+ * Dynamic pressure + ISA troposphere (educational 0-11 km geometric-altitude core).
  * Formula fragments only (wrapAsRunnable adds main / includes / live inputs).
  * Matches DynamicPressureTool + lib/physics/atmosphere.ts (troposphere branch).
  * Free vars: h [m], v [m/s].
  */
-const A = 'ISA troposphere educational core; q = ½ ρ v²; perfect gas air. SI.'
+const A = 'ISA troposphere core; geometric h → geopotential H = h R_E/(R_E+h); q = ½ ρ v²; perfect-gas air. SI.'
 
 export const dynamicPressureSnippets: FormulaSnippet = {
   formulaId: 'dynamic-pressure',
@@ -19,7 +19,9 @@ P0 = 101325.0
 L = 0.0065
 g0 = 9.80665
 R = 287.05287
-T = T0 - L * h
+RE = 6356660.0
+H = h * RE / (RE + h)
+T = T0 - L * H
 p = P0 * (T / T0) ** (g0 / (L * R))
 rho = p / (R * T)
 a = math.sqrt(1.4 * R * T)
@@ -28,7 +30,9 @@ M = v / a`,
 
     javascript: `// Dynamic pressure + ISA troposphere: ${A}
 const T0 = 288.15, P0 = 101325, L = 0.0065, g0 = 9.80665, R = 287.05287
-const T = T0 - L * h
+const RE = 6356660
+const H = h * RE / (RE + h)
+const T = T0 - L * H
 const p = P0 * (T / T0) ** (g0 / (L * R))
 const rho = p / (R * T)
 const a = Math.sqrt(1.4 * R * T)
@@ -41,7 +45,9 @@ const P0: number = 101325
 const L: number = 0.0065
 const g0: number = 9.80665
 const Rair: number = 287.05287
-const T: number = T0 - L * h
+const RE: number = 6356660
+const H: number = h * RE / (RE + h)
+const T: number = T0 - L * H
 const p: number = P0 * (T / T0) ** (g0 / (L * Rair))
 const rho: number = p / (Rair * T)
 const a: number = Math.sqrt(1.4 * Rair * T)
@@ -54,7 +60,9 @@ const double P0 = 101325.0;
 const double L = 0.0065;
 const double g0 = 9.80665;
 const double R = 287.05287;
-const double T = T0 - L * h;
+const double RE = 6356660.0;
+const double H = h * RE / (RE + h);
+const double T = T0 - L * H;
 const double p = P0 * pow(T / T0, g0 / (L * R));
 const double rho = p / (R * T);
 const double a = sqrt(1.4 * R * T);
@@ -67,7 +75,9 @@ const double P0 = 101325.0;
 const double L = 0.0065;
 const double g0 = 9.80665;
 const double R = 287.05287;
-const double T = T0 - L * h;
+const double RE = 6356660.0;
+const double H = h * RE / (RE + h);
+const double T = T0 - L * H;
 const double p = P0 * std::pow(T / T0, g0 / (L * R));
 const double rho = p / (R * T);
 const double a = std::sqrt(1.4 * R * T);
@@ -80,7 +90,9 @@ let p0 = 101325.0_f64;
 let lapse = 0.0065_f64;
 let g0 = 9.80665_f64;
 let r_air = 287.05287_f64;
-let t = t0 - lapse * h;
+let r_e = 6_356_660.0_f64;
+let h_geo = h * r_e / (r_e + h);
+let t = t0 - lapse * h_geo;
 let p = p0 * (t / t0).powf(g0 / (lapse * r_air));
 let rho = p / (r_air * t);
 let a = (1.4 * r_air * t).sqrt();
@@ -93,7 +105,9 @@ const P0: f64 = 101325.0;
 const L: f64 = 0.0065;
 const g0: f64 = 9.80665;
 const R: f64 = 287.05287;
-const T = T0 - L * h;
+const RE: f64 = 6356660.0;
+const H = h * RE / (RE + h);
+const T = T0 - L * H;
 const p = P0 * std.math.pow(f64, T / T0, g0 / (L * R));
 const rho = p / (R * T);
 const a = std.math.sqrt(1.4 * R * T);
@@ -106,7 +120,9 @@ P0 = 101325.0d0
 L = 0.0065d0
 g0 = 9.80665d0
 R = 287.05287d0
-T = T0 - L * h
+RE = 6356660.0d0
+H = h * RE / (RE + h)
+T = T0 - L * H
 p = P0 * (T / T0)**(g0 / (L * R))
 rho = p / (R * T)
 a = sqrt(1.4d0 * R * T)
@@ -119,7 +135,9 @@ P0 = 101325;
 L = 0.0065;
 g0 = 9.80665;
 R = 287.05287;
-T = T0 - L * h;
+RE = 6356660;
+H = h * RE / (RE + h);
+T = T0 - L * H;
 p = P0 * (T / T0)^(g0 / (L * R));
 rho = p / (R * T);
 a = sqrt(1.4 * R * T);
@@ -132,7 +150,9 @@ P0 = 101325.0
 L = 0.0065
 g0 = 9.80665
 R = 287.05287
-T = T0 - L * h
+RE = 6356660.0
+H = h * RE / (RE + h)
+T = T0 - L * H
 p = P0 * (T / T0)^(g0 / (L * R))
 rho = p / (R * T)
 a = sqrt(1.4 * R * T)
@@ -144,7 +164,8 @@ M = v / a`,
   q=\\tfrac12\\rho v^{2},\\quad
   M=v/a,\\quad
   a=\\sqrt{\\gamma R T},\\quad
-  T=T_{0}-L h
+  H=h R_E/(R_E+h),\quad
+  T=T_{0}-L H
 \\]`,
   },
 }

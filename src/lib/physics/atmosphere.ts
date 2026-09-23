@@ -8,6 +8,8 @@ export const ISA_L = 0.0065 // K/m troposphere lapse
 export const ISA_G0 = 9.80665
 export const ISA_R_AIR = 287.05287 // J/(kg·K)
 export const ISA_GAMMA = 1.4
+// U.S. Standard Atmosphere 1976 geopotential conversion radius (NASA/TM-2005-213659 A.1).
+const ISA_GEOPOTENTIAL_RADIUS_M = 6_356_660
 
 export type IsaLayer = {
   h: number // geometric altitude m
@@ -24,28 +26,29 @@ export type IsaLayer = {
  */
 export function isaAtmosphere(h: number): IsaLayer | null {
   if (!Number.isFinite(h) || h < 0 || h > 32_000) return null
+  const H = (h * ISA_GEOPOTENTIAL_RADIUS_M) / (h + ISA_GEOPOTENTIAL_RADIUS_M)
 
   let T: number
   let p: number
   let layer: IsaLayer['layer']
 
-  if (h <= 11_000) {
+  if (H <= 11_000) {
     layer = 'troposphere'
-    T = ISA_T0 - ISA_L * h
+    T = ISA_T0 - ISA_L * H
     p = ISA_P0 * (T / ISA_T0) ** (ISA_G0 / (ISA_L * ISA_R_AIR))
-  } else if (h <= 20_000) {
+  } else if (H <= 20_000) {
     layer = 'tropopause'
     const T11 = ISA_T0 - ISA_L * 11_000
     const p11 = ISA_P0 * (T11 / ISA_T0) ** (ISA_G0 / (ISA_L * ISA_R_AIR))
     T = T11
-    p = p11 * Math.exp((-ISA_G0 * (h - 11_000)) / (ISA_R_AIR * T11))
+    p = p11 * Math.exp((-ISA_G0 * (H - 11_000)) / (ISA_R_AIR * T11))
   } else {
     layer = 'stratosphere'
     const T11 = ISA_T0 - ISA_L * 11_000
     const p11 = ISA_P0 * (T11 / ISA_T0) ** (ISA_G0 / (ISA_L * ISA_R_AIR))
     const p20 = p11 * Math.exp((-ISA_G0 * (20_000 - 11_000)) / (ISA_R_AIR * T11))
     // ISA 20-32 km: T increases at +1 K/km from 216.65 K
-    T = 216.65 + 0.001 * (h - 20_000)
+    T = 216.65 + 0.001 * (H - 20_000)
     p = p20 * (T / 216.65) ** (-ISA_G0 / (0.001 * ISA_R_AIR))
   }
 

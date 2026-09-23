@@ -22159,27 +22159,29 @@ var ISA_L = 65e-4;
 var ISA_G0 = 9.80665;
 var ISA_R_AIR = 287.05287;
 var ISA_GAMMA = 1.4;
+var ISA_GEOPOTENTIAL_RADIUS_M = 6356660;
 function isaAtmosphere(h) {
   if (!Number.isFinite(h) || h < 0 || h > 32e3) return null;
+  const H = h * ISA_GEOPOTENTIAL_RADIUS_M / (h + ISA_GEOPOTENTIAL_RADIUS_M);
   let T;
   let p;
   let layer;
-  if (h <= 11e3) {
+  if (H <= 11e3) {
     layer = "troposphere";
-    T = ISA_T0 - ISA_L * h;
+    T = ISA_T0 - ISA_L * H;
     p = ISA_P0 * (T / ISA_T0) ** (ISA_G0 / (ISA_L * ISA_R_AIR));
-  } else if (h <= 2e4) {
+  } else if (H <= 2e4) {
     layer = "tropopause";
     const T11 = ISA_T0 - ISA_L * 11e3;
     const p11 = ISA_P0 * (T11 / ISA_T0) ** (ISA_G0 / (ISA_L * ISA_R_AIR));
     T = T11;
-    p = p11 * Math.exp(-ISA_G0 * (h - 11e3) / (ISA_R_AIR * T11));
+    p = p11 * Math.exp(-ISA_G0 * (H - 11e3) / (ISA_R_AIR * T11));
   } else {
     layer = "stratosphere";
     const T11 = ISA_T0 - ISA_L * 11e3;
     const p11 = ISA_P0 * (T11 / ISA_T0) ** (ISA_G0 / (ISA_L * ISA_R_AIR));
     const p20 = p11 * Math.exp(-ISA_G0 * (2e4 - 11e3) / (ISA_R_AIR * T11));
-    T = 216.65 + 1e-3 * (h - 2e4);
+    T = 216.65 + 1e-3 * (H - 2e4);
     p = p20 * (T / 216.65) ** (-ISA_G0 / (1e-3 * ISA_R_AIR));
   }
   const rho = p / (ISA_R_AIR * T);
