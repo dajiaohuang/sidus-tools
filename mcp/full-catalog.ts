@@ -488,8 +488,8 @@ return cwTwoImpulseToOrigin(n, { x: args.x0_m, y: args.y0_m, z: args.z0_m }, arg
     temp_k: z.number(),
     pressure_pa: z.number(),
     dry_o2_frac: z.number(),
-    pp_co2_pa: z.number(),
-    relative_humidity: z.number(),
+    pp_co2_pa: z.number().min(0),
+    relative_humidity: z.number().min(0).max(1),
   },
     sample: {"volume_m3":100,"temp_k":293.15,"pressure_pa":101325,"dry_o2_frac":0.21,"pp_co2_pa":400,"relative_humidity":0.4},
     run: (args) => {

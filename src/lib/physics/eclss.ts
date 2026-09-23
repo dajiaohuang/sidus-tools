@@ -167,13 +167,16 @@ export function cabinMassesFromComposition(
   ppCO2Pa = 0,
   rh = 0,
 ): { o2: number; n2: number; co2: number; h2o: number } | null {
+  if (![V, T, pTotalPa, dryO2Frac, ppCO2Pa, rh].every(Number.isFinite)) return null
   if (!(V > 0) || !(T > 0) || !(pTotalPa > 0)) return null
   if (dryO2Frac < 0 || dryO2Frac > 1) return null
+  if (ppCO2Pa < 0 || rh < 0 || rh > 1) return null
   // Saturation vapor pressure water (Tetens, Pa)
   const Tc = T - 273.15
   const pSat = 610.94 * Math.exp((17.625 * Tc) / (Tc + 243.04))
-  const ppH2O = Math.min(pTotalPa * 0.5, Math.max(0, rh) * pSat)
-  const pDry = Math.max(0, pTotalPa - ppH2O - Math.max(0, ppCO2Pa))
+  const ppH2O = rh * pSat
+  const pDry = pTotalPa - ppH2O - ppCO2Pa
+  if (!(pDry >= 0)) return null
   const ppO2 = dryO2Frac * pDry
   const ppN2 = (1 - dryO2Frac) * pDry
   const n = (p: number) => (p * V) / (R_UNIV * T)
