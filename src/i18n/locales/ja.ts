@@ -1119,6 +1119,7 @@ export const ja: TMessages = {
     invalid_array_inputs: 'アレイ入力が無効です。',
     invalid_battery_inputs: 'バッテリ入力が無効です。',
     invalid_cabin_inputs: 'キャビン入力が無効です。',
+    error_cabin_o2_depleted: '代謝はシミュレートされません。選択した活動時間と乗員数に対してキャビン内の O₂ が不足しています。',
     invalid_drag_inputs: '抗力入力が無効です。',
     invalid_thrust_inputs: '推力入力が無効です。',
     invalid_thermal_inputs: '熱入力が無効です。',

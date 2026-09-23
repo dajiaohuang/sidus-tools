@@ -1113,6 +1113,7 @@ export const zh: TMessages = {
     invalid_array_inputs: '阵列输入无效。',
     invalid_battery_inputs: '电池输入无效。',
     invalid_cabin_inputs: '座舱输入无效。',
+    error_cabin_o2_depleted: '未模拟代谢：座舱氧气不足，无法支持所选活动时长和乘员数。',
     invalid_drag_inputs: '阻力输入无效。',
     invalid_thrust_inputs: '推力输入无效。',
     invalid_thermal_inputs: '热控输入无效。',

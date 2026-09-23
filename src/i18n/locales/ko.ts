@@ -1118,6 +1118,7 @@ export const ko: TMessages = {
     invalid_array_inputs: '어레이 입력이 잘못되었습니다.',
     invalid_battery_inputs: '배터리 입력이 잘못되었습니다.',
     invalid_cabin_inputs: '캐빈 입력이 잘못되었습니다.',
+    error_cabin_o2_depleted: '대사를 시뮬레이션하지 않았습니다. 선택한 활동 시간과 승무원 수에 비해 객실 O₂가 부족합니다.',
     invalid_drag_inputs: '항력 입력이 잘못되었습니다.',
     invalid_thrust_inputs: '추력 입력이 잘못되었습니다.',
     invalid_thermal_inputs: '열 입력이 잘못되었습니다.',

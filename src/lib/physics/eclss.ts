@@ -196,8 +196,9 @@ export function applyMetabolism(
 ): { masses: typeof masses; atm: CabinAtmosphere } | null {
   const b = metabolicBudget(activity, durationS, crew)
   if (!b) return null
+  if (b.o2Kg > masses.o2) return null
   const next = {
-    o2: Math.max(0, masses.o2 - b.o2Kg),
+    o2: masses.o2 - b.o2Kg,
     n2: masses.n2,
     co2: masses.co2 + b.co2Kg,
     h2o: masses.h2o + b.h2oKg,
