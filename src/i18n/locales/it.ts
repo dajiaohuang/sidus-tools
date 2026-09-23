@@ -1119,6 +1119,7 @@ export const it: TMessages = {
     invalid_array_inputs: 'Input array non validi.',
     invalid_battery_inputs: 'Input batteria non validi.',
     invalid_cabin_inputs: 'Input cabina non validi.',
+    error_cabin_o2_depleted: 'Metabolismo non simulato: l’O₂ in cabina non è sufficiente per l’attività e la durata selezionate.',
     invalid_drag_inputs: 'Input drag non validi.',
     invalid_thrust_inputs: 'Input spinta non validi.',
     invalid_thermal_inputs: 'Input termici non validi.',

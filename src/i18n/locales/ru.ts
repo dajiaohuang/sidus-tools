@@ -1119,6 +1119,7 @@ export const ru: TMessages = {
     invalid_array_inputs: 'Недопустимые параметры панели.',
     invalid_battery_inputs: 'Недопустимые параметры батареи.',
     invalid_cabin_inputs: 'Недопустимые параметры кабины.',
+    error_cabin_o2_depleted: 'Метаболизм не смоделирован: в кабине недостаточно O₂ для выбранной активности и длительности.',
     invalid_drag_inputs: 'Недопустимые параметры сопротивления.',
     invalid_thrust_inputs: 'Недопустимые параметры тяги.',
     invalid_thermal_inputs: 'Недопустимые тепловые параметры.',

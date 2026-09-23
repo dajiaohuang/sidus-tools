@@ -12,6 +12,7 @@ import {
   atmosphereFlags,
   cabinFromMasses,
   cabinMassesFromComposition,
+  metabolicBudget,
   METABOLIC_RATES,
   type MetabolicActivity,
   TOOL_UNIT_SETS,
@@ -55,6 +56,8 @@ export function CabinAtmosphereTool() {
     if (p.activity !== 'none' && p.crew > 0 && hoursS > 0) {
       const act = p.activity as MetabolicActivity
       if (act in METABOLIC_RATES) {
+        const budget = metabolicBudget(act, hoursS, p.crew)
+        if (budget && budget.o2Kg > masses0.o2) return { error: 'oxygen-depleted' as const }
         const step = applyMetabolism(V, T, masses0, act, hoursS, p.crew)
         if (step) {
           masses = step.masses
@@ -62,7 +65,7 @@ export function CabinAtmosphereTool() {
             crew: p.crew,
             activity: t(`fields.activity_${act}`),
           })
-        }
+        } else return null
       }
     }
     const atm = cabinFromMasses(V, T, masses)
@@ -173,6 +176,8 @@ export function CabinAtmosphereTool() {
       results={
         !res ? (
           <p className="font-mono text-sm text-muted">{t('fields.invalid_cabin_inputs')}</p>
+        ) : 'error' in res ? (
+          <p className="font-mono text-sm text-muted">{t('fields.error_cabin_o2_depleted')}</p>
         ) : (
           <div className="space-y-3">
             <p className="font-mono text-[11px] text-muted">{res.note}</p>

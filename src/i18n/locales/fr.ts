@@ -1119,6 +1119,7 @@ export const fr: TMessages = {
     invalid_array_inputs: 'Entrées panneau invalides.',
     invalid_battery_inputs: 'Entrées batterie invalides.',
     invalid_cabin_inputs: 'Entrées cabine invalides.',
+    error_cabin_o2_depleted: 'Métabolisme non simulé : l’O₂ disponible dans la cabine ne suffit pas pour l’activité et la durée sélectionnées.',
     invalid_drag_inputs: 'Entrées traînée invalides.',
     invalid_thrust_inputs: 'Entrées poussée invalides.',
     invalid_thermal_inputs: 'Entrées thermiques invalides.',

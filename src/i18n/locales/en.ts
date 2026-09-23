@@ -1119,6 +1119,7 @@ export const en = {
     invalid_array_inputs: 'Invalid array inputs.',
     invalid_battery_inputs: 'Invalid battery inputs.',
     invalid_cabin_inputs: 'Invalid cabin inputs.',
+    error_cabin_o2_depleted: 'Metabolism not simulated: insufficient cabin O₂ for the selected crew activity and duration.',
     invalid_drag_inputs: 'Invalid drag inputs.',
     invalid_thrust_inputs: 'Invalid thrust inputs.',
     invalid_thermal_inputs: 'Invalid thermal inputs.',
