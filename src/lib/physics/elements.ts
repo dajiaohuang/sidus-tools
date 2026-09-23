@@ -97,6 +97,10 @@ export function rvToElements(r: Vec3, v: Vec3, mu: number): ClassicalElements | 
       if (r[2] < 0) nu = TWO_PI - nu
     } else {
       nu = Math.atan2(r[1], r[0])
+      // For an equatorial retrograde orbit, i = π makes the PQW y-axis
+      // point toward -y in the inertial frame. Mirror the longitude so the
+      // elements round-trip to the original Cartesian state.
+      if (hvec[2] < 0) nu = -nu
       if (nu < 0) nu += TWO_PI
     }
   }

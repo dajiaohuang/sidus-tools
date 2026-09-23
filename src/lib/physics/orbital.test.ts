@@ -3,11 +3,13 @@ import {
   EARTH_MU,
   EARTH_RADIUS,
   circularOrbitVelocity,
+  elementsToRv,
   hohmannTransfer,
   j2RaanRate,
   multiStageDeltaV,
   orbitalPeriod,
   planeChangeDeltaV,
+  rvToElements,
   visViva,
 } from './index'
 
@@ -70,6 +72,24 @@ describe('multi-stage', () => {
     expect(r).not.toBeNull()
     expect(r!.dv.length).toBe(2)
     expect(r!.dvTotal).toBeCloseTo(r!.dv[0] + r!.dv[1], 10)
+  })
+})
+
+describe('Cartesian / classical elements conversion', () => {
+  it('round-trips an equatorial retrograde circular state', () => {
+    const radius = 7_000_000
+    const r = [0, radius, 0] as [number, number, number]
+    const v = [circularOrbitVelocity(EARTH_MU, radius), 0, 0] as [number, number, number]
+    const elements = rvToElements(r, v, EARTH_MU)
+    expect(elements).not.toBeNull()
+    const state = elementsToRv(elements!, EARTH_MU)
+    expect(state).not.toBeNull()
+    expect(state!.r[0]).toBeCloseTo(r[0], 6)
+    expect(state!.r[1]).toBeCloseTo(r[1], 6)
+    expect(state!.r[2]).toBeCloseTo(r[2], 6)
+    expect(state!.v[0]).toBeCloseTo(v[0], 6)
+    expect(state!.v[1]).toBeCloseTo(v[1], 6)
+    expect(state!.v[2]).toBeCloseTo(v[2], 6)
   })
 })
 
