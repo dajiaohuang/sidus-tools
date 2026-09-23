@@ -23182,10 +23182,6 @@ function radarReceivedPower(opts) {
   const pr = pt * g * g * lam * lam * rcs / ((4 * Math.PI) ** 3 * R ** 4);
   return Number.isFinite(pr) && pr > 0 ? pr : null;
 }
-function ebN0FromCn0(cn0Hz, bitRate) {
-  if (!(cn0Hz > 0) || !(bitRate > 0)) return null;
-  return cn0Hz / bitRate;
-}
 function freeFallTimeConstG(h, g = G0) {
   if (!(h > 0) || !(g > 0)) return null;
   return Math.sqrt(2 * h / g);
@@ -24547,8 +24543,8 @@ var MCP_TOOL_DEFS = [
       const i = args.i_deg * Math.PI / 180;
       const j22 = 0.00108262668;
       return {
-        raan_rate_rad_s: j2RaanRate(EARTH_MU, EARTH_RADIUS, j22, args.a_m, args.e, i),
-        argp_rate_rad_s: j2ArgpRate(EARTH_MU, EARTH_RADIUS, j22, args.a_m, args.e, i)
+        raan_rate_rad_s: j2RaanRate(EARTH_MU, args.a_m, args.e, i, j22, EARTH_RADIUS),
+        argp_rate_rad_s: j2ArgpRate(EARTH_MU, args.a_m, args.e, i, j22, EARTH_RADIUS)
       };
     }
   },
@@ -24705,7 +24701,7 @@ var MCP_TOOL_DEFS = [
     },
     sample: { "volume_m3": 100, "p0_pa": 101325, "p_final_pa": 7e4, "hole_area_m2": 1e-4, "temp_k": 293.15 },
     run: (args) => {
-      const t = leakDepressTime(args.volume_m3, args.p0_pa, args.p_final_pa, args.hole_area_m2, args.temp_k);
+      const t = leakDepressTime(args.volume_m3, args.hole_area_m2, args.p0_pa, args.p_final_pa, args.temp_k);
       return t == null ? null : { t_s: t };
     }
   },
@@ -24719,7 +24715,7 @@ var MCP_TOOL_DEFS = [
     },
     sample: { "heat_w": 5e3, "dT_k": 10 },
     run: (args) => {
-      const mdot = coolantMassFlow(args.heat_w, args.cp_j_kg_k ?? 4180, args.dT_k);
+      const mdot = coolantMassFlow(args.heat_w, args.dT_k, args.cp_j_kg_k ?? 4180);
       return mdot == null ? null : { mdot_kg_s: mdot };
     }
   },
@@ -24836,7 +24832,7 @@ var MCP_TOOL_DEFS = [
     },
     sample: { "a_m": 6778137 },
     run: (args) => {
-      return circularEclipseDuration(args.mu ?? EARTH_MU, args.a_m, args.body_radius_m ?? EARTH_RADIUS);
+      return circularEclipseDuration(args.a_m, args.body_radius_m ?? EARTH_RADIUS, args.mu ?? EARTH_MU);
     }
   },
   {
@@ -24863,7 +24859,7 @@ var MCP_TOOL_DEFS = [
     run: (args) => {
       return {
         force_n: solarRadiationForce(args.area_m2, args.cr, args.r_au),
-        accel_m_s2: solarRadiationAccel(args.area_m2, args.mass_kg, args.cr, args.r_au)
+        accel_m_s2: solarRadiationAccel(args.mass_kg, args.area_m2, args.cr, args.r_au)
       };
     }
   },
@@ -24902,7 +24898,9 @@ var MCP_TOOL_DEFS = [
     },
     sample: { "a_m": 6778137, "dv_m_s": 1 },
     run: (args) => {
-      const da = deltaAFromTangentialDv(args.mu ?? EARTH_MU, args.a_m, args.dv_m_s);
+      const mu2 = args.mu ?? EARTH_MU;
+      const v = circularOrbitVelocity(mu2, args.a_m);
+      const da = deltaAFromTangentialDv(args.a_m, v, args.dv_m_s);
       return da == null ? null : { da_m: da };
     }
   },
@@ -24951,10 +24949,9 @@ var MCP_TOOL_DEFS = [
     },
     sample: { "a_m": 6778137, "delta_a_m": -5e3, "phase_gain_deg": 10 },
     run: (args) => {
-      const n = cwMeanMotion(args.mu ?? EARTH_MU, args.a_m);
-      if (n == null) return null;
-      const drift = coellipticDrift(n, args.a_m, args.delta_a_m);
-      const t = timeForPhaseGain(drift?.nRel ?? 0, args.phase_gain_deg * Math.PI / 180);
+      const drift = coellipticDrift(args.mu ?? EARTH_MU, args.a_m, args.delta_a_m);
+      if (!drift) return null;
+      const t = timeForPhaseGain(drift.nRel, args.phase_gain_deg * Math.PI / 180);
       return { ...drift, t_phase_s: t };
     }
   },
@@ -25011,8 +25008,8 @@ var MCP_TOOL_DEFS = [
     },
     sample: { "altitude_m": 4e5 },
     run: (args) => {
-      const n = meanMotionFromAltitude(args.mu ?? EARTH_MU, args.body_radius_m ?? EARTH_RADIUS, args.altitude_m);
-      return n == null ? null : { n_rad_s: n };
+      const motion = meanMotionFromAltitude(args.altitude_m, args.mu ?? EARTH_MU, args.body_radius_m ?? EARTH_RADIUS);
+      return motion == null ? null : { n_rad_s: motion.n, period_s: motion.period, velocity_m_s: motion.v };
     }
   },
   {
@@ -25026,7 +25023,7 @@ var MCP_TOOL_DEFS = [
     },
     sample: { "area_m2": 5, "eta": 0.3, "incidence_deg": 0, "r_au": 1 },
     run: (args) => {
-      const p = solarArrayPower(args.area_m2, args.eta, args.incidence_deg * Math.PI / 180, args.r_au);
+      const p = solarArrayPower(args.area_m2, args.eta, args.incidence_deg, args.r_au);
       return p == null ? null : { p_w: p };
     }
   },
@@ -25121,7 +25118,7 @@ var MCP_TOOL_DEFS = [
     },
     sample: { "altitude_m": 4e5 },
     run: (args) => {
-      const s = horizonSlantRange(args.body_radius_m ?? EARTH_RADIUS, args.altitude_m);
+      const s = horizonSlantRange(args.altitude_m, args.body_radius_m ?? EARTH_RADIUS);
       return s == null ? null : { slant_m: s };
     }
   },
@@ -25135,7 +25132,7 @@ var MCP_TOOL_DEFS = [
     },
     sample: { "diameter_m": 1, "freq_hz": 12e9 },
     run: (args) => {
-      const bw = antennaBeamwidth(args.diameter_m, args.freq_hz, args.k);
+      const bw = antennaBeamwidth(args.freq_hz, args.diameter_m, args.k);
       return bw == null ? null : { beamwidth_rad: bw };
     }
   },
@@ -25166,7 +25163,7 @@ var MCP_TOOL_DEFS = [
     },
     sample: { "diameter_m": 6378137, "distance_m": 6778137 },
     run: (args) => {
-      const a = angularDiameter(args.diameter_m, args.distance_m);
+      const a = angularDiameter(args.diameter_m / 2, args.distance_m);
       return a == null ? null : { angle_rad: a };
     }
   },
@@ -25179,8 +25176,8 @@ var MCP_TOOL_DEFS = [
     },
     sample: { "wavelength_m": 5e-7, "diameter_m": 0.3 },
     run: (args) => {
-      const r = diffractionResolution(args.wavelength_m, args.diameter_m);
-      return r == null ? null : { theta_rad: r };
+      const r = diffractionResolution(C / args.wavelength_m, args.diameter_m);
+      return r == null ? null : { theta_rad: r.thetaRad };
     }
   },
   {
@@ -25305,7 +25302,9 @@ var MCP_TOOL_DEFS = [
     },
     sample: { "a_m": 6778137, "beta_deg": 20 },
     run: (args) => {
-      return eclipseWithBeta(args.mu ?? EARTH_MU, args.a_m, args.body_radius_m ?? EARTH_RADIUS, args.beta_deg * Math.PI / 180);
+      const mu2 = args.mu ?? EARTH_MU;
+      const period = orbitalPeriod(mu2, args.a_m);
+      return eclipseWithBeta(args.a_m, args.body_radius_m ?? EARTH_RADIUS, args.beta_deg * Math.PI / 180, period);
     }
   },
   {
@@ -25393,7 +25392,7 @@ var MCP_TOOL_DEFS = [
     sample: { "e": 0.1, "E_deg": 30 },
     run: (args) => {
       const E = args.E_deg * Math.PI / 180;
-      const M = meanAnomalyFromE(args.e, E);
+      const M = meanAnomalyFromE(E, args.e);
       return M == null ? null : { M_rad: M };
     }
   },
@@ -25407,7 +25406,7 @@ var MCP_TOOL_DEFS = [
     },
     sample: { "h_m": 4e5, "rho0_kg_m3": 1.225, "H_m": 8500 },
     run: (args) => {
-      const rho = exponentialDensity(args.rho0_kg_m3, args.h_m, args.H_m);
+      const rho = exponentialDensity(args.h_m, args.rho0_kg_m3, args.H_m);
       return rho == null ? null : { rho_kg_m3: rho };
     }
   },
@@ -25619,7 +25618,7 @@ var MCP_TOOL_DEFS = [
     },
     sample: { "r1_m": 1496e8, "r2_m": 2279e8 },
     run: (args) => {
-      return heliocentricHohmann(args.mu_sun ?? 13271244e13, args.r1_m, args.r2_m);
+      return heliocentricHohmann(args.r1_m, args.r2_m, args.mu_sun ?? SUN_MU);
     }
   },
   {
@@ -25840,7 +25839,7 @@ var MCP_TOOL_DEFS = [
     },
     sample: { "dt_s": 0.07, "clock_bias_s": 1e-6 },
     run: (args) => {
-      return { rho_m: gnssPseudorange(args.dt_s, args.clock_bias_s ?? 0) };
+      return { rho_m: gnssPseudorange(0, args.dt_s, args.clock_bias_s ?? 0) };
     }
   },
   {
@@ -25990,7 +25989,7 @@ var MCP_TOOL_DEFS = [
     },
     sample: { "k": 0.01, "rate_mm_h": 10, "alpha": 1, "path_km": 5 },
     run: (args) => {
-      const a = rainAttenuationDb(args.k, args.rate_mm_h, args.alpha, args.path_km);
+      const a = rainAttenuationDb(args.rate_mm_h, args.path_km, args.k, args.alpha);
       return a == null ? null : { atten_db: a };
     }
   },
@@ -26003,8 +26002,8 @@ var MCP_TOOL_DEFS = [
     },
     sample: { "cn0_dbhz": 55, "rb_bps": 1e6 },
     run: (args) => {
-      const e = ebN0FromCn0(args.cn0_dbhz, args.rb_bps);
-      return e == null ? null : { eb_n0_db: e };
+      if (!(args.rb_bps > 0) || !Number.isFinite(args.cn0_dbhz)) return null;
+      return { eb_n0_db: args.cn0_dbhz - 10 * Math.log10(args.rb_bps) };
     }
   },
   {
@@ -26071,7 +26070,7 @@ var MCP_TOOL_DEFS = [
     },
     sample: { "mass_kg": 80, "rho_kg_m3": 1.225, "cd": 1, "area_m2": 0.7 },
     run: (args) => {
-      const v = terminalVelocity(args.mass_kg, args.rho_kg_m3, args.cd, args.area_m2, args.g ?? 9.80665);
+      const v = terminalVelocity(args.mass_kg, args.cd, args.area_m2, args.rho_kg_m3, args.g ?? 9.80665);
       return v == null ? null : { v_m_s: v };
     }
   },
@@ -26087,7 +26086,7 @@ var MCP_TOOL_DEFS = [
     },
     sample: { "mass_kg": 100, "rho_kg_m3": 1.225, "cd": 1.5, "area_m2": 30 },
     run: (args) => {
-      const v = terminalVelocity(args.mass_kg, args.rho_kg_m3, args.cd, args.area_m2, args.g ?? 9.80665);
+      const v = terminalVelocity(args.mass_kg, args.cd, args.area_m2, args.rho_kg_m3, args.g ?? 9.80665);
       return v == null ? null : { v_m_s: v };
     }
   },
@@ -26353,7 +26352,7 @@ var MCP_TOOL_DEFS = [
     },
     sample: { "eta": 0.9, "area_m2": 100, "mass_kg": 10, "flux_w_m2": 1361 },
     run: (args) => {
-      const a = solarSailAccel(args.eta, args.flux_w_m2 ?? 1361, args.area_m2, args.mass_kg);
+      const a = solarSailAccel(args.flux_w_m2 ?? 1361, args.area_m2, args.mass_kg, args.eta);
       return a == null ? null : { a_m_s2: a };
     }
   },
@@ -26416,7 +26415,7 @@ var MCP_TOOL_DEFS = [
     },
     sample: { "h_m": 4e5, "beta_kg_m2": 100, "rho_kg_m3": 2e-12, "v_m_s": 7660, "scale_h_m": 5e4 },
     run: (args) => {
-      const t = orbitLifetimeRough(args.h_m, args.beta_kg_m2, args.rho_kg_m3, args.v_m_s, args.scale_h_m);
+      const t = orbitLifetimeRough(args.rho_kg_m3, args.beta_kg_m2, args.v_m_s, args.scale_h_m ?? 5e4, EARTH_RADIUS + args.h_m);
       return t == null ? null : { t_s: t };
     }
   },
@@ -26663,7 +26662,7 @@ var MCP_TOOL_DEFS = [
     },
     sample: { "e": 0.1, "E_rad": 0.5 },
     run: (args) => {
-      const M = meanAnomalyFromE(args.e, args.E_rad);
+      const M = meanAnomalyFromE(args.E_rad, args.e);
       return M == null ? null : { M_rad: M };
     }
   },
@@ -26704,7 +26703,7 @@ var MCP_TOOL_DEFS = [
     },
     sample: { "rho0": 1.225, "h_m": 4e5, "H_m": 8500 },
     run: (args) => {
-      const rho = exponentialDensity(args.rho0, args.h_m, args.H_m);
+      const rho = exponentialDensity(args.h_m, args.rho0, args.H_m);
       return rho == null ? null : { rho_kg_m3: rho };
     }
   },
@@ -26798,7 +26797,7 @@ var MCP_TOOL_DEFS = [
     },
     sample: { "r_au": 1.5 },
     run: (args) => {
-      const f = solarFluxAtDistance(args.r_au, args.s0);
+      const f = solarFluxAtDistance(args.r_au * AU, args.s0);
       return f == null ? null : { flux_w_m2: f };
     }
   },
