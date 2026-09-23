@@ -70,9 +70,10 @@ export function CabinAtmosphereTool() {
     return { masses, atm, note, flags: atmosphereFlags(atm) }
   }, [T, V, hoursS, p.activity, p.crew, p.o2frac, p.rh, pTotal, ppco2Pa, t])
 
-  // Snippet free vars (m_O2/m_N2/m_CO2) must stay present even when `res` is
-  // null (invalid inputs): recompute from the base composition unconditionally.
+  // Keep snippet inputs available for invalid states, but prefer the exact
+  // post-metabolism masses represented by the visible result when it exists.
   const massesForCode = cabinMassesFromComposition(V, T, pTotal, p.o2frac, ppco2Pa, p.rh)
+  const snippetMasses = res?.masses ?? massesForCode ?? { o2: 0, n2: 0, co2: 0, h2o: 0 }
 
   return (
     <ToolShell
@@ -249,7 +250,29 @@ export function CabinAtmosphereTool() {
           </div>
         )
       }
-      code={<CodeExport formulaId="cabin-atmosphere" values={{ V, T, pTotal, ppco2Pa, hoursS, p: p.p, o2frac: p.o2frac, ppco2: p.ppco2, rh: p.rh, crew: p.crew, hours: p.hours, activity: p.activity, m_O2: massesForCode?.o2 ?? 0, m_N2: massesForCode?.n2 ?? 0, m_CO2: massesForCode?.co2 ?? 0 }} />}
+      code={
+        <CodeExport
+          formulaId="cabin-atmosphere"
+          values={{
+            V,
+            T,
+            pTotal,
+            ppco2Pa,
+            hoursS,
+            p: p.p,
+            o2frac: p.o2frac,
+            ppco2: p.ppco2,
+            rh: p.rh,
+            crew: p.crew,
+            hours: p.hours,
+            activity: p.activity,
+            m_O2: snippetMasses.o2,
+            m_N2: snippetMasses.n2,
+            m_CO2: snippetMasses.co2,
+            m_H2O: snippetMasses.h2o,
+          }}
+        />
+      }
     />
   )
 }

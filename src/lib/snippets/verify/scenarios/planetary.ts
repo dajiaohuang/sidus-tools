@@ -20,19 +20,33 @@ export const PLANETARY_SCENARIOS: Record<string, Scenario[]> = {
         'NASA-cited ISS habitable volume ~388 m^3, nominal 101.3 kPa (14.7 psi) total pressure, ' +
         '22C (295.15 K), ~21% O2 dry mole fraction, ppCO2 ~3 mmHg (within ISS nominal CO2 band), ' +
         '~40% RH (ISS target range); masses derived via ideal-gas cabinMassesFromComposition.',
-      bag: { V: 388, T: 295.15, m_O2: 106.1036319179339, m_N2: 349.45425818186703, m_CO2: 2.7831024669207673 },
+      bag: { V: 388, T: 295.15, m_O2: 106.1036319179339, m_N2: 349.45425818186703, m_CO2: 2.7831024669207673, m_H2O: 3.0061775729040208 },
     },
     {
       name: 'dragon-class-cabin',
       source:
         'SpaceX Crew Dragon public pressurized-volume spec ~9.3 m^3, sea-level-equivalent 101.3 kPa, ' +
         '22C, 21% O2 dry, ppCO2 ~2 mmHg, 40% RH; masses derived via ideal-gas cabinMassesFromComposition.',
-      bag: { V: 9.3, T: 295.15, m_O2: 2.5466006897201425, m_N2: 8.387276088719515, m_CO2: 0.04447225591471329 },
+      bag: { V: 9.3, T: 295.15, m_O2: 2.5466006897201425, m_N2: 8.387276088719515, m_CO2: 0.04447225591471329, m_H2O: 0.07205528718558607 },
     },
     {
       name: 'synthetic',
-      source: 'adversarial synthetic: distinct non-round V/T/gas masses',
-      bag: { V: 13.457, T: 289.4, m_O2: 4.031871715547959, m_N2: 11.49086093055162, m_CO2: 0.15063237766027243 },
+      source: 'adversarial synthetic: distinct non-round V/T and nonzero masses for all four cabin gases',
+      bag: { V: 13.457, T: 289.4, m_O2: 4.031871715547959, m_N2: 11.49086093055162, m_CO2: 0.15063237766027243, m_H2O: 0.123 },
+    },
+    {
+      name: 'post-nominal-metabolism-default',
+      source:
+        'Default CabinAtmosphereTool composition after 8 h nominal metabolism for 3 crew; mass vector independently ' +
+        'computed with applyMetabolism and cabinMassesFromComposition to verify that snippets accept the displayed state.',
+      bag: {
+        V: 10,
+        T: 295.15,
+        m_O2: 1.9203603115270353,
+        m_N2: 9.018576439483349,
+        m_CO2: 1.0846196300158206,
+        m_H2O: 0.6534788034253615,
+      },
     },
   ],
 

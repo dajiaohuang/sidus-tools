@@ -223,6 +223,7 @@ export const SAMPLE: LiveCodeValues = {
   m_CO2: 1,
   m_O2: 1,
   m_N2: 1,
+  m_H2O: 1,
   m_lioh: 1,
   mCO2: 1,
   mO2: 1,
