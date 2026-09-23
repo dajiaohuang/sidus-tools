@@ -10,6 +10,8 @@ export const M_N2 = 0.028014
 export const M_H2O = 0.018015
 /** LiOH molar mass kg/mol */
 export const M_LIOH = 0.02395
+/** Stoichiometric maximum: one CO2 molecule per two LiOH molecules [kg/kg]. */
+export const LIOH_THEORETICAL_CO2_CAPACITY = M_CO2 / (2 * M_LIOH)
 /**
  * Practical CO2 capacity of LiOH canisters (kg CO2 / kg LiOH).
  * Stoichiometry 2 LiOH + CO2 → Li2CO3 + H2O ⇒ 0.919 kg/kg theoretical;
@@ -216,7 +218,15 @@ export function liohDuration(
   co2RateKgS: number,
   capacity = LIOH_CO2_CAPACITY,
 ): { capacityKg: number; durationS: number } | null {
-  if (!(mLiohKg > 0) || !(co2RateKgS > 0) || !(capacity > 0)) return null
+  if (
+    !(mLiohKg > 0) ||
+    !(co2RateKgS > 0) ||
+    !(capacity > 0) ||
+    !Number.isFinite(mLiohKg) ||
+    !Number.isFinite(co2RateKgS) ||
+    !Number.isFinite(capacity) ||
+    capacity > LIOH_THEORETICAL_CO2_CAPACITY
+  ) return null
   const capacityKg = mLiohKg * capacity
   return { capacityKg, durationS: capacityKg / co2RateKgS }
 }
@@ -224,7 +234,14 @@ export function liohDuration(
 /**
  * Stoichiometric LiOH mass for a given CO2 mass (theoretical + practical).
  */
-export function liohForCo2(co2Kg: number, capacity = LIOH_CO2_CAPACITY): number {
+export function liohForCo2(co2Kg: number, capacity = LIOH_CO2_CAPACITY): number | null {
+  if (
+    !(co2Kg >= 0) ||
+    !(capacity > 0) ||
+    !Number.isFinite(co2Kg) ||
+    !Number.isFinite(capacity) ||
+    capacity > LIOH_THEORETICAL_CO2_CAPACITY
+  ) return null
   return co2Kg / capacity
 }
 

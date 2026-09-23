@@ -22345,6 +22345,8 @@ var M_O2 = 0.031998;
 var M_CO2 = 0.04401;
 var M_N2 = 0.028014;
 var M_H2O = 0.018015;
+var M_LIOH = 0.02395;
+var LIOH_THEORETICAL_CO2_CAPACITY = M_CO2 / (2 * M_LIOH);
 var LIOH_CO2_CAPACITY = 0.85;
 var METABOLIC_RATES = {
   // 3.60e-4 kg/min O2, 4.55e-4 CO2
@@ -22443,7 +22445,7 @@ function cabinMassesFromComposition(V, T, pTotalPa, dryO2Frac, ppCO2Pa = 0, rh =
   };
 }
 function liohDuration(mLiohKg, co2RateKgS, capacity = LIOH_CO2_CAPACITY) {
-  if (!(mLiohKg > 0) || !(co2RateKgS > 0) || !(capacity > 0)) return null;
+  if (!(mLiohKg > 0) || !(co2RateKgS > 0) || !(capacity > 0) || !Number.isFinite(mLiohKg) || !Number.isFinite(co2RateKgS) || !Number.isFinite(capacity) || capacity > LIOH_THEORETICAL_CO2_CAPACITY) return null;
   const capacityKg = mLiohKg * capacity;
   return { capacityKg, durationS: capacityKg / co2RateKgS };
 }
@@ -24684,7 +24686,7 @@ var MCP_TOOL_DEFS = [
     inputSchema: {
       lioh_kg: number2(),
       co2_rate_kg_s: number2(),
-      capacity: number2().optional()
+      capacity: number2().positive().max(LIOH_THEORETICAL_CO2_CAPACITY).optional()
     },
     sample: { "lioh_kg": 2, "co2_rate_kg_s": 4e-5 },
     run: (args) => {
