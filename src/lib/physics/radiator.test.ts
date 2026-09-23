@@ -133,6 +133,15 @@ describe('radiatorHeatPump', () => {
     rel(r!.cop, 2.31382, 1e-5)
   })
 
+  it('rejects direct COP above the Carnot limit but allows the reversible limit', () => {
+    const copCarnot = ICES.tColdK / (ICES.tHotK - ICES.tColdK)
+    const atLimit = radiatorHeatPump({ ...ICES, cop: copCarnot })
+    expect(atLimit).not.toBeNull()
+    rel(atLimit!.carnotFraction, 1, 1e-12)
+    expect(radiatorHeatPump({ ...ICES, cop: copCarnot * (1 + 1e-12) })).toBeNull()
+    expect(radiatorHeatPump({ ...ICES, cop: 8 })).toBeNull()
+  })
+
   it('patent algebra: 10 kW at COP 1.85 rejects 15.405 kW', () => {
     const r = radiatorHeatPump({ q: 10_000, tColdK: 300, tHotK: 375, cop: 1.85, emissivity: 0.85 })
     rel(r!.qRej, 15405.4, 1e-5)
