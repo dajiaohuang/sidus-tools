@@ -11,8 +11,9 @@ Authorship and numeric verification are separate claims. The authorship
 claim above (hand-written, idiomatic, pure SI) holds for every tool and
 every `CodeLang` key. The numeric verification claim, that a snippet's
 printed output matches shipped `src/lib/physics`, holds only for the
-tools listed in
-[docs/verify-matrix/report.md](../../../docs/verify-matrix/report.md).
+tools listed in the generated verification report from
+`npx tsx scripts/verify-snippets.ts --require-all --out=docs/verify-matrix`.
+The report is a CI artifact and is intentionally not committed to the repository.
 A tool without expected values there is never described as passing.
 
 LaTeX snippets are display-math fragments, not standalone documents. CI
