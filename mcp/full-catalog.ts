@@ -35,6 +35,7 @@ import {
   cabinFromMasses,
   cabinMassesFromComposition,
   liohDuration,
+  LIOH_THEORETICAL_CO2_CAPACITY,
   leakDepressTime,
   coolantMassFlow,
   muFromMass,
@@ -503,7 +504,7 @@ if (!masses) return null; return cabinFromMasses(args.volume_m3, args.temp_k, ma
     inputSchema: {
     lioh_kg: z.number(),
     co2_rate_kg_s: z.number(),
-    capacity: z.number().optional(),
+    capacity: z.number().positive().max(LIOH_THEORETICAL_CO2_CAPACITY).optional(),
   },
     sample: {"lioh_kg":2,"co2_rate_kg_s":0.00004},
     run: (args) => {
