@@ -27239,12 +27239,16 @@ var MCP_TOOL_DEFS = [
     name: "sgp4",
     description: "Mean motion from TLE mean-motion revs/day (not full SGP4 prop).",
     inputSchema: {
-      n_rev_day: number2()
+      n_rev_day: number2().positive()
     },
     sample: { "n_rev_day": 15.5 },
     run: (args) => {
-      const n = args.n_rev_day * 2 * Math.PI / 86400;
-      return { n_rad_s: n, period_s: 2 * Math.PI / n, note: "Use UI SGP4 tool for full TLE propagation" };
+      const nRevDay = args.n_rev_day;
+      if (typeof nRevDay !== "number" || !Number.isFinite(nRevDay) || nRevDay <= 0) return null;
+      const n = nRevDay / 86400 * (2 * Math.PI);
+      const period = 86400 / nRevDay;
+      if (!Number.isFinite(n) || n <= 0 || !Number.isFinite(period) || period <= 0) return null;
+      return { n_rad_s: n, period_s: period, note: "Use UI SGP4 tool for full TLE propagation" };
     }
   },
   {
