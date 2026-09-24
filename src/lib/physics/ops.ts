@@ -166,7 +166,7 @@ export function equalStageMassRatio(
   ispS: number,
   g0 = 9.80665,
 ): { dvStage: number; massRatio: number; ve: number } | null {
-  if (!(totalDv > 0) || !(nStages >= 1) || !(ispS > 0)) return null
+  if (!(totalDv >= 0) || !(nStages >= 1) || !(ispS > 0) || !(g0 > 0)) return null
   const ve = ispS * g0
   const dvStage = totalDv / nStages
   return { dvStage, massRatio: Math.exp(dvStage / ve), ve }
