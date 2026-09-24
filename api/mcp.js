@@ -22573,13 +22573,18 @@ function hohmannWithPlaneChange(mu2, r1, r2, deltaIRad) {
   };
 }
 function circularizeBurn(mu2, a, e, at) {
-  if (!(a > 0) || e < 0 || e >= 1) return null;
+  if (!Number.isFinite(mu2) || !(mu2 > 0) || !Number.isFinite(a) || !(a > 0) || !Number.isFinite(e) || e < 0 || e >= 1 || at !== "peri" && at !== "apo") return null;
   const rp = a * (1 - e);
   const ra = a * (1 + e);
   const r = at === "peri" ? rp : ra;
+  if (!Number.isFinite(r) || !(r > 0)) return null;
   const vEll = visViva(mu2, r, a);
   const vCirc = circularOrbitVelocity(mu2, r);
-  return { r, vEll, vCirc, dv: Math.abs(vEll - vCirc) };
+  const dv = Math.abs(vEll - vCirc);
+  if (!Number.isFinite(vEll) || !(vEll > 0) || !Number.isFinite(vCirc) || !(vCirc > 0) || !Number.isFinite(dv)) {
+    return null;
+  }
+  return { r, vEll, vCirc, dv };
 }
 function geoRadius(mu2, periodS = 86164.0905) {
   if (!(mu2 > 0) || !(periodS > 0)) return null;
@@ -24869,14 +24874,15 @@ var MCP_TOOL_DEFS = [
     name: "circularize",
     description: "Circularize burn at apo or peri.",
     inputSchema: {
-      a_m: number2(),
-      e: number2(),
-      at: string2(),
-      mu: number2().optional()
+      a_m: number2().finite().positive(),
+      e: number2().finite().min(0).lt(1),
+      at: _enum(["peri", "apo"]),
+      mu: number2().finite().positive().optional()
     },
     sample: { "a_m": 75e5, "e": 0.1, "at": "apo" },
     run: (args) => {
-      return circularizeBurn(args.mu ?? EARTH_MU, args.a_m, args.e, args.at === "peri" ? "peri" : "apo");
+      if (args.at !== "peri" && args.at !== "apo") return null;
+      return circularizeBurn(args.mu === void 0 ? EARTH_MU : args.mu, args.a_m, args.e, args.at);
     }
   },
   {

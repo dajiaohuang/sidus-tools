@@ -683,14 +683,15 @@ return { c3_m2_s2: c3, v_p_m_s: vp, e: hyperbolicEccentricity(mu, args.r_m, args
     name: "circularize",
     description: "Circularize burn at apo or peri.",
     inputSchema: {
-    a_m: z.number(),
-    e: z.number(),
-    at: z.string(),
-    mu: z.number().optional(),
+    a_m: z.number().finite().positive(),
+    e: z.number().finite().min(0).lt(1),
+    at: z.enum(['peri', 'apo']),
+    mu: z.number().finite().positive().optional(),
   },
     sample: {"a_m":7500000,"e":0.1,"at":"apo"},
     run: (args) => {
-      return circularizeBurn(args.mu ?? EARTH_MU, args.a_m, args.e, args.at === 'peri' ? 'peri' : 'apo')
+      if (args.at !== 'peri' && args.at !== 'apo') return null
+      return circularizeBurn(args.mu === undefined ? EARTH_MU : args.mu, args.a_m, args.e, args.at)
     },
   },
   {
