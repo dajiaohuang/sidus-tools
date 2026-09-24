@@ -21578,7 +21578,8 @@ var BODIES = [
   { id: "saturn", name: "Saturn", mu: 37931187e9, radius: 58232e3, mass: 56834e22, color: "#d4c4a0", type: "planet" },
   { id: "uranus", name: "Uranus", mu: 5793939e9, radius: 25362e3, mass: 8681e22, color: "#9ec4c8", type: "planet" },
   { id: "neptune", name: "Neptune", mu: 6836529e9, radius: 24622e3, mass: 102413e21, color: "#5a7ab0", type: "planet" },
-  { id: "pluto", name: "Pluto", mu: 871e9, radius: 1188300, mass: 1303e19, color: "#b8a898", type: "dwarf" }
+  // JPL PLU060 Pluto-body GM: 869.3 ± 0.4 km³/s² (not Pluto-system GM).
+  { id: "pluto", name: "Pluto", mu: 8693e8, radius: 1188300, mass: 1303e19, color: "#b8a898", type: "dwarf" }
 ];
 function getBody(id) {
   return BODIES.find((b) => b.id === id) ?? BODIES.find((b) => b.id === "earth");
