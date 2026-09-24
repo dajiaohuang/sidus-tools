@@ -18,6 +18,32 @@ describe('live code values', () => {
     expect(formatCodeNumber(400)).toBe('400')
     expect(formatCodeNumber(3.986004418e14)).toMatch(/e14$/i)
     expect(formatCodeNumber(0.0000123)).toMatch(/e-/i)
+
+    const roundTripValues = [0.9999999999999, 0.9999999999999999, 0.3333333333333333, 3.986004418e14, 0.0000123, Number.MIN_VALUE]
+    for (const value of roundTripValues) {
+      expect(Number(formatCodeNumber(value))).toBe(value)
+    }
+    expect(formatCodeNumber(0.9999999999999)).toBe('0.9999999999999')
+    expect(Object.is(Number(formatCodeNumber(-0)), -0)).toBe(true)
+  })
+
+  it('preserves near-boundary values in generated language inputs', () => {
+    const eccentricity = 0.9999999999999
+    const executableLanguages = [
+      'python',
+      'javascript',
+      'typescript',
+      'c',
+      'cpp',
+      'rust',
+      'zig',
+      'matlab',
+      'julia',
+      'fortran',
+    ] as const
+    for (const lang of executableLanguages) {
+      expect(liveValuesPreamble(lang, { e: eccentricity })).toContain('0.9999999999999')
+    }
   })
 
   it('builds python preamble from live values', () => {
