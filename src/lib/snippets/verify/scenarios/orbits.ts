@@ -6,6 +6,34 @@
 import type { Scenario } from '../inputs'
 
 export const ORBITS_SCENARIOS: Record<string, Scenario[]> = {
+  'rv-elements-inverse': [
+    {
+      name: 'inclined-ellipse',
+      source: 'synthetic non-circular elliptic state; exercises all three Euler rotations',
+      bag: {
+        mu: 3.986004418e14, a: 9_000_000, e: 0.4,
+        i: Math.PI / 6, raan: 40 * Math.PI / 180,
+        argp: 20 * Math.PI / 180, nu: Math.PI / 4,
+      },
+    },
+    {
+      name: 'near-circular-retrograde',
+      source: 'synthetic near-circular retrograde elliptic elements; exercises i>90 degrees and small e',
+      bag: {
+        mu: 3.986004418e14, a: 7_000_000, e: 1e-4,
+        i: 120 * Math.PI / 180, raan: 70 * Math.PI / 180,
+        argp: 15 * Math.PI / 180, nu: 210 * Math.PI / 180,
+      },
+    },
+    {
+      name: 'physical-hyperbola',
+      source: 'synthetic hyperbola with a<0, e>1, and positive physical-branch radius denominator',
+      bag: {
+        mu: 3.986004418e14, a: -10_000_000, e: 1.5,
+        i: 0.7, raan: 1.1, argp: 0.5, nu: 2 * Math.PI / 3,
+      },
+    },
+  ],
   'circular-orbit': [
     {
       name: 'iss',

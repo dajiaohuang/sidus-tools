@@ -56,9 +56,7 @@ def rv_to_elements(r, v, mu):
     return dict(a=a, e=e, i=i, raan=raan, argp=argp, nu=nu, h=h, energy=energy)
 
 def elements_to_rv(a, e, i, raan, argp, nu, mu):
-    p = a * (1 - e*e) if e < 1 else a * (e*e - 1)  # ellipse / hyperbola
-    if e < 1:
-        p = a * (1 - e*e)
+    p = a * (1 - e*e) if e < 1 else abs(a) * (e*e - 1)  # ellipse / hyperbola
     r_pf = p / (1 + e*np.cos(nu))
     r_w = np.array([r_pf*np.cos(nu), r_pf*np.sin(nu), 0.0])
     v_w = np.sqrt(mu/p) * np.array([-np.sin(nu), e + np.cos(nu), 0.0])

@@ -4,7 +4,7 @@ import type { CodeLang } from '../types'
 import { EXPECTED } from './expected'
 import { put } from './expected/shared'
 import { asInjected, inputBagFor } from './inputs'
-import { compareResults, printedKeyVariants, resolvePrintedValue } from '../../../../scripts/verify-snippets'
+import { compareResults, parsePrinted, printedKeyVariants, resolvePrintedValue } from '../../../../scripts/verify-snippets'
 
 /**
  * Guards the comparison-completeness bug: the render path (`wrapAsRunnable` →
@@ -32,6 +32,15 @@ function preFixResolve(key: string, lang: CodeLang, printed: Map<string, number>
 }
 
 describe('comparison-completeness: canonicalized EXPECTED keys', () => {
+  it('parses Windows CRLF output lines emitted by Python subprocesses', () => {
+    expect(parsePrinted('rx_out = -123.5\r\nvy_out = 4.25\r\n')).toEqual(
+      new Map([
+        ['rx_out', -123.5],
+        ['vy_out', 4.25],
+      ]),
+    )
+  })
+
   it('hall-thruster-isp and isentropic-nozzle EXPECTED both key a result "Isp" (the real regression case)', () => {
     const hallKeys = Object.keys(EXPECTED['hall-thruster-isp']!(asInjected(inputBagFor('hall-thruster-isp')) as Record<string, number | string>))
     const nozzleKeys = Object.keys(
