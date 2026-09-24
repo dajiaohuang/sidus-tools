@@ -444,7 +444,7 @@ return cwTwoImpulseToOrigin(n, { x: args.x0_m, y: args.y0_m, z: args.z0_m }, arg
     gr_dbi: z.number(),
     freq_hz: z.number(),
     range_m: z.number(),
-    other_loss_db: z.number().optional(),
+    other_loss_db: z.number().min(0).finite().optional(),
     t_sys_k: z.number().optional(),
     required_cn0_dbhz: z.number().optional(),
   },

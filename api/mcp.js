@@ -22288,6 +22288,7 @@ function linkBudget(input) {
   const { ptW, gtDbi, grDbi, freqHz, rangeM } = input;
   if (!(ptW > 0) || !(freqHz > 0) || !(rangeM > 0)) return null;
   const other = input.otherLossDb ?? 0;
+  if (!Number.isFinite(other) || other < 0) return null;
   const freqMHz = freqHz / 1e6;
   const rangeKm = rangeM / 1e3;
   const lfs = freeSpacePathLossDb(rangeKm, freqMHz);
@@ -24616,7 +24617,7 @@ var MCP_TOOL_DEFS = [
       gr_dbi: number2(),
       freq_hz: number2(),
       range_m: number2(),
-      other_loss_db: number2().optional(),
+      other_loss_db: number2().min(0).finite().optional(),
       t_sys_k: number2().optional(),
       required_cn0_dbhz: number2().optional()
     },
