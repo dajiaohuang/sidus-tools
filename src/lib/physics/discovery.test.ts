@@ -206,6 +206,17 @@ describe('discovery pass 3', () => {
     expect(hyperbolicEccentricity(3.986e14, 6578e3, 3000)).toBeGreaterThan(1)
   })
 
+  it('mean anomaly from E is limited to elliptic eccentricities', () => {
+    const E = Math.PI / 3
+    expect(meanAnomalyFromE(E, 0)).toBe(E)
+    expect(meanAnomalyFromE(E, 0.1)).toBeCloseTo(0.9605950108181538, 14)
+    expect(meanAnomalyFromE(0.5, 1 - Number.EPSILON)).not.toBeNull()
+    expect(meanAnomalyFromE(0.5, 1)).toBeNull()
+    expect(meanAnomalyFromE(0.5, 1.5)).toBeNull()
+    expect(meanAnomalyFromE(0.5, -0.1)).toBeNull()
+    expect(meanAnomalyFromE(Number.POSITIVE_INFINITY, 0.1)).toBeNull()
+  })
+
   it('thermal, radar, Kepler helpers', () => {
     expect(stefanBoltzmannPower(1, 300, 1)).not.toBeNull()
     expect(wienPeakWavelength(5800)).not.toBeNull()
