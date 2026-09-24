@@ -201,16 +201,10 @@ log_mass_ratio = 0
 if solve_for_m0 >= 0.5
     dv_result = dv_target
     m0_result = mf * exp(exponent)
-    if exponent < 1e-3
-        propellant_result = mf * exponent * (1 + exponent * (0.5 + exponent * (1/6 + exponent * (1/24 + exponent/120))))
-    else
-        propellant_result = mf * (exp(exponent) - 1)
-    end
+    propellant_result = mf * expm1(exponent)
 else
     mass_excess_ratio = (m0 - mf) / mf
-    if mass_excess_ratio < 1e-3
-        log_mass_ratio = mass_excess_ratio * (1 + mass_excess_ratio * (-1/2 + mass_excess_ratio * (1/3 + mass_excess_ratio * (-1/4 + mass_excess_ratio * (1/5 + mass_excess_ratio * (-1/6 + mass_excess_ratio * (1/7 + mass_excess_ratio * (-1/8 + mass_excess_ratio * (1/9 - mass_excess_ratio/10))))))));
-    elseif mass_excess_ratio <= 0.5
+    if mass_excess_ratio <= 0.5
         log_mass_ratio = log1p(mass_excess_ratio)
     else
         log_mass_ratio = log(m0) - log(mf)

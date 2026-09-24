@@ -175,7 +175,7 @@ export const SYSTEMS_EXPECTED: Record<string, ExpectedFn> = {
     const out: Record<string, number> = {}
     const m0 = rocketMassInitial(isp, dv, mf, g0)
     put(out, ['m0'], m0)
-    put(out, ['prop'], propellantMass(m0, mf))
+    put(out, ['prop'], rocketPropellantMassForDeltaV(isp, dv, mf, g0))
     return out
   },
 
