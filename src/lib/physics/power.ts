@@ -80,7 +80,10 @@ export function thermalRadiatedPower(
 
 /**
  * Equilibrium temperature for flat plate facing sun (simplified):
- * ε σ T⁴ A = (1−a) S A cosθ  ⇒ T = [ (1−a) S cosθ / (ε σ) ]^{1/4}
+ * ε σ T⁴ A = α_s S₀ A max(0, cosθ) / r_AU²
+ *   ⇒ T = [ α_s S₀ max(0, cosθ) / (ε σ r_AU²) ]^{1/4}
+ * where α_s is solar absorptivity (not reflectivity/albedo), and S₀ is
+ * the solar irradiance at 1 AU.
  * for two-sided radiator factor 2 often used: here single-side educational.
  */
 export function equilibriumTemperature(

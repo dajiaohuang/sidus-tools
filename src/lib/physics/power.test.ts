@@ -43,8 +43,8 @@ describe('power / sensors physics', () => {
 
   it('equilibrium temperature positive in sunlight', () => {
     const T = equilibriumTemperature(0.3, 0.8, 0, 1)!
-    expect(T).toBeGreaterThan(200)
-    expect(T).toBeLessThan(400)
+    // Independent direct evaluation: [α_s S₀ / (ε σ)]^(1/4), with S₀ = 1361 W/m².
+    expect(T).toBeCloseTo(308.0132605, 6)
   })
 
   it('drag force positive', () => {
