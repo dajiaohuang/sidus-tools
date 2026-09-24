@@ -1275,7 +1275,7 @@ export const fr: TMessages = {
     note_cabin_initial: 'Composition initiale (gaz parfait)',
     note_cabin_after: 'Après métabolisme · {{crew}} équipage · {{activity}} (sans épurateur / sans appoint O₂)',
     note_multistage: 'Ideal rocket per stage: Δv = g₀·Isp·ln(m₀/m_f). Stages are independent (no automatic payload stacking).',
-    note_sgp4_tle: 'Paste a 2- or 3-line NORAD TLE (CelesTrak™). Sample is an offline ISS-like TLE, not live data. Output frame is approximately TEME; geodetic conversion is an engineering approximation without full EOP.',
+    note_sgp4_tle: 'Collez un TLE NORAD de 2 ou 3 lignes (CelesTrak™). L’exemple est un TLE hors ligne similaire à celui de l’ISS, pas une donnée en temps réel. Le repère de sortie est approximativement TEME ; la conversion géodésique est une approximation d’ingénierie sans paramètres complets d’orientation de la Terre (EOP).',
     note_cabin_leak: 'Isothermal choked-orifice model to vacuum exterior: order-of-magnitude only. Real leaks need geometry, multi-phase, and vehicle-specific orifice tables.',
     note_lioh: '2 LiOH + CO₂ → Li₂CO₃ + H₂O. Used on Soyuz, Shuttle, contingency ISS. Not a CDRA/Vozdukh model: regenerative systems are different hardware.',
     note_lambert: 'Coplanar shortcut: r₁ and r₂ are magnitudes; transfer angle is in the XY plane with focus at the origin.',

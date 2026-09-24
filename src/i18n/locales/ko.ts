@@ -1274,7 +1274,7 @@ export const ko: TMessages = {
     note_cabin_initial: '초기 조성(이상 기체)',
     note_cabin_after: '대사 후 · 승무원 {{crew}} · {{activity}}(스크러버 없음 / O₂ 보충 없음)',
     note_multistage: 'Ideal rocket per stage: Δv = g₀·Isp·ln(m₀/m_f). Stages are independent (no automatic payload stacking).',
-    note_sgp4_tle: 'Paste a 2- or 3-line NORAD TLE (CelesTrak™). Sample is an offline ISS-like TLE, not live data. Output frame is approximately TEME; geodetic conversion is an engineering approximation without full EOP.',
+    note_sgp4_tle: 'NORAD TLE 2행 또는 3행을 붙여 넣으세요(CelesTrak™). 샘플은 ISS 유사 오프라인 TLE이며 실시간 데이터가 아닙니다. 출력 좌표계는 대략 TEME입니다. 완전한 지구 방향 매개변수(EOP)를 적용하지 않으므로 측지 좌표 변환은 공학적 근사치입니다.',
     note_cabin_leak: 'Isothermal choked-orifice model to vacuum exterior: order-of-magnitude only. Real leaks need geometry, multi-phase, and vehicle-specific orifice tables.',
     note_lioh: '2 LiOH + CO₂ → Li₂CO₃ + H₂O. Used on Soyuz, Shuttle, contingency ISS. Not a CDRA/Vozdukh model: regenerative systems are different hardware.',
     note_lambert: 'Coplanar shortcut: r₁ and r₂ are magnitudes; transfer angle is in the XY plane with focus at the origin.',
