@@ -81,8 +81,9 @@ export function rvToElements(r: Vec3, v: Vec3, mu: number): ClassicalElements | 
     argp = clampAcos(vdot(nvec, evec) / (n * e))
     if (evec[2] < 0) argp = TWO_PI - argp
   } else if (e > EPS) {
-    // equatorial: use longitude of periapsis from e_x
-    argp = Math.atan2(evec[1], evec[0])
+    // Equatorial retrograde motion reflects the perifocal y-axis.
+    const periapsisY = hvec[2] < 0 ? -evec[1] : evec[1]
+    argp = Math.atan2(periapsisY, evec[0])
     if (argp < 0) argp += TWO_PI
   }
 

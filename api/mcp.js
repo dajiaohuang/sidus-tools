@@ -21827,7 +21827,8 @@ function rvToElements(r, v, mu2) {
     argp = clampAcos(vdot(nvec, evec) / (n * e));
     if (evec[2] < 0) argp = TWO_PI - argp;
   } else if (e > EPS) {
-    argp = Math.atan2(evec[1], evec[0]);
+    const periapsisY = hvec[2] < 0 ? -evec[1] : evec[1];
+    argp = Math.atan2(periapsisY, evec[0]);
     if (argp < 0) argp += TWO_PI;
   }
   let nu = 0;

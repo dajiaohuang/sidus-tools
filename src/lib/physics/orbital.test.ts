@@ -92,6 +92,40 @@ describe('Cartesian / classical elements conversion', () => {
     expect(state!.v[2]).toBeCloseTo(v[2], 6)
   })
 
+  it('recovers periapsis for an eccentric equatorial retrograde state', () => {
+    const a = 9_000_000
+    const e = 0.2
+    const argp = 0.7
+    const nu = 0.4
+    const p = a * (1 - e * e)
+    const rPf = p / (1 + e * Math.cos(nu))
+    const xPf = rPf * Math.cos(nu)
+    const yPf = rPf * Math.sin(nu)
+    const speedScale = Math.sqrt(EARTH_MU / p)
+    const vxPf = -speedScale * Math.sin(nu)
+    const vyPf = speedScale * (e + Math.cos(nu))
+    const cosArgp = Math.cos(argp)
+    const sinArgp = Math.sin(argp)
+
+    // R3(0) R1(pi) R3(argp) reflects the perifocal y-axis.
+    const r = [cosArgp * xPf - sinArgp * yPf, -sinArgp * xPf - cosArgp * yPf, 0] as [number, number, number]
+    const v = [cosArgp * vxPf - sinArgp * vyPf, -sinArgp * vxPf - cosArgp * vyPf, 0] as [number, number, number]
+    const elements = rvToElements(r, v, EARTH_MU)
+
+    expect(elements).not.toBeNull()
+    expect(elements!.a).toBeCloseTo(a, 7)
+    expect(elements!.e).toBeCloseTo(e, 13)
+    expect(elements!.i).toBeCloseTo(Math.PI, 13)
+    expect(elements!.raan).toBe(0)
+    expect(elements!.argp).toBeCloseTo(argp, 13)
+    expect(elements!.nu).toBeCloseTo(nu, 13)
+
+    const state = elementsToRv(elements!, EARTH_MU)
+    expect(state).not.toBeNull()
+    expect(Math.hypot(...state!.r.map((x, i) => x - r[i]!)) / Math.hypot(...r)).toBeLessThan(1e-12)
+    expect(Math.hypot(...state!.v.map((x, i) => x - v[i]!)) / Math.hypot(...v)).toBeLessThan(1e-12)
+  })
+
   const hyperbola = { a: -10_000_000, e: 1.5, i: 0, raan: 0, argp: 0 }
 
   it.each([140, 180, 220])('rejects hyperbolic true anomaly %i outside the physical branch', (nuDeg) => {
