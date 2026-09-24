@@ -154,6 +154,25 @@ int main(void) {
     expect(out).toContain('std::printf')
   })
 
+  it('preserves near-unity numeric output in C, C++, MATLAB, and custom MATLAB snippets', () => {
+    const ratio = Math.exp((1e-6 / 3) / (300 * 9.80665))
+    expect(ratio).toBeGreaterThan(1)
+    expect(Number(ratio.toPrecision(9))).toBe(1)
+    expect(Number(ratio.toPrecision(6))).toBe(1)
+    expect(Number(ratio.toPrecision(17))).toBe(ratio)
+
+    const c = wrapAsRunnable('double ratio = 1.0000000001133018;', 'c', {})
+    const cpp = wrapAsRunnable('double ratio = 1.0000000001133018;', 'cpp', {})
+    const matlab = renderLiveCode('ratio = 1.0000000001133018;', 'matlab', {})
+    expect(c).toMatch(/ratio = %\.17g/)
+    expect(cpp).toMatch(/ratio = %\.17g/)
+    expect(matlab).toMatch(/ratio = %\.17g/)
+
+    const keplerMatlab = renderLiveCode(getSnippets('kepler-propagate')!.code.matlab!, 'matlab', {})
+    expect(keplerMatlab).toContain("fprintf('r0n = %.17g")
+    expect(keplerMatlab).toContain("fprintf('v0n = %.17g")
+  })
+
   it('wraps rust fragment into fn main (not top-level let)', () => {
     const out = wrapAsRunnable(
       'let v_esc = (2.0 * mu / r).sqrt();\nlet v_c = (mu / r).sqrt();',

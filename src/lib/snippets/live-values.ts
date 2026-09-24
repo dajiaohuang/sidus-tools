@@ -1169,18 +1169,18 @@ function printLines(
     case 'julia':
       return finalNames.map((n) => `println("${n} = ", ${n})`)
     case 'matlab':
-      return finalNames.map((n) => `fprintf('${n} = %g\\n', ${n});`)
+      return finalNames.map((n) => `fprintf('${n} = %.17g\\n', ${n});`)
     case 'c':
       return finalNames.map((n) => {
         const raw = bag[n]
         if (typeof raw === 'string') return `printf("${n} = %s\\n", ${n});`
-        return `printf("${n} = %.9g\\n", (double)(${n}));`
+        return `printf("${n} = %.17g\\n", (double)(${n}));`
       })
     case 'cpp':
       return finalNames.map((n) => {
         const raw = bag[n]
         if (typeof raw === 'string') return `std::printf("${n} = %s\\n", ${n});`
-        return `std::printf("${n} = %.9g\\n", static_cast<double>(${n}));`
+        return `std::printf("${n} = %.17g\\n", static_cast<double>(${n}));`
       })
     case 'rust':
       return finalNames.map((n) => `println!("${n} = {:?}", ${n});`)
