@@ -9,6 +9,7 @@ import {
   observerEciPosition,
   parseTle,
   propagateEci,
+  SAMPLE_ISS_TLE,
   sunEciSi,
   sunElevationRad,
   topocentricSezSi,
@@ -261,6 +262,27 @@ describe('TLE parsing', () => {
   it('rejects garbage input', () => {
     const p = parseTle('not a tle')
     expect(p.ok).toBe(false)
+  })
+
+  it('rejects line pairs with different NORAD catalog numbers', () => {
+    const line1 = VALLADO_CASES[0].l1
+    const line2 = VALLADO_CASES[1].l2
+    const p = parseTle(`${line1}\n${line2}`)
+    expect(p.ok).toBe(false)
+  })
+
+  it('rejects an invalid checksum on either 69-character element line', () => {
+    const { l1, l2 } = VALLADO_CASES[0]
+    const corruptChecksum = (line: string) => `${line.slice(0, 68)}${(Number(line[68]) + 1) % 10}`
+    expect(parseTle(`${corruptChecksum(l1)}\n${l2}`).ok).toBe(false)
+    expect(parseTle(`${l1}\n${corruptChecksum(l2)}`).ok).toBe(false)
+  })
+
+  it('rejects truncated element lines and accepts the shipped demo TLE', () => {
+    const { l1, l2 } = VALLADO_CASES[0]
+    const p = parseTle(`${l1.slice(0, -1)}\n${l2}`)
+    expect(p.ok).toBe(false)
+    expect(parseTle(SAMPLE_ISS_TLE).ok).toBe(true)
   })
 
   it('parses a 3-line TLE (name + lines) and returns the name', () => {
