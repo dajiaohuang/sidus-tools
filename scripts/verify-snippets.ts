@@ -322,9 +322,9 @@ function latexDocument(body: string): string {
  * NaN / Infinity are kept: a snippet printing NaN is a numeric failure to report,
  * not a line to discard.
  */
-function parsePrinted(stdout: string): Map<string, number> {
+export function parsePrinted(stdout: string): Map<string, number> {
   const out = new Map<string, number>()
-  for (const line of stdout.split('\n')) {
+  for (const line of stdout.split(/\r\n|\n|\r/)) {
     const m = line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.+)$/)
     if (!m) continue
     const raw = m[2]!.trim().replace(/[dD]([+-]?\d)/, 'e$1')
