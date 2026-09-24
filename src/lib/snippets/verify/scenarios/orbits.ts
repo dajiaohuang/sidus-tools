@@ -36,6 +36,11 @@ export const ORBITS_SCENARIOS: Record<string, Scenario[]> = {
       bag: { h1: 400_000, h2: 800_000 },
     },
     {
+      name: 'leo-lower',
+      source: 'inward Hohmann transfer lowering an ISS-class orbit to 200 km; Δv outputs are burn magnitudes',
+      bag: { h1: 400_000, h2: 200_000 },
+    },
+    {
       name: 'synthetic',
       source: 'adversarial synthetic: distinct non-round mu/R/h1/h2',
       bag: { mu: 3.5e14, R: 6_450_000, h1: 250_777, h2: 19_650_321 },
