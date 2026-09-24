@@ -2933,13 +2933,16 @@ return w == null ? null : { swath_m: w }
     name: "look_angles",
     description: "Simple elevation from range and heights (not full ECI look).",
     inputSchema: {
-    ground_range_m: z.number(),
+    ground_range_m: z.number().nonnegative(),
     delta_h_m: z.number(),
   },
     sample: {"ground_range_m":500000,"delta_h_m":400000},
     run: (args) => {
-      const el = elevationFromRangeHeight(args.ground_range_m, args.delta_h_m); const slant = slantRange(args.ground_range_m, args.delta_h_m);
-return { elev_rad: el, slant_m: slant, note: 'Educational; full TLE look-angles in UI' }
+      if (args.ground_range_m === 0 && args.delta_h_m === 0) return null
+      const el = elevationFromRangeHeight(args.ground_range_m, args.delta_h_m)
+      const slant = slantRange(args.ground_range_m, args.delta_h_m)
+      if (el == null || slant == null || !Number.isFinite(el) || !Number.isFinite(slant)) return null
+      return { elev_rad: el, slant_m: slant, note: 'Educational; full TLE look-angles in UI' }
     },
   },
   {

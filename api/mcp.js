@@ -27251,13 +27251,15 @@ var MCP_TOOL_DEFS = [
     name: "look_angles",
     description: "Simple elevation from range and heights (not full ECI look).",
     inputSchema: {
-      ground_range_m: number2(),
+      ground_range_m: number2().nonnegative(),
       delta_h_m: number2()
     },
     sample: { "ground_range_m": 5e5, "delta_h_m": 4e5 },
     run: (args) => {
+      if (args.ground_range_m === 0 && args.delta_h_m === 0) return null;
       const el = elevationFromRangeHeight(args.ground_range_m, args.delta_h_m);
       const slant = slantRange(args.ground_range_m, args.delta_h_m);
+      if (el == null || slant == null || !Number.isFinite(el) || !Number.isFinite(slant)) return null;
       return { elev_rad: el, slant_m: slant, note: "Educational; full TLE look-angles in UI" };
     }
   },
