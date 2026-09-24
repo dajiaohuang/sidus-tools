@@ -26,7 +26,7 @@ import { vdot, vnorm, vscale, vsub, vunit } from './vector'
 import { AU, EARTH_RADIUS } from './constants'
 
 export type TleParseResult =
-  | { ok: true; satrec: SatRec; name: string }
+  | { ok: true; satrec: SatRec; name: string; line1: string; line2: string }
   | { ok: false; error: string }
 
 export type EciStateSi = {
@@ -87,7 +87,7 @@ export function parseTle(text: string): TleParseResult {
     if (!satrec || (satrec as { error?: number }).error) {
       return { ok: false, error: 'Invalid TLE (checksum or format).' }
     }
-    return { ok: true, satrec, name }
+    return { ok: true, satrec, name, line1: l1, line2: l2 }
   } catch {
     return { ok: false, error: 'Failed to parse TLE.' }
   }

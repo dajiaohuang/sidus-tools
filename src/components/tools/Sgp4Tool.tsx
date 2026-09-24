@@ -187,7 +187,21 @@ export function Sgp4Tool() {
           />
         ) : null
       }
-      code={<CodeExport formulaId="sgp4" values={{ trailDurationS, minutes: p.minutes, samples: p.samples, at: p.at }} />}
+      code={
+        parsed.ok && state ? (
+          <CodeExport
+            formulaId="sgp4"
+            values={{
+              trailDurationS,
+              minutes: p.minutes,
+              samples: p.samples,
+              tleLine1: parsed.line1,
+              tleLine2: parsed.line2,
+              at: state.date.toISOString(),
+            }}
+          />
+        ) : null
+      }
     />
   )
 }

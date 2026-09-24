@@ -267,7 +267,11 @@ describe('TLE parsing', () => {
     const caseA = VALLADO_CASES[0]
     const p = parseTle(`STR#3 SGP4 TEST\n${caseA.l1}\n${caseA.l2}`)
     expect(p.ok).toBe(true)
-    if (p.ok) expect(p.name).toBe('STR#3 SGP4 TEST')
+    if (p.ok) {
+      expect(p.name).toBe('STR#3 SGP4 TEST')
+      expect(p.line1).toBe(caseA.l1)
+      expect(p.line2).toBe(caseA.l2)
+    }
   })
 })
 
