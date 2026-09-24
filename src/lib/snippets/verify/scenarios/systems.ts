@@ -22,6 +22,16 @@ export const SYSTEMS_SCENARIOS: Record<string, Scenario[]> = {
       source: 'adversarial synthetic: distinct non-round Isp/m0/mf',
       bag: { isp: 417.3, m0: 83_456.2, mf: 9123.7 },
     },
+    {
+      name: 'inverse-initial-mass-from-target-dv',
+      source: 'inverse Tsiolkovsky relation: solve m0 from a 9000 m/s target, Isp=330 s, and 100000 kg final mass',
+      bag: { solve_for_m0: 1, isp: 330, mf: 100_000, dv_target: 9000 },
+    },
+    {
+      name: 'inverse-zero-dv-boundary',
+      source: 'inverse Tsiolkovsky boundary: zero target delta-v must return m0=mf and zero propellant',
+      bag: { solve_for_m0: 1, isp: 300, mf: 1200, dv_target: 0 },
+    },
   ],
 
   'heat-flux': [
