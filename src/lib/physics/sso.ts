@@ -3,11 +3,11 @@
 import { EARTH_J2 } from './j2'
 import { EARTH_MU, EARTH_RADIUS } from './constants'
 
-/** Mean solar motion ≈ 2π / sidereal year [rad/s]. */
-export const OMEGA_SUN = (2 * Math.PI) / (365.256363004 * 86400)
+/** Mean solar motion ≈ 2π / tropical year [rad/s], matching the mean-Sun rate. */
+export const OMEGA_SUN = (2 * Math.PI) / (365.24219 * 86400)
 
 /**
- * Circular SSO inclination (rad) so that Ω̇_J2 = −ω_sun (retrograde LEO).
+ * Circular SSO inclination (rad) so that Ω̇_J2 = +ω_sun (retrograde LEO).
  * cos i = − (2/3) (a/R)² (ω_sun) / (n J2)
  * with n = √(μ/a³).
  */

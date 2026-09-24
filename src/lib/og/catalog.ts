@@ -111,7 +111,7 @@ export const TOOL_OG: Record<string, ToolOgMeta> = {
     blurb: 'Range azimuth & Earth boost',
   },
   sso: {
-    formula: 'Ω̇_J2 = −ω_sun  →  i_SSO(a)',
+    formula: 'Ω̇_J2 = +ω_sun  →  i_SSO(a)',
     accent: '#7a9bb8',
     blurb: 'Sun-synchronous inclination',
   },

@@ -19,6 +19,10 @@ describe('OG payload', () => {
     }
   })
 
+  it('Sun-synchronous card uses the eastward retrograde-node sign', () => {
+    expect(TOOL_OG.sso.formula).toContain('Ω̇_J2 = +ω_sun')
+  })
+
   it('static tool card without params is non-dynamic', () => {
     const p = computeToolOg('hohmann', {})
     expect(p.dynamic).toBe(false)

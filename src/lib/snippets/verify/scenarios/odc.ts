@@ -28,17 +28,17 @@ export const ODC_SCENARIOS: Record<string, Scenario[]> = {
     {
       name: 'ltan18-500km-june-solstice',
       source: '500 km dusk-dawn SSO on 2026-06-21 00:00 UTC (JD 2461212.5): beta 59.16 deg, 22.65 min eclipse',
-      bag: { h: 500_000, ltan_h: 18, jd: 2461212.5, mu: 3.986004418e14, R: 6_378_137, J2: 1.08262668e-3, omega_sun: 1.9909865927683785e-7 },
+      bag: { h: 500_000, ltan_h: 18, jd: 2461212.5, mu: 3.986004418e14, R: 6_378_137, J2: 1.08262668e-3, omega_sun: 1.9910638518083137e-7 },
     },
     {
       name: 'ltan06-550km-december-solstice',
       source: '550 km dawn-dusk SSO on 2026-12-21 00:00 UTC (JD 2461395.5): beta -58.97 deg with eclipse',
-      bag: { h: 550_000, ltan_h: 6, jd: 2461395.5, mu: 3.986004418e14, R: 6_378_137, J2: 1.08262668e-3, omega_sun: 1.9909865927683785e-7 },
+      bag: { h: 550_000, ltan_h: 6, jd: 2461395.5, mu: 3.986004418e14, R: 6_378_137, J2: 1.08262668e-3, omega_sun: 1.9910638518083137e-7 },
     },
     {
       name: 'synthetic',
       source: 'adversarial synthetic: 612.3 km, LTAN 18.4 h, JD 2461230.75 (2026-07-09), beta about 59.5 deg, eclipse well inside beta*',
-      bag: { h: 612_300, ltan_h: 18.4, jd: 2461230.75, mu: 3.986004418e14, R: 6_378_137, J2: 1.08262668e-3, omega_sun: 1.9909865927683785e-7 },
+      bag: { h: 612_300, ltan_h: 18.4, jd: 2461230.75, mu: 3.986004418e14, R: 6_378_137, J2: 1.08262668e-3, omega_sun: 1.9910638518083137e-7 },
     },
   ],
 

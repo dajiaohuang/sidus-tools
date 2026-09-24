@@ -22216,7 +22216,7 @@ function launchAzimuth(latRad, iRad) {
 }
 
 // src/lib/physics/sso.ts
-var OMEGA_SUN = 2 * Math.PI / (365.256363004 * 86400);
+var OMEGA_SUN = 2 * Math.PI / (365.24219 * 86400);
 function ssoInclination(a, mu2 = EARTH_MU, R = EARTH_RADIUS, j22 = EARTH_J2, omegaSun = OMEGA_SUN) {
   if (!(a > R) || !(mu2 > 0)) return null;
   const n = Math.sqrt(mu2 / (a * a * a));

@@ -518,7 +518,7 @@ export const SAMPLE_OVERRIDES: Record<string, LiveCodeValues> = {
   // Radiator free vars (n_sides, S, f_sun, F, albedo, alpha_ir) exist in no shared bag.
   'radiator-net-flux': { T: 293.15, eps: 0.92, alpha: 0.09, n_sides: 2, S: 1366, f_sun: 1, F: 0.25, albedo: 0.3, Te: 253.15, alpha_ir: 0.09 },
   // LTAN/JD/omega_sun exist in no shared bag; shared bag's J2/mu/R are reused.
-  'sso-dawn-dusk': { h: 500_000, ltan_h: 18, jd: 2461212.5, mu: 3.986004418e14, R: 6_378_137, J2: 1.08262668e-3, omega_sun: 1.9909865927683785e-7 },
+  'sso-dawn-dusk': { h: 500_000, ltan_h: 18, jd: 2461212.5, mu: 3.986004418e14, R: 6_378_137, J2: 1.08262668e-3, omega_sun: 1.9910638518083137e-7 },
   // Latent-heat/quality/pump free vars exist in no shared bag.
   'two-phase-loop': { Q: 1e6, h_fg: 1186.28e3, dx: 1, cp: 4738.9, dT: 10, rho_l: 610.39, dp: 1e5, eta_p: 0.5 },
   // Heat-pump temperature pair and Carnot fraction exist in no shared bag.

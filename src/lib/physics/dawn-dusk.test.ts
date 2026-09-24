@@ -51,24 +51,24 @@ describe('dawnDuskBeta', () => {
   it('500 km LTAN 18 on 2026-06-21: beta 59.163 deg and a 22.65 min eclipse', () => {
     const r = dawnDuskBeta({ altitudeM: 500_000, ltanHours: 18, date: new Date('2026-06-21T00:00:00Z') })
     expect(r).not.toBeNull()
-    expect(r!.inclRad / DEG).toBeCloseTo(97.401519, 4)
+    expect(r!.inclRad / DEG).toBeCloseTo(97.4018077418, 4)
     expect(r!.periodS).toBeCloseTo(5676.978, 2)
     expect(r!.betaStarRad / DEG).toBeCloseTo(68.018674, 4)
     expect(r!.sunDeclRad / DEG).toBeCloseTo(23.43543, 4)
-    expect(r!.betaRad / DEG).toBeCloseTo(59.163055, 4)
+    expect(r!.betaRad / DEG).toBeCloseTo(59.1627665326, 4)
     expect(r!.eclipseS).toBeCloseTo(1359.19, 1)
     expect(r!.eclipseFraction).toBeCloseTo(1359.19 / 5676.978, 4)
   })
 
   it('500 km LTAN 18 near the March equinox: beta 82.84 deg, no eclipse', () => {
     const r = dawnDuskBeta({ altitudeM: 500_000, ltanHours: 18, date: new Date('2026-03-20T00:00:00Z') })
-    expect(r!.betaRad / DEG).toBeCloseTo(82.83984, 4)
+    expect(r!.betaRad / DEG).toBeCloseTo(82.8395515364, 4)
     expect(r!.eclipseS).toBe(0)
   })
 
   it('500 km LTAN 06 on 2026-12-21: beta -59.166 deg with eclipse', () => {
     const r = dawnDuskBeta({ altitudeM: 500_000, ltanHours: 6, date: new Date('2026-12-21T00:00:00Z') })
-    expect(r!.betaRad / DEG).toBeCloseTo(-59.165674, 4)
+    expect(r!.betaRad / DEG).toBeCloseTo(-59.1653855819, 4)
     expect(r!.eclipseS).toBeCloseTo(1359.04, 1)
   })
 
