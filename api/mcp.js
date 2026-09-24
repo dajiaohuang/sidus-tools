@@ -21577,7 +21577,8 @@ var BODIES = [
   { id: "jupiter", name: "Jupiter", mu: 126686534e9, radius: 69911e3, mass: 18982e23, color: "#c4a882", type: "planet" },
   { id: "saturn", name: "Saturn", mu: 37931187e9, radius: 58232e3, mass: 56834e22, color: "#d4c4a0", type: "planet" },
   { id: "uranus", name: "Uranus", mu: 5793939e9, radius: 25362e3, mass: 8681e22, color: "#9ec4c8", type: "planet" },
-  { id: "neptune", name: "Neptune", mu: 6836529e9, radius: 24622e3, mass: 102413e21, color: "#5a7ab0", type: "planet" },
+  // JPL NEP097 Neptune-primary GM: 6835099.97 ± 9.63 km³/s² (not system GM).
+  { id: "neptune", name: "Neptune", mu: 683509997e7, radius: 24622e3, mass: 102413e21, color: "#5a7ab0", type: "planet" },
   { id: "pluto", name: "Pluto", mu: 871e9, radius: 1188300, mass: 1303e19, color: "#b8a898", type: "dwarf" }
 ];
 function getBody(id) {
