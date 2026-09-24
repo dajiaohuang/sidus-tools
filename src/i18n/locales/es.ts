@@ -1275,7 +1275,7 @@ export const es: TMessages = {
     note_cabin_initial: 'Composición inicial (gas ideal)',
     note_cabin_after: 'Tras metabolismo · {{crew}} tripulación · {{activity}} (sin scrubber / sin reposición de O₂)',
     note_multistage: 'Ideal rocket per stage: Δv = g₀·Isp·ln(m₀/m_f). Stages are independent (no automatic payload stacking).',
-    note_sgp4_tle: 'Pega un TLE NORAD de 2 o 3 líneas (CelesTrak™). El ejemplo es un TLE similar al de la ISS guardado sin conexión, no son datos en tiempo real. El sistema de referencia de salida es aproximadamente TEME; la conversión a coordenadas geodésicas es una aproximación de ingeniería que no incorpora parámetros completos de orientación de la Tierra (EOP).',
+    note_sgp4_tle: 'Pega un TLE NORAD de 2 o 3 líneas (CelesTrak™). El ejemplo es un TLE similar al de la ISS guardado sin conexión y no contiene datos en tiempo real. El sistema de referencia de salida es aproximadamente TEME; la conversión a coordenadas geodésicas es una aproximación de ingeniería que no incorpora parámetros completos de orientación de la Tierra (EOP).',
     note_cabin_leak: 'Isothermal choked-orifice model to vacuum exterior: order-of-magnitude only. Real leaks need geometry, multi-phase, and vehicle-specific orifice tables.',
     note_lioh: '2 LiOH + CO₂ → Li₂CO₃ + H₂O. Used on Soyuz, Shuttle, contingency ISS. Not a CDRA/Vozdukh model: regenerative systems are different hardware.',
     note_lambert: 'Coplanar shortcut: r₁ and r₂ are magnitudes; transfer angle is in the XY plane with focus at the origin.',
