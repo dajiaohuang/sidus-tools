@@ -1269,7 +1269,7 @@ export const zh: TMessages = {
     note_cabin_initial: '初始成分（理想气体）',
     note_cabin_after: '代谢后 · {{crew}} 人 · {{activity}}（无净化器/无补氧）',
     note_multistage: 'Ideal rocket per stage: Δv = g₀·Isp·ln(m₀/m_f). Stages are independent (no automatic payload stacking).',
-    note_sgp4_tle: 'Paste a 2- or 3-line NORAD TLE (CelesTrak™). Sample is an offline ISS-like TLE, not live data. Output frame is approximately TEME; geodetic conversion is an engineering approximation without full EOP.',
+    note_sgp4_tle: '粘贴 2 行或 3 行的 NORAD 两行根数（TLE；CelesTrak™）。示例是离线保存的 ISS 类 TLE，不是实时数据。输出坐标系近似为 TEME；由于未完整使用地球定向参数（EOP），大地坐标转换仅为工程近似。',
     note_cabin_leak: 'Isothermal choked-orifice model to vacuum exterior: order-of-magnitude only. Real leaks need geometry, multi-phase, and vehicle-specific orifice tables.',
     note_lioh: '2 LiOH + CO₂ → Li₂CO₃ + H₂O. Used on Soyuz, Shuttle, contingency ISS. Not a CDRA/Vozdukh model: regenerative systems are different hardware.',
     note_lambert: 'Coplanar shortcut: r₁ and r₂ are magnitudes; transfer angle is in the XY plane with focus at the origin.',
