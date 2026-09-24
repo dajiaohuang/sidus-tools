@@ -37,6 +37,11 @@ export const SYSTEMS_SCENARIOS: Record<string, Scenario[]> = {
       source: 'small positive inverse delta-v: stable propellant calculation avoids subtracting nearly equal masses',
       bag: { solve_for_m0: 1, isp: 320, mf: 5000, dv_target: 1e-12 },
     },
+    {
+      name: 'forward-near-unit-mass-ratio',
+      source: 'near-unit mass ratio: stable logarithm preserves small positive delta-v',
+      bag: { solve_for_m0: 0, isp: 320, m0: 5000 + 1e-8, mf: 5000 },
+    },
   ],
 
   'heat-flux': [

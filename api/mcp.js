@@ -21658,7 +21658,9 @@ function apsidesWithSpeeds(mu2, a, e) {
 }
 function rocketDeltaV(ispS, m0, mf, g0 = 9.80665) {
   if (!(ispS > 0) || !(m0 > 0) || !(mf > 0) || m0 <= mf) return NaN;
-  return ispS * g0 * Math.log(m0 / mf);
+  const massExcessRatio = (m0 - mf) / mf;
+  const logMassRatio = massExcessRatio <= 0.5 ? Math.log1p(massExcessRatio) : Math.log(m0) - Math.log(mf);
+  return ispS * g0 * logMassRatio;
 }
 function rocketMassInitial(ispS, deltaV, mf, g0 = 9.80665) {
   if (!(ispS > 0) || !(mf > 0) || !(deltaV >= 0)) return NaN;

@@ -100,7 +100,12 @@ export function specificEnergy(mu: number, a: number): number {
 /** Tsiolkovsky rocket equation: Δv = Isp · g0 · ln(m0/mf). */
 export function rocketDeltaV(ispS: number, m0: number, mf: number, g0 = 9.80665): number {
   if (!(ispS > 0) || !(m0 > 0) || !(mf > 0) || m0 <= mf) return NaN
-  return ispS * g0 * Math.log(m0 / mf)
+  const massExcessRatio = (m0 - mf) / mf
+  const logMassRatio =
+    massExcessRatio <= 0.5
+      ? Math.log1p(massExcessRatio)
+      : Math.log(m0) - Math.log(mf)
+  return ispS * g0 * logMassRatio
 }
 
 /** Exhaust velocity from Isp: ve = Isp · g0. */
