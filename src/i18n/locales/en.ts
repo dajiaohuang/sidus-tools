@@ -940,6 +940,7 @@ export const en = {
     site_height: "Site height",
     site_lat: "Site lat",
     site_latitude: "Site latitude",
+    observer_latitude_domain: "Latitude must be between -90° and +90°.",
     site_lon: "Site lon",
     site_longitude: "Site longitude",
     slant_range_to_horizon: "Slant range to horizon",

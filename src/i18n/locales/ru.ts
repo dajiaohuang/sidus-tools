@@ -941,6 +941,7 @@ export const ru: TMessages = {
     site_height: "Site height",
     site_lat: "Site lat",
     site_latitude: "Site latitude",
+    observer_latitude_domain: "Широта должна находиться в диапазоне от -90° до +90°.",
     site_lon: "Site lon",
     site_longitude: "Site longitude",
     slant_range_to_horizon: "Slant range to horizon",

@@ -935,6 +935,7 @@ export const zh: TMessages = {
     site_height: "Site height",
     site_lat: "Site lat",
     site_latitude: "Site latitude",
+    observer_latitude_domain: "纬度必须在 -90° 至 +90° 之间。",
     site_lon: "Site lon",
     site_longitude: "Site longitude",
     slant_range_to_horizon: "Slant range to horizon",

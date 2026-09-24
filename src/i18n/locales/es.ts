@@ -941,6 +941,7 @@ export const es: TMessages = {
     site_height: "Site height",
     site_lat: "Site lat",
     site_latitude: "Site latitude",
+    observer_latitude_domain: "La latitud debe estar entre -90° y +90°.",
     site_lon: "Site lon",
     site_longitude: "Site longitude",
     slant_range_to_horizon: "Slant range to horizon",
