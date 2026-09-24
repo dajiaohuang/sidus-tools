@@ -56,6 +56,17 @@ export const SAMPLE_ISS_TLE = `ISS (ZARYA)
 1 25544U 98067A   26236.43525466  .00008197  00000+0  15348-3 0  9992
 2 25544  51.6332 322.3014 0007699  78.6726 281.5127 15.49604681582335`
 
+/** Validate the standard column-69 modulo-10 checksum on a 69-column TLE line. */
+function hasValidTleChecksum(line: string): boolean {
+  if (line.length !== 69 || !/^[0-9]$/.test(line[68])) return false
+  let sum = 0
+  for (const ch of line.slice(0, 68)) {
+    if (ch >= '0' && ch <= '9') sum += Number(ch)
+    else if (ch === '-') sum += 1
+  }
+  return sum % 10 === Number(line[68])
+}
+
 /** Parse 2- or 3-line TLE text (optional name line). */
 export function parseTle(text: string): TleParseResult {
   const lines = text
@@ -80,6 +91,15 @@ export function parseTle(text: string): TleParseResult {
 
   if (!l1.startsWith('1 ') || !l2.startsWith('2 ')) {
     return { ok: false, error: 'TLE lines must start with "1 " and "2 ".' }
+  }
+  if (l1.slice(2, 7) !== l2.slice(2, 7)) {
+    return { ok: false, error: 'Invalid TLE (checksum or format).' }
+  }
+  if (!hasValidTleChecksum(l1)) {
+    return { ok: false, error: 'Invalid TLE (checksum or format).' }
+  }
+  if (!hasValidTleChecksum(l2)) {
+    return { ok: false, error: 'Invalid TLE (checksum or format).' }
   }
 
   try {
