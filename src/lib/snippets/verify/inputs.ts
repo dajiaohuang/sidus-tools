@@ -577,12 +577,7 @@ export function scenariosFor(toolId: string): { name: string; source?: string; b
 
 /**
  * The bag as a snippet actually receives it: every number round-tripped through the
- * same literal formatter `liveValues` uses to emit the live-inputs preamble.
- *
- * `formatCodeNumber` keeps 7 significant digits for |x| >= 1e7 or |x| < 1e-3, so a
- * snippet given Earth's mu computes with 3.986004e14, not 3.986004418e14. Comparing a
- * listing against physics fed the unrounded value would flag that injection rounding as
- * a formula error in every mu-bearing tool.
+ * same shortest-decimal literal formatter `liveValues` uses for its input preamble.
  */
 export function asInjected(values: LiveCodeValues): LiveCodeValues {
   const out: LiveCodeValues = {}
