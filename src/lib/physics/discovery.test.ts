@@ -217,6 +217,30 @@ describe('discovery pass 3', () => {
     expect(meanAnomalyFromE(Number.POSITIVE_INFINITY, 0.1)).toBeNull()
   })
 
+  it('preserves mean anomaly near the parabolic limit and periapsis', () => {
+    const e = 0.9999999999999999
+    const E = 1e-8
+    const expected = 1.2768896912918232e-24
+    const actual = meanAnomalyFromE(E, e)
+    expect(actual).not.toBeNull()
+    expect(Math.abs(actual! / expected - 1)).toBeLessThan(2e-15)
+    const negative = meanAnomalyFromE(-E, e)
+    expect(negative).not.toBeNull()
+    expect(Math.abs(negative! / -expected - 1)).toBeLessThan(2e-15)
+
+    const moderateSmallAngle = meanAnomalyFromE(1e-4, 0.999999)
+    expect(moderateSmallAngle).not.toBeNull()
+    expect(Math.abs(moderateSmallAngle! / 1.0016666650279224e-10 - 1)).toBeLessThan(2e-15)
+
+    const injectedPrecisionCase = meanAnomalyFromE(1e-8, 0.999999999999)
+    expect(injectedPrecisionCase).not.toBeNull()
+    expect(Math.abs(injectedPrecisionCase! / 9.999945449465452e-21 - 1)).toBeLessThan(2e-15)
+
+    const threshold = meanAnomalyFromE(0.5, e)
+    expect(threshold).not.toBeNull()
+    expect(Math.abs(threshold! / 0.020574461395797053 - 1)).toBeLessThan(2e-15)
+  })
+
   it('thermal, radar, Kepler helpers', () => {
     expect(stefanBoltzmannPower(1, 300, 1)).not.toBeNull()
     expect(wienPeakWavelength(5800)).not.toBeNull()
