@@ -16,6 +16,7 @@ import {
   propellantMass,
   rocketDeltaV,
   rocketMassInitial,
+  rocketPropellantMassForDeltaV,
   TOOL_UNIT_SETS,
   toSi,
 } from '@/lib/physics'
@@ -63,7 +64,7 @@ export function RocketEquationTool() {
       deltaV: dv_si,
       m0: M0,
       mf: mf_kg,
-      prop: propellantMass(M0, mf_kg),
+      prop: rocketPropellantMassForDeltaV(p.isp, dv_si, mf_kg),
       ratio: M0 / mf_kg,
       ve: exhaustVelocity(p.isp),
     }

@@ -32,6 +32,11 @@ export const SYSTEMS_SCENARIOS: Record<string, Scenario[]> = {
       source: 'inverse Tsiolkovsky boundary: zero target delta-v must return m0=mf and zero propellant',
       bag: { solve_for_m0: 1, isp: 300, mf: 1200, dv_target: 0 },
     },
+    {
+      name: 'inverse-small-positive-dv-propellant',
+      source: 'small positive inverse delta-v: stable propellant calculation avoids subtracting nearly equal masses',
+      bag: { solve_for_m0: 1, isp: 320, mf: 5000, dv_target: 1e-12 },
+    },
   ],
 
   'heat-flux': [

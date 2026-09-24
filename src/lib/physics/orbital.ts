@@ -120,6 +120,17 @@ export function rocketMassInitial(
   return mf * Math.exp(deltaV / ve)
 }
 
+/** Propellant mass for target Δv, evaluated without subtractive cancellation. */
+export function rocketPropellantMassForDeltaV(
+  ispS: number,
+  deltaV: number,
+  mf: number,
+  g0 = 9.80665,
+): number {
+  if (!(ispS > 0) || !(mf > 0) || !(deltaV >= 0) || !(g0 > 0)) return NaN
+  return mf * Math.expm1(deltaV / (ispS * g0))
+}
+
 export function propellantMass(m0: number, mf: number): number {
   return m0 - mf
 }

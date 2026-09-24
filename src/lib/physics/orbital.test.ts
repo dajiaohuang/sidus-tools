@@ -8,6 +8,7 @@ import {
   multiStageDeltaV,
   orbitalPeriod,
   planeChangeDeltaV,
+  rocketPropellantMassForDeltaV,
   visViva,
 } from './index'
 
@@ -70,6 +71,22 @@ describe('multi-stage', () => {
     expect(r).not.toBeNull()
     expect(r!.dv.length).toBe(2)
     expect(r!.dvTotal).toBeCloseTo(r!.dv[0] + r!.dv[1], 10)
+  })
+})
+
+describe('rocket equation small-delta-v propellant precision', () => {
+  it('preserves tiny positive propellant mass that wet-minus-dry subtraction loses', () => {
+    const isp = 320
+    const dv = 1e-12
+    const dryMass = 5000
+    const stableExpected = dryMass * Math.expm1(dv / (isp * 9.80665))
+    const naive = dryMass * Math.exp(dv / (isp * 9.80665)) - dryMass
+    const actual = rocketPropellantMassForDeltaV(isp, dv, dryMass)
+
+    expect(actual).toBeGreaterThan(0)
+    expect(actual).toBe(stableExpected)
+    expect(Math.abs(naive - stableExpected) / stableExpected).toBeGreaterThan(0.4)
+    expect(rocketPropellantMassForDeltaV(isp, 0, dryMass)).toBe(0)
   })
 })
 

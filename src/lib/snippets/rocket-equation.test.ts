@@ -26,6 +26,7 @@ describe('rocket-equation code export solve modes', () => {
     }
     expect(rocketSnippets.code.latex).toContain('\\exp')
     expect(rocketSnippets.code.latex).toContain('I_{sp} g_0')
+    expect(rocketSnippets.code.latex).toContain('\\operatorname{expm1}')
   })
 
   it('matches an independent inverse-equation anchor and reports target delta-v', () => {
@@ -60,5 +61,23 @@ describe('rocket-equation code export solve modes', () => {
     expect(result.m0_result).toBe(1200)
     expect(result.propellant_result).toBe(0)
     expect(result.mass_ratio).toBe(1)
+  })
+
+  it('preserves small positive inverse propellant mass without subtracting rounded masses', () => {
+    const isp = 320
+    const mf = 5000
+    const dvTarget = 1e-12
+    const result = EXPECTED['rocket-equation']({
+      isp,
+      m0: mf,
+      mf,
+      dv_target: dvTarget,
+      solve_for_m0: 1,
+    })
+    const stableExpected = mf * Math.expm1(dvTarget / (isp * 9.80665))
+    const roundedSubtraction = mf * Math.exp(dvTarget / (isp * 9.80665)) - mf
+
+    expect(result.propellant_result).toBe(stableExpected)
+    expect(Math.abs(roundedSubtraction - stableExpected) / stableExpected).toBeGreaterThan(0.4)
   })
 })

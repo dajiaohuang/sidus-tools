@@ -47,6 +47,7 @@ import {
   respiratoryQuotient,
   rocketDeltaV,
   rocketMassInitial,
+  rocketPropellantMassForDeltaV,
   solarSailAccel,
   suttonGravesHeatFlux,
   tankPropellantMass,
@@ -73,7 +74,11 @@ export const SYSTEMS_EXPECTED: Record<string, ExpectedFn> = {
     put(out, ['ve'], ve)
     put(out, ['dv_result'], dvResult)
     put(out, ['m0_result'], m0Result)
-    put(out, ['propellant_result'], propellantMass(m0Result, mf))
+    put(
+      out,
+      ['propellant_result'],
+      solveForM0 ? rocketPropellantMassForDeltaV(isp, dvTarget, mf) : propellantMass(m0Result, mf),
+    )
     put(out, ['mass_ratio'], m0Result / mf)
     return out
   },
