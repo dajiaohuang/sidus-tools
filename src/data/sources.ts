@@ -80,10 +80,10 @@ export const SOURCES: Record<string, SourceRef> = {
   },
   'itu-fspl': {
     id: 'itu-fspl',
-    name: 'Free-space path loss (Friis / ITU-style FSPL)',
-    org: 'ITU / standard radio engineering',
-    url: 'https://en.wikipedia.org/wiki/Free-space_path_loss',
-    note: 'L_fs = 20 log10(d_km) + 20 log10(f_MHz) + 32.44 dB form used in educational link budgets.',
+    name: 'Free-space attenuation (ITU-R P.525-5)',
+    org: 'International Telecommunication Union Radiocommunication Sector (ITU-R)',
+    url: 'https://www.itu.int/rec/R-REC-P.525-5-202411-I/en',
+    note: 'ITU-R P.525-5 Eqs. (5)–(6): L_bf = 20 log10(4πd/λ); practical form uses d in km and f in MHz with a 32.4 dB constant. SIDUS uses 32.44 dB as an approximation of the same Friis relation.',
   },
   'nasa-ochmo': {
     id: 'nasa-ochmo',
