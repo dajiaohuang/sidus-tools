@@ -111,6 +111,20 @@ describe('ISA / launch / SSO', () => {
     expect((i! * 180) / Math.PI).toBeGreaterThan(96)
     expect((i! * 180) / Math.PI).toBeLessThan(99)
   })
+
+  it('matches the mean-solar J2 nodal rate over a tropical year', async () => {
+    const { EARTH_J2, EARTH_MU, EARTH_RADIUS, ssoInclination } = await import('./index')
+    const a = EARTH_RADIUS + 550_000
+    const meanSolarRate = (2 * Math.PI) / (365.24219 * 86400)
+    const n = Math.sqrt(EARTH_MU / (a * a * a))
+    const cosI = -((2 / 3) * (a / EARTH_RADIUS) ** 2 * meanSolarRate) / (n * EARTH_J2)
+    const expectedI = Math.acos(cosI)
+    const actualI = ssoInclination(a)!
+    const actualNodeRate = -1.5 * n * EARTH_J2 * (EARTH_RADIUS / a) ** 2 * Math.cos(actualI)
+
+    expect(actualI).toBeCloseTo(expectedI, 13)
+    expect(actualNodeRate).toBeCloseTo(meanSolarRate, 15)
+  })
 })
 
 describe('apsides / Hohmann geometry consistency', () => {
