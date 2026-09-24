@@ -21660,11 +21660,6 @@ function rocketDeltaV(ispS, m0, mf, g0 = 9.80665) {
   if (!(ispS > 0) || !(m0 > 0) || !(mf > 0) || m0 <= mf) return NaN;
   return ispS * g0 * Math.log(m0 / mf);
 }
-function rocketMassInitial(ispS, deltaV, mf, g0 = 9.80665) {
-  if (!(ispS > 0) || !(mf > 0) || !(deltaV >= 0)) return NaN;
-  const ve = ispS * g0;
-  return mf * Math.exp(deltaV / ve);
-}
 
 // src/lib/physics/units.ts
 var UNIT_DEFS = [
@@ -22606,9 +22601,13 @@ function idealThrust(mdot, ve) {
   return mdot * ve;
 }
 function propellantForDeltaV(ispS, deltaV, dryMass, g0 = G0) {
-  const m0 = rocketMassInitial(ispS, deltaV, dryMass, g0);
-  if (!Number.isFinite(m0) || m0 <= dryMass) return null;
-  return { m0, prop: m0 - dryMass, ratio: m0 / dryMass };
+  if (!(ispS > 0) || !(deltaV >= 0) || !(dryMass > 0) || !(g0 > 0)) return null;
+  const exponent = deltaV / (ispS * g0);
+  const ratio = Math.exp(exponent);
+  const m0 = dryMass * ratio;
+  const prop = dryMass * Math.expm1(exponent);
+  if (!Number.isFinite(m0) || !Number.isFinite(prop) || !Number.isFinite(ratio)) return null;
+  return { m0, prop, ratio };
 }
 
 // src/lib/physics/ops.ts
@@ -22679,7 +22678,7 @@ function meanMotionFromAltitude(h, mu2 = EARTH_MU, bodyR = EARTH_RADIUS) {
   return { a, n, period: orbitalPeriod(mu2, a), v: circularOrbitVelocity(mu2, a) };
 }
 function equalStageMassRatio(totalDv, nStages, ispS, g0 = 9.80665) {
-  if (!(totalDv > 0) || !(nStages >= 1) || !(ispS > 0)) return null;
+  if (!(totalDv >= 0) || !(nStages >= 1) || !(ispS > 0) || !(g0 > 0)) return null;
   const ve = ispS * g0;
   const dvStage = totalDv / nStages;
   return { dvStage, massRatio: Math.exp(dvStage / ve), ve };

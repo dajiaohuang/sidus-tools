@@ -19,7 +19,7 @@ import {
   hohmannWithPlaneChange,
   planeChangeAtApsides,
 } from './maneuvers'
-import { idealThrust, propellantForDeltaV } from './propulsion'
+import { idealThrust, massRatioForDeltaV, propellantForDeltaV } from './propulsion'
 
 describe('wave2 physics', () => {
   it('muFromMass recovers Earth-scale μ order', () => {
@@ -94,6 +94,12 @@ describe('wave2 physics', () => {
     const p = propellantForDeltaV(300, 3000, 1000)!
     expect(p.prop).toBeGreaterThan(0)
     expect(idealThrust(10, 3000)).toBe(30_000)
+  })
+
+  it('zero delta-v requires zero propellant and unit mass ratio', () => {
+    expect(propellantForDeltaV(320, 0, 5000)).toEqual({ m0: 5000, prop: 0, ratio: 1 })
+    expect(massRatioForDeltaV(320, 0)).toBe(1)
+    expect(propellantForDeltaV(320, -1, 5000)).toBeNull()
   })
 
   it('ballistic β and light time', () => {

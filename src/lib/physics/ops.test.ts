@@ -66,6 +66,15 @@ describe('ops physics', () => {
     expect(e.massRatio).toBeGreaterThan(1)
   })
 
+  it('zero total delta-v is a valid no-burn limit', () => {
+    expect(equalStageMassRatio(0, 3, 300)).toEqual({
+      dvStage: 0,
+      massRatio: 1,
+      ve: 300 * 9.80665,
+    })
+    expect(equalStageMassRatio(-1, 3, 300)).toBeNull()
+  })
+
   it('mean motion LEO ~0.001 rad/s', () => {
     const m = meanMotionFromAltitude(400e3)!
     expect(m.n).toBeGreaterThan(0.001)
