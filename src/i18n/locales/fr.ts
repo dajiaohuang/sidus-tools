@@ -668,6 +668,7 @@ export const fr: TMessages = {
     ay: "Ay",
     az: "Az",
     azimuth: "Azimuth",
+    azimuth_undefined: "Indéfini au zénith",
     azimuth_n_e: "Azimuth (N\u2192E)",
     beat_synodic: "Beat / synodic",
     bielliptic_tof: "Bielliptic TOF",

@@ -668,6 +668,7 @@ export const ru: TMessages = {
     ay: "Ay",
     az: "Az",
     azimuth: "Azimuth",
+    azimuth_undefined: "Не определён в зените",
     azimuth_n_e: "Azimuth (N\u2192E)",
     beat_synodic: "Beat / synodic",
     bielliptic_tof: "Bielliptic TOF",

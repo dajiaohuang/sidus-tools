@@ -128,15 +128,23 @@ export function LookAnglesTool() {
           <p className="font-mono text-sm text-muted">{t('fields.no_look_angles')}</p>
         ) : (
           <div className="sidus-results">
-            <ResultCard
-              label={t('fields.azimuth')}
-              si={look.azimuthRad}
-              category="angle"
-              unitId="deg"
-              unitIds={TOOL_UNIT_SETS.angle}
-              digits={3}
-              accent
-            />
+            {look.azimuthRad === null ? (
+              <ResultCard
+                label={t('fields.azimuth')}
+                value={t('fields.azimuth_undefined')}
+                accent
+              />
+            ) : (
+              <ResultCard
+                label={t('fields.azimuth')}
+                si={look.azimuthRad}
+                category="angle"
+                unitId="deg"
+                unitIds={TOOL_UNIT_SETS.angle}
+                digits={3}
+                accent
+              />
+            )}
             <ResultCard
               label={t('fields.elevation')}
               si={look.elevationRad}

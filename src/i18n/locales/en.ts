@@ -666,6 +666,7 @@ export const en = {
     ay: "Ay",
     az: "Az",
     azimuth: "Azimuth",
+    azimuth_undefined: "Undefined at zenith",
     azimuth_n_e: "Azimuth (N\u2192E)",
     beat_synodic: "Beat / synodic",
     bielliptic_tof: "Bielliptic TOF",

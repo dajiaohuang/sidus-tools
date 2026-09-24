@@ -667,6 +667,7 @@ export const ko: TMessages = {
     ay: "Ay",
     az: "Az",
     azimuth: "Azimuth",
+    azimuth_undefined: "천정에서는 정의되지 않음",
     azimuth_n_e: "Azimuth (N\u2192E)",
     beat_synodic: "Beat / synodic",
     bielliptic_tof: "Bielliptic TOF",

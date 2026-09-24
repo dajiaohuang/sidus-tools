@@ -668,6 +668,7 @@ export const ja: TMessages = {
     ay: "Ay",
     az: "Az",
     azimuth: "Azimuth",
+    azimuth_undefined: "天頂では未定義",
     azimuth_n_e: "Azimuth (N\u2192E)",
     beat_synodic: "Beat / synodic",
     bielliptic_tof: "Bielliptic TOF",

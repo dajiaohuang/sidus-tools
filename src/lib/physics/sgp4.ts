@@ -53,7 +53,8 @@ export function isValidGeodeticObserver(observer: GeodeticDeg): boolean {
 }
 
 export type LookAnglesSi = {
-  azimuthRad: number
+  /** Null when the horizontal line of sight is unresolved at zenith. */
+  azimuthRad: number | null
   elevationRad: number
   rangeM: number
 }
@@ -206,8 +207,14 @@ export function lookAnglesFromEci(
   ) {
     return null
   }
+  const sez = topocentricSezSi(observer, [satEcf.x * 1000, satEcf.y * 1000, satEcf.z * 1000])
+  if (!sez) return null
+  const horizontalKm = Math.hypot(sez.southM, sez.eastM) / 1000
   return {
-    azimuthRad: look.azimuth,
+    // Azimuth has no physical value at zenith. Use the same scale-aware
+    // binary64 floor as the zero-range guard to avoid exposing atan2(0, 0)'s
+    // arbitrary convention, while preserving every resolvable off-zenith LOS.
+    azimuthRad: horizontalKm <= roundoffFloorKm ? null : look.azimuth,
     elevationRad: look.elevation,
     rangeM: look.rangeSat * 1000,
   }

@@ -498,6 +498,41 @@ describe('observer look-angle input domain and zero-range singularity', () => {
   })
 })
 
+describe('look-angle azimuth at zenith', () => {
+  const date = new Date('2026-01-01T00:00:00.000Z')
+  const observer = { latDeg: 0, lonDeg: 0, heightM: 0 }
+
+  const lookAtEcf = (satEcf: { x: number; y: number; z: number }) => {
+    const satEci = ecfToEci(satEcf, gstime(date))
+    return lookAnglesFromEci(
+      observer,
+      [satEci.x * 1000, satEci.y * 1000, satEci.z * 1000],
+      date,
+    )
+  }
+
+  it('marks exact zenith azimuth undefined instead of returning atan2(0, 0)', () => {
+    const look = lookAtEcf({ x: 7078.137, y: 0, z: 0 })
+
+    expect(look).toBeTruthy()
+    if (!look) throw new Error('unreachable: narrowed by expect above')
+    expect(look.azimuthRad).toBeNull()
+    expect(look.elevationRad).toBeCloseTo(Math.PI / 2, 12)
+    expect(look.rangeM).toBeCloseTo(700_000, 5)
+  })
+
+  it('preserves a resolvable one-metre east bearing immediately off zenith', () => {
+    const look = lookAtEcf({ x: 7078.137, y: 0.001, z: 0 })
+
+    expect(look).toBeTruthy()
+    if (!look) throw new Error('unreachable: narrowed by expect above')
+    expect(look.azimuthRad).not.toBeNull()
+    expect(look.azimuthRad as number).toBeCloseTo(Math.PI / 2, 8)
+    expect(look.elevationRad).toBeCloseTo(Math.PI / 2, 5)
+    expect(look.rangeM).toBeCloseTo(700_000, 5)
+  })
+})
+
 describe('sunEciSi', () => {
   it('|r| is within 3% of 1 AU near perihelion (early Jan) and aphelion (early Jul)', () => {
     // Earth's orbital eccentricity (~0.0167) bounds sunPos's |rsun| to
