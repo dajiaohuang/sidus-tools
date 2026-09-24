@@ -24428,15 +24428,17 @@ var MCP_TOOL_DEFS = [
   },
   {
     name: "hohmann",
-    description: "Hohmann transfer \u0394v and TOF between circular coplanar orbits.",
+    description: "Hohmann transfer \u0394v and TOF between circular coplanar orbits; mu and radii must be finite and positive.",
     inputSchema: {
-      r1_m: number2(),
-      r2_m: number2(),
-      mu: number2().optional()
+      r1_m: number2().finite().positive(),
+      r2_m: number2().finite().positive(),
+      mu: number2().finite().positive().optional()
     },
     sample: { "r1_m": 6778137, "r2_m": 42164e3 },
     run: (args) => {
-      return hohmannTransfer(args.mu ?? EARTH_MU, args.r1_m, args.r2_m);
+      const mu2 = args.mu ?? EARTH_MU;
+      if (![mu2, args.r1_m, args.r2_m].every(Number.isFinite) || !(mu2 > 0) || !(args.r1_m > 0) || !(args.r2_m > 0)) return null;
+      return hohmannTransfer(mu2, args.r1_m, args.r2_m);
     }
   },
   {
@@ -24454,16 +24456,18 @@ var MCP_TOOL_DEFS = [
   },
   {
     name: "bielliptic",
-    description: "Bielliptic three-burn transfer via intermediate apo rb.",
+    description: "Bielliptic three-burn transfer via intermediate apoapsis rb, which must exceed both endpoint radii; mu and radii must be finite and positive.",
     inputSchema: {
-      r1_m: number2(),
-      r2_m: number2(),
-      rb_m: number2(),
-      mu: number2().optional()
+      r1_m: number2().finite().positive(),
+      r2_m: number2().finite().positive(),
+      rb_m: number2().finite().positive(),
+      mu: number2().finite().positive().optional()
     },
     sample: { "r1_m": 6778137, "r2_m": 63246e3, "rb_m": 168656e3 },
     run: (args) => {
-      return biellipticTransfer(args.mu ?? EARTH_MU, args.r1_m, args.r2_m, args.rb_m);
+      const mu2 = args.mu ?? EARTH_MU;
+      if (![mu2, args.r1_m, args.r2_m, args.rb_m].every(Number.isFinite) || !(mu2 > 0) || !(args.r1_m > 0) || !(args.r2_m > 0) || !(args.rb_m > Math.max(args.r1_m, args.r2_m))) return null;
+      return biellipticTransfer(mu2, args.r1_m, args.r2_m, args.rb_m);
     }
   },
   {

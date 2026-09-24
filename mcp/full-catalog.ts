@@ -265,15 +265,22 @@ return { body: body.id, r_m: r, v_m_s: circularOrbitVelocity(body.mu, r), period
   },
   {
     name: "hohmann",
-    description: "Hohmann transfer Δv and TOF between circular coplanar orbits.",
+    description: "Hohmann transfer Δv and TOF between circular coplanar orbits; mu and radii must be finite and positive.",
     inputSchema: {
-    r1_m: z.number(),
-    r2_m: z.number(),
-    mu: z.number().optional(),
+    r1_m: z.number().finite().positive(),
+    r2_m: z.number().finite().positive(),
+    mu: z.number().finite().positive().optional(),
   },
     sample: {"r1_m":6778137,"r2_m":42164000},
     run: (args) => {
-      return hohmannTransfer(args.mu ?? EARTH_MU, args.r1_m, args.r2_m)
+      const mu = args.mu ?? EARTH_MU
+      if (
+        ![mu, args.r1_m, args.r2_m].every(Number.isFinite) ||
+        !(mu > 0) ||
+        !(args.r1_m > 0) ||
+        !(args.r2_m > 0)
+      ) return null
+      return hohmannTransfer(mu, args.r1_m, args.r2_m)
     },
   },
   {
@@ -290,16 +297,24 @@ return { body: body.id, r_m: r, v_m_s: circularOrbitVelocity(body.mu, r), period
   },
   {
     name: "bielliptic",
-    description: "Bielliptic three-burn transfer via intermediate apo rb.",
+    description: "Bielliptic three-burn transfer via intermediate apoapsis rb, which must exceed both endpoint radii; mu and radii must be finite and positive.",
     inputSchema: {
-    r1_m: z.number(),
-    r2_m: z.number(),
-    rb_m: z.number(),
-    mu: z.number().optional(),
+    r1_m: z.number().finite().positive(),
+    r2_m: z.number().finite().positive(),
+    rb_m: z.number().finite().positive(),
+    mu: z.number().finite().positive().optional(),
   },
     sample: {"r1_m":6778137,"r2_m":63246000,"rb_m":168656000},
     run: (args) => {
-      return biellipticTransfer(args.mu ?? EARTH_MU, args.r1_m, args.r2_m, args.rb_m)
+      const mu = args.mu ?? EARTH_MU
+      if (
+        ![mu, args.r1_m, args.r2_m, args.rb_m].every(Number.isFinite) ||
+        !(mu > 0) ||
+        !(args.r1_m > 0) ||
+        !(args.r2_m > 0) ||
+        !(args.rb_m > Math.max(args.r1_m, args.r2_m))
+      ) return null
+      return biellipticTransfer(mu, args.r1_m, args.r2_m, args.rb_m)
     },
   },
   {
