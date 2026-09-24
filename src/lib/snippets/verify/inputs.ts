@@ -433,6 +433,7 @@ export const SAMPLE: LiveCodeValues = {
  */
 export const SAMPLE_OVERRIDES: Record<string, LiveCodeValues> = {
   'panel-eol-power': { d: 0.005, p0: 200, years: 15 },
+  'gnss-troposphere-delay': { elev: Math.PI / 6, pressurePa: 101325, tK: 288.15, vaporPressurePa: 1100 },
   // Bag-level G is the gravitational constant; this tool's G is antenna gain, so override with a physical value.
   'antenna-gain-effective': { G: 1000, lam: 0.1 },
   'cr3bp-jacobi': { mu: 0.01215, x: 0.8, y: 0, vx: 0, vy: 0.1 },
