@@ -1126,11 +1126,10 @@ return { beta_kg_m2: beta, dv_per_rev_m_s: dv }
     name: "orbital_energy",
     description: "Specific orbital energy.",
     inputSchema: {
-    r_m: z.number(),
     a_m: z.number(),
     mu: z.number().optional(),
   },
-    sample: {"r_m":6778137,"a_m":6778137},
+    sample: {"a_m":6778137},
     run: (args) => {
       const e = specificEnergyCircular(args.mu ?? EARTH_MU, args.a_m); return { energy_j_kg: e }
     },

@@ -25324,11 +25324,10 @@ var MCP_TOOL_DEFS = [
     name: "orbital_energy",
     description: "Specific orbital energy.",
     inputSchema: {
-      r_m: number2(),
       a_m: number2(),
       mu: number2().optional()
     },
-    sample: { "r_m": 6778137, "a_m": 6778137 },
+    sample: { "a_m": 6778137 },
     run: (args) => {
       const e = specificEnergyCircular(args.mu ?? EARTH_MU, args.a_m);
       return { energy_j_kg: e };
