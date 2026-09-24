@@ -2331,9 +2331,9 @@ return w == null ? null : { swath_m: w }
     name: "capture_circularize",
     description: "Capture then circularize Δv.",
     inputSchema: {
-    rp_m: z.number(),
-    v_inf_m_s: z.number(),
-    mu: z.number().optional(),
+    rp_m: z.number().finite().positive(),
+    v_inf_m_s: z.number().finite().min(0),
+    mu: z.number().finite().positive().optional(),
   },
     sample: {"rp_m":6778137,"v_inf_m_s":2000},
     run: (args) => {

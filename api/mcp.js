@@ -23395,6 +23395,7 @@ function magnetorquerMoment(turns, current, area) {
   return turns * current * area;
 }
 function captureCircularizeDv(mu2, rp, vInf) {
+  if (!Number.isFinite(mu2) || !Number.isFinite(rp) || !Number.isFinite(vInf)) return null;
   if (!(mu2 > 0) || !(rp > 0) || !(vInf >= 0)) return null;
   const vp = Math.sqrt(vInf * vInf + 2 * mu2 / rp);
   const vc = Math.sqrt(mu2 / rp);
@@ -26602,9 +26603,9 @@ var MCP_TOOL_DEFS = [
     name: "capture_circularize",
     description: "Capture then circularize \u0394v.",
     inputSchema: {
-      rp_m: number2(),
-      v_inf_m_s: number2(),
-      mu: number2().optional()
+      rp_m: number2().finite().positive(),
+      v_inf_m_s: number2().finite().min(0),
+      mu: number2().finite().positive().optional()
     },
     sample: { "rp_m": 6778137, "v_inf_m_s": 2e3 },
     run: (args) => {
