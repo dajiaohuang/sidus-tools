@@ -3,10 +3,8 @@
  * geometry-category tools (strict category partition: crew + planetary + geometry).
  * See scenarios/index.ts for how these merge into the runner's SCENARIOS map.
  *
- * `elevation-azimuth` is UNVERIFIABLE (EXPECTED returns `{}` regardless of bag; see
- * expected/planetary.ts), so these scenarios never reach a numeric comparison — they
- * exist to satisfy the pilot's >=3-scenario minimum and to document plausible ENU
- * inputs for future waves.
+ * Elevation/azimuth scenarios exercise the ENU line-of-sight contract directly;
+ * the southwest case covers normalization into a compass azimuth.
  */
 import type { Scenario } from '../inputs'
 
@@ -381,12 +379,12 @@ export const PLANETARY_SCENARIOS: Record<string, Scenario[]> = {
   'elevation-azimuth': [
     {
       name: 'high-elevation-ne',
-      source: 'documents a plausible ENU line-of-sight (target to the NE, high elevation); no shipped counterpart (see UNVERIFIABLE note).',
+      source: 'ENU line-of-sight in the northeast quadrant at high elevation.',
       bag: { east: 3000, north: 4000, up: 8000 },
     },
     {
       name: 'low-elevation-sw',
-      source: 'documents a plausible ENU line-of-sight (target to the SW, near horizon).',
+      source: 'ENU line-of-sight in the southwest quadrant; raw atan2 is negative before compass normalization.',
       bag: { east: -1500, north: -2000, up: 200 },
     },
     {

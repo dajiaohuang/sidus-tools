@@ -330,6 +330,15 @@ describe('snippet verification expected values', () => {
   it('covers exactly the pilots plus every landed coverage wave', () => {
     expect(Object.keys(EXPECTED).sort()).toEqual([...COVERED].sort())
   })
+
+  it('matches the analytic southwest ENU look-angle vector', () => {
+    const fixed = EXPECTED['elevation-azimuth']({ east: -1, north: 0, up: 1 })
+    expect(fixed.rho).toBeCloseTo(Math.sqrt(2), 14)
+    expect(fixed.el).toBeCloseTo(Math.PI / 4, 14)
+    expect(fixed.az).toBeCloseTo((3 * Math.PI) / 2, 14)
+    expect(fixed.az).toBeGreaterThanOrEqual(0)
+    expect(fixed.az).toBeLessThan(2 * Math.PI)
+  })
 })
 
 /**

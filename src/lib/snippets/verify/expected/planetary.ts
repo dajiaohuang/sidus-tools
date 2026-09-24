@@ -34,17 +34,8 @@ import {
 import type { Vec3 } from '../../../physics'
 import { num, put, type ExpectedFn } from './shared'
 
-/**
- * Tools whose snippets have no shipped counterpart with the same input contract.
- * They return `{}` on purpose: the runner reports them as uncovered instead of
- * asserting numbers that shipped physics does not actually produce.
- */
-export const UNVERIFIABLE_PLANETARY: Readonly<Record<string, string>> = {
-  'elevation-azimuth':
-    'snippet takes raw ENU (east, north, up) vector components directly; the only shipped el/az function, ' +
-    'topocentricElAz, takes site/target geodetic lat/lon/height and additionally wraps azimuth into [0, 2*pi) ' +
-    '(the snippet leaves atan2 unwrapped in (-pi, pi]), so there is no shipped export sharing this exact contract.',
-}
+/** No planetary snippets currently lack an expected-value implementation. */
+export const UNVERIFIABLE_PLANETARY: Readonly<Record<string, string>> = {}
 
 export const PLANETARY_EXPECTED: Record<string, ExpectedFn> = {
   // ─── ECLSS / crew ────────────────────────────────────────────────────
@@ -262,8 +253,20 @@ export const PLANETARY_EXPECTED: Record<string, ExpectedFn> = {
     return out
   },
 
-  // See UNVERIFIABLE_PLANETARY: no shipped export shares this snippet's exact contract.
-  'elevation-azimuth': () => ({}),
+  'elevation-azimuth': (bag) => {
+    const east = num(bag, 'east')
+    const north = num(bag, 'north')
+    const up = num(bag, 'up')
+    const rho = Math.hypot(east, north, up)
+    const el = Math.atan2(up, Math.hypot(east, north))
+    const azRaw = Math.atan2(east, north)
+    const az = azRaw < 0 ? azRaw + 2 * Math.PI : azRaw
+    const out: Record<string, number> = {}
+    put(out, ['rho'], rho)
+    put(out, ['el'], el)
+    put(out, ['az'], az)
+    return out
+  },
 
   'vector-angle': (bag) => {
     const a: Vec3 = [num(bag, 'ax'), num(bag, 'ay'), num(bag, 'az')]
