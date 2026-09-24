@@ -131,7 +131,10 @@ export function klobucharIonoDelayM(
   return Number.isFinite(d) && d >= 0 ? d : Number.isFinite(dVert) ? dVert * mf : null
 }
 
-/** Optical free-space received power: Pr = Pt ηt ηr Gt Gr (λ/(4π R))² / L. */
+/**
+ * Far-field optical received power: Pr = Pt ηt ηr Gt Gr (λ/(4π R))² / L.
+ * ηt and ηr are passive efficiencies in (0, 1]; L is a passive linear loss factor ≥ 1.
+ */
 export function opticalLinkReceivedPower(opts: {
   ptW: number
   etaT: number
@@ -145,14 +148,15 @@ export function opticalLinkReceivedPower(opts: {
   const { ptW, etaT, etaR, gt, gr, wavelengthM: lam, rangeM: R } = opts
   const L = opts.lossLin ?? 1
   if (
+    ![ptW, etaT, etaR, gt, gr, lam, R, L].every(Number.isFinite) ||
     !(ptW > 0) ||
-    !(etaT > 0) ||
-    !(etaR > 0) ||
+    !(etaT > 0 && etaT <= 1) ||
+    !(etaR > 0 && etaR <= 1) ||
     !(gt > 0) ||
     !(gr > 0) ||
     !(lam > 0) ||
     !(R > 0) ||
-    !(L > 0)
+    !(L >= 1)
   )
     return null
   const fspl = (lam / (4 * Math.PI * R)) ** 2

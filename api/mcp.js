@@ -23123,7 +23123,7 @@ function klobucharIonoDelayM(elevRad, tecu, fHz = 157542e4) {
 function opticalLinkReceivedPower(opts) {
   const { ptW, etaT, etaR, gt, gr, wavelengthM: lam, rangeM: R } = opts;
   const L = opts.lossLin ?? 1;
-  if (!(ptW > 0) || !(etaT > 0) || !(etaR > 0) || !(gt > 0) || !(gr > 0) || !(lam > 0) || !(R > 0) || !(L > 0))
+  if (![ptW, etaT, etaR, gt, gr, lam, R, L].every(Number.isFinite) || !(ptW > 0) || !(etaT > 0 && etaT <= 1) || !(etaR > 0 && etaR <= 1) || !(gt > 0) || !(gr > 0) || !(lam > 0) || !(R > 0) || !(L >= 1))
     return null;
   const fspl = (lam / (4 * Math.PI * R)) ** 2;
   const pr = ptW * etaT * etaR * gt * gr * fspl / L;
@@ -25872,13 +25872,13 @@ var MCP_TOOL_DEFS = [
     name: "laser_link_budget",
     description: "Optical link received power sketch.",
     inputSchema: {
-      pt_w: number2(),
-      gt: number2(),
-      gr: number2(),
-      wavelength_m: number2(),
-      range_m: number2(),
-      eta_t: number2().optional(),
-      eta_r: number2().optional()
+      pt_w: number2().positive().finite(),
+      gt: number2().positive().finite(),
+      gr: number2().positive().finite(),
+      wavelength_m: number2().positive().finite(),
+      range_m: number2().positive().finite(),
+      eta_t: number2().positive().max(1).finite().optional(),
+      eta_r: number2().positive().max(1).finite().optional()
     },
     sample: { "pt_w": 1, "gt": 1e5, "gr": 1e5, "wavelength_m": 155e-8, "range_m": 1e6, "eta_t": 0.8, "eta_r": 0.7 },
     run: (args) => {

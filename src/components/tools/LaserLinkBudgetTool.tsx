@@ -41,8 +41,8 @@ export function LaserLinkBudgetTool() {
       parameters={
         <ParamsGrid>
           <UiField label={t('fields.disc_pt')} type="number" min={1e-12}  step="any" value={p.pt} onChange={(e)=>setP({pt:Number(e.target.value)})} />
-          <UiField label={t('fields.etat')} type="number" min={0.01}  step="any" value={p.etaT} onChange={(e)=>setP({etaT:Number(e.target.value)})} />
-          <UiField label={t('fields.etar')} type="number" min={0.01}  step="any" value={p.etaR} onChange={(e)=>setP({etaR:Number(e.target.value)})} />
+          <UiField label={t('fields.etat')} type="number" min={0.01} max={1} step="any" value={p.etaT} onChange={(e)=>setP({etaT:Number(e.target.value)})} />
+          <UiField label={t('fields.etar')} type="number" min={0.01} max={1} step="any" value={p.etaR} onChange={(e)=>setP({etaR:Number(e.target.value)})} />
           <UiField label={t('fields.disc_gt')} type="number" min={1}  step="any" value={p.gt} onChange={(e)=>setP({gt:Number(e.target.value)})} />
           <UiField label={t('fields.disc_gr')} type="number" min={1}  step="any" value={p.gr} onChange={(e)=>setP({gr:Number(e.target.value)})} />
           <UiField label={t('fields.lam')} type="number" min={1e-9}  step="any" value={p.lam} onChange={(e)=>setP({lam:Number(e.target.value)})} />
@@ -60,10 +60,12 @@ export function LaserLinkBudgetTool() {
         )
       }
       code={
-        <CodeExport
-          formulaId="laser-link-budget"
-          values={{ ...p, R: toSi(p.R, p.Ru) }}
-        />
+        res == null ? undefined : (
+          <CodeExport
+            formulaId="laser-link-budget"
+            values={{ ...p, R: toSi(p.R, p.Ru) }}
+          />
+        )
       }
     />
   )
