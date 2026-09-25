@@ -421,8 +421,9 @@ export const OPS_SCENARIOS: Record<string, Scenario[]> = {
       bag: { p0: 100, d: 0, years: 10 },
     },
     {
-      name: 'geo-15yr-gaas',
-      source: 'representative GaAs triple-junction degradation ≈2.5%/yr, well-known 15-year GEO design life',
+      name: 'synthetic-constant-compound-loss',
+      source:
+        'synthetic inputs: assume a constant compounded 2.5% fractional power loss per year for 15 years; not a mission-specific GaAs or GEO performance estimate',
       bag: { p0: 200, d: 0.025, years: 15 },
     },
     {
