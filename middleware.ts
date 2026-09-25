@@ -117,6 +117,11 @@ function resolveOgCtx(requestUrl: URL): OgCtx {
   } else if (requestUrl.pathname === '/resources') {
     title = 'Resources · SIDUS'
     description = 'Public data sources and references used by SIDUS.'
+  } else if (requestUrl.pathname === '/privacy') {
+    title = 'Privacy · SIDUS'
+    description =
+      'How SIDUS uses cookies, Google Analytics via Tag Manager, and Cloudflare Web Analytics. ' +
+      'Consent, retention, and your rights.'
   } else {
     const m = requestUrl.pathname.match(/^\/tools\/([^/]+)\/?$/)
     if (m) {
@@ -369,5 +374,5 @@ export default async function middleware(request: Request) {
 }
 
 export const config = {
-  matcher: ['/', '/tools', '/tools/:path*', '/resources'],
+  matcher: ['/', '/tools', '/tools/:path*', '/resources', '/privacy'],
 }
