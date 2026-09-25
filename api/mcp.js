@@ -23542,9 +23542,14 @@ function planckSpectralRadiance(lambdaM, tempK) {
   if (!(lambdaM > 0) || !(tempK > 0)) return null;
   const x = PLANCK_H * C / (lambdaM * BOLTZMANN_K * tempK);
   if (!Number.isFinite(x) || x <= 0) return null;
-  if (x > 700) return 0;
-  const num = 2 * PLANCK_H * C * C / lambdaM ** 5;
-  const B = num / (Math.exp(x) - 1);
+  let B;
+  if (x > 50) {
+    const logB = Math.log(2 * PLANCK_H * C * C) - 5 * Math.log(lambdaM) - x;
+    B = Math.exp(logB);
+  } else {
+    const num = 2 * PLANCK_H * C * C / lambdaM ** 5;
+    B = num / Math.expm1(x);
+  }
   return Number.isFinite(B) && B >= 0 ? B : null;
 }
 function eirpLinear(pt, gainLin) {

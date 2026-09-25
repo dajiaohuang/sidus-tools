@@ -530,9 +530,14 @@ export const OPS_SCENARIOS: Record<string, Scenario[]> = {
       bag: { T: 5778, lam: 500e-9 },
     },
     {
+      name: 'high-exponent-representable-tail',
+      source: 'independent NIST Planck-law Decimal anchor; exp(x) overflows while B_lambda remains representable',
+      bag: { T: 200_000, lam: 1e-10 },
+    },
+    {
       name: 'cmb-branch',
       source:
-        'branch coverage: well-known cosmic microwave background temperature 2.725 K at a near-IR wavelength ⇒ x≫700, exact hard-zero clamp regime',
+        'branch coverage: well-known cosmic microwave background temperature 2.725 K at a near-IR wavelength; final radiance underflows binary64',
       bag: { T: 2.725, lam: 1e-6 },
     },
     {
