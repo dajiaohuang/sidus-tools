@@ -535,6 +535,11 @@ export const OPS_SCENARIOS: Record<string, Scenario[]> = {
       bag: { T: 200_000, lam: 1e-10 },
     },
     {
+      name: 'rayleigh-jeans-small-exponent',
+      source: 'independent Decimal evaluation of the NIST Planck law; exercises expm1 cancellation near x=0',
+      bag: { T: 300, lam: 100 },
+    },
+    {
       name: 'cmb-branch',
       source:
         'branch coverage: well-known cosmic microwave background temperature 2.725 K at a near-IR wavelength; final radiance underflows binary64',

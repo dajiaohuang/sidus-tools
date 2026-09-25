@@ -100,6 +100,13 @@ describe('Planck B(λ, T)', () => {
     // At this wavelength, the exact Planck tail is below the binary64 range.
     expect(planckSpectralRadiance(1e-10, 160_000)).toBe(0)
   })
+
+  it('matches an independent Rayleigh-Jeans-limit anchor without exp-minus-one cancellation', () => {
+    // 80-digit Decimal evaluation for the exact binary64 inputs lambda=100 m, T=300 K.
+    const radiance = planckSpectralRadiance(100, 300)
+    expect(radiance).not.toBeNull()
+    expect(radiance! / 2.4834483485500135e-20).toBeCloseTo(1, 14)
+  })
 })
 
 describe('EIRP and G/T', () => {
