@@ -433,6 +433,9 @@ export const SAMPLE: LiveCodeValues = {
  */
 export const SAMPLE_OVERRIDES: Record<string, LiveCodeValues> = {
   'panel-eol-power': { d: 0.005, p0: 200, years: 15 },
+  // Exercise the representable high-exponent tail; the shared bag's wavelength
+  // and temperature are unrelated to this tool and miss exp(x) overflow.
+  'planck-radiance': { lam: 1e-10, T: 200_000 },
   // Bag-level G is the gravitational constant; this tool's G is antenna gain, so override with a physical value.
   'antenna-gain-effective': { G: 1000, lam: 0.1 },
   'cr3bp-jacobi': { mu: 0.01215, x: 0.8, y: 0, vx: 0, vy: 0.1 },
