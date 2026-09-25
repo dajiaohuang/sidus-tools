@@ -2207,17 +2207,17 @@ return w == null ? null : { swath_m: w }
   },
   {
     name: "arg_perigee_drift_j2",
-    description: "J2 argument of perigee drift.",
+    description: "First-order secular J2 argument-of-perigee rate for elliptic orbits (0 < e < 1); undefined for e = 0.",
     inputSchema: {
     a_m: z.number(),
-    e: z.number(),
+    e: z.number().gt(0).lt(1),
     i_deg: z.number(),
   },
     sample: {"a_m":6778137,"e":0.001,"i_deg":51.6},
     run: (args) => {
       const a = args.a_m
       const e = args.e
-      if (!(a > 0) || !(e >= 0) || !(e < 1)) return null
+      if (!(a > 0) || !(e > 0) || !(e < 1)) return null
       const n = Math.sqrt(EARTH_MU / (a * a * a))
       const p = a * (1 - e * e)
       const r = argPerigeeDriftJ2(n, 1.08262668e-3, EARTH_RADIUS, p, (args.i_deg * Math.PI) / 180)
