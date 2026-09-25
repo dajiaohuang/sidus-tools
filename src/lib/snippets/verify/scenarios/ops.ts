@@ -141,13 +141,13 @@ export const OPS_SCENARIOS: Record<string, Scenario[]> = {
 
   battery: [
     {
-      name: 'smallsat-bus',
-      source: 'representative smallsat Li-ion pack: 50 Ah, 28 V bus, 100 W load',
+      name: 'synthetic-pack-estimate',
+      source: 'illustrative synthetic input: 50 Ah, 28 V constant-voltage assumption, 100 W constant load; not a battery-specific discharge profile',
       bag: { C_Ah: 50, V: 28, P: 100 },
     },
     {
-      name: 'cubesat-cell',
-      source: 'representative cubesat single Li-ion cell: 2.5 Ah, 3.7 V, 5 W load',
+      name: 'synthetic-cell-estimate',
+      source: 'illustrative synthetic input: 2.5 Ah, 3.7 V constant-voltage assumption, 5 W constant load; not a cell-specific discharge profile',
       bag: { C_Ah: 2.5, V: 3.7, P: 5 },
     },
     {
