@@ -439,8 +439,9 @@ export const OPS_SCENARIOS: Record<string, Scenario[]> = {
       bag: { eUsed: 500, eCap: 500 },
     },
     {
-      name: 'leo-design-limit',
-      source: 'well-known LEO cycling-battery design limit ≈20% DoD',
+      name: 'representative-nicd-leo-20-percent',
+      source:
+        'NASA NTRS 19930009226: 20% is a conservative NiCd assumption for a 2-year LEO mission (~11,000 cycles); representative case, not a universal limit.',
       bag: { eUsed: 100, eCap: 500 },
     },
     {
