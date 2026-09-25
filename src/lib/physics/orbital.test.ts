@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   EARTH_MU,
   EARTH_RADIUS,
+  apsidesWithSpeeds,
   circularOrbitVelocity,
   hohmannTransfer,
   j2RaanRate,
@@ -119,6 +120,17 @@ describe('apsides / Hohmann geometry consistency', () => {
     const e = 0.15
     expect(a * (1 - e)).toBeCloseTo(5_950_000)
     expect(a * (1 + e)).toBeCloseTo(8_050_000)
+  })
+
+  it('preserves the nonzero apoapsis speed at the elliptic binary64 boundary', () => {
+    const e = 0.9999999999999999
+    const result = apsidesWithSpeeds(1, 1, e)
+
+    expect(result).not.toBeNull()
+    expect(result!.ra).toBe(2)
+    expect(result!.vp).toBe(134_217_728)
+    expect(result!.va).toBeGreaterThan(0)
+    expect(Math.abs(result!.va / 7.450580596923828e-9 - 1)).toBeLessThan(1e-15)
   })
 
   it('Hohmann transfer ellipse matches circular r1,r2 at apo/peri', () => {

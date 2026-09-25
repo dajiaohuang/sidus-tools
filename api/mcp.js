@@ -21652,8 +21652,10 @@ function apsidesWithSpeeds(mu2, a, e) {
     return null;
   }
   const { rp, ra } = apsides(a, e);
-  const vp = visViva(mu2, rp, a);
-  const va = visViva(mu2, ra, a);
+  const sqrtMu = Math.sqrt(mu2);
+  const sqrtA = Math.sqrt(a);
+  const vp = sqrtMu * Math.sqrt((1 + e) / (1 - e)) / sqrtA;
+  const va = sqrtMu * Math.sqrt((1 - e) / (1 + e)) / sqrtA;
   return { rp, ra, vp, va };
 }
 function rocketDeltaV(ispS, m0, mf, g0 = 9.80665) {

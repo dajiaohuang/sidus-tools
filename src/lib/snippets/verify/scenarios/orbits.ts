@@ -222,6 +222,11 @@ export const ORBITS_SCENARIOS: Record<string, Scenario[]> = {
       source: 'adversarial synthetic: high-eccentricity non-round a/e',
       bag: { a: 15_234_567, e: 0.85 },
     },
+    {
+      name: 'elliptic-near-parabolic',
+      source: 'near-parabolic ellipse; eccentricity remains representable through the live-code literal formatter',
+      bag: { mu: 1, a: 1, e: 0.9999999999 },
+    },
   ],
 
   bodies: [
