@@ -1139,14 +1139,22 @@ return { beta_kg_m2: beta, dv_per_rev_m_s: dv }
     name: "true_anomaly",
     description: "Radius from true anomaly.",
     inputSchema: {
-    a_m: z.number(),
-    e: z.number(),
-    nu_deg: z.number(),
-  },
-    sample: {"a_m":8000000,"e":0.1,"nu_deg":45},
+      a_m: z.number().positive(),
+      e: z.number().min(0).max(0.999),
+      nu_deg: z.number(),
+    },
+    sample: { a_m: 8_000_000, e: 0.1, nu_deg: 45 },
     run: (args) => {
-      const nu = (args.nu_deg * Math.PI) / 180; const p = args.a_m * (1 - args.e ** 2); const r = p / (1 + args.e * Math.cos(nu));
-return { r_m: r, nu_rad: nu }
+      if (!(args.a_m > 0) || !Number.isFinite(args.a_m)) return null
+      if (!Number.isFinite(args.e) || !(args.e >= 0 && args.e <= 0.999)) return null
+      if (!Number.isFinite(args.nu_deg)) return null
+      const nu = (args.nu_deg * Math.PI) / 180
+      const p = args.a_m * (1 - args.e ** 2)
+      const denominator = 1 + args.e * Math.cos(nu)
+      if (!(denominator > 0) || !Number.isFinite(denominator)) return null
+      const r = p / denominator
+      if (!(r > 0) || !Number.isFinite(r)) return null
+      return { r_m: r, nu_rad: nu }
     },
   },
   {

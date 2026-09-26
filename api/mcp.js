@@ -25338,15 +25338,21 @@ var MCP_TOOL_DEFS = [
     name: "true_anomaly",
     description: "Radius from true anomaly.",
     inputSchema: {
-      a_m: number2(),
-      e: number2(),
+      a_m: number2().positive(),
+      e: number2().min(0).max(0.999),
       nu_deg: number2()
     },
-    sample: { "a_m": 8e6, "e": 0.1, "nu_deg": 45 },
+    sample: { a_m: 8e6, e: 0.1, nu_deg: 45 },
     run: (args) => {
+      if (!(args.a_m > 0) || !Number.isFinite(args.a_m)) return null;
+      if (!Number.isFinite(args.e) || !(args.e >= 0 && args.e <= 0.999)) return null;
+      if (!Number.isFinite(args.nu_deg)) return null;
       const nu = args.nu_deg * Math.PI / 180;
       const p = args.a_m * (1 - args.e ** 2);
-      const r = p / (1 + args.e * Math.cos(nu));
+      const denominator = 1 + args.e * Math.cos(nu);
+      if (!(denominator > 0) || !Number.isFinite(denominator)) return null;
+      const r = p / denominator;
+      if (!(r > 0) || !Number.isFinite(r)) return null;
       return { r_m: r, nu_rad: nu };
     }
   },
