@@ -33,7 +33,52 @@ export const passPredictSnippets: FormulaSnippet = {
 import math
 from datetime import datetime, timezone, timedelta
 from sgp4.api import Satrec, jday
-# also use look_angles() from the Look-angles snippet (ECEF → SEZ)
+
+# SGP4 returns TEME. Treat UTC as UT1 and ignore polar motion in this
+# educational TEME → PEF approximation (Vallado GMST-1982).
+def teme_to_pef_m(r_teme_km, jd, fr):
+    tut1 = ((jd - 2451545.0) + fr) / 36525.0
+    gmst_seconds = (
+        -6.2e-6 * tut1 ** 3
+        + 0.093104 * tut1 ** 2
+        + (876600.0 * 3600.0 + 8640184.812866) * tut1
+        + 67310.54841
+    )
+    theta = math.radians(gmst_seconds / 240.0) % (2.0 * math.pi)
+    x_km, y_km, z_km = r_teme_km
+    c, s = math.cos(theta), math.sin(theta)
+    return [
+        (x_km * c + y_km * s) * 1000.0,
+        (-x_km * s + y_km * c) * 1000.0,
+        z_km * 1000.0,
+    ]
+
+def look_angles(lat_deg, lon_deg, h_m, r_pef_m):
+    # Observer geodetic coordinates are degrees; the SEZ trigonometry is radians.
+    lat_rad, lon_rad = math.radians(lat_deg), math.radians(lon_deg)
+    f = 1.0 / 298.257223563
+    e2 = f * (2.0 - f)
+    a_m = 6378137.0
+    n_m = a_m / math.sqrt(1.0 - e2 * math.sin(lat_rad) ** 2)
+    obs_x = (n_m + h_m) * math.cos(lat_rad) * math.cos(lon_rad)
+    obs_y = (n_m + h_m) * math.cos(lat_rad) * math.sin(lon_rad)
+    obs_z = (n_m * (1.0 - e2) + h_m) * math.sin(lat_rad)
+    dx_m, dy_m, dz_m = r_pef_m[0] - obs_x, r_pef_m[1] - obs_y, r_pef_m[2] - obs_z
+    south = (
+        math.sin(lat_rad) * math.cos(lon_rad) * dx_m
+        + math.sin(lat_rad) * math.sin(lon_rad) * dy_m
+        - math.cos(lat_rad) * dz_m
+    )
+    east = -math.sin(lon_rad) * dx_m + math.cos(lon_rad) * dy_m
+    zenith = (
+        math.cos(lat_rad) * math.cos(lon_rad) * dx_m
+        + math.cos(lat_rad) * math.sin(lon_rad) * dy_m
+        + math.sin(lat_rad) * dz_m
+    )
+    az = math.atan2(east, -south) % (2.0 * math.pi)
+    el = math.atan2(zenith, math.hypot(south, east))
+    range_m = math.hypot(south, east, zenith)
+    return az, el, range_m
 
 def elev_at(sat, lat_deg, lon_deg, h_m, t):
     jd, fr = jday(t.year, t.month, t.day, t.hour, t.minute,
@@ -41,8 +86,8 @@ def elev_at(sat, lat_deg, lon_deg, h_m, t):
     err, r_km, _v = sat.sgp4(jd, fr)
     if err != 0:
         return None
-    r_ecef_m = [x * 1000 for x in r_km]  # approx if already ECEF/TEME-as-ECEF for demo
-    _az, el, _rng = look_angles(lat_deg, lon_deg, h_m, r_ecef_m)
+    r_pef_m = teme_to_pef_m(r_km, jd, fr)
+    _az, el, _rng = look_angles(lat_deg, lon_deg, h_m, r_pef_m)
     return el
 
 def find_next_pass(sat, lat_deg, lon_deg, h_m, start=None,
