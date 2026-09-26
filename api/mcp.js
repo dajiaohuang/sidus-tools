@@ -27265,8 +27265,8 @@ var MCP_TOOL_DEFS = [
     name: "pass_predict",
     description: "Horizon crossing time sketch from period and duty (not full pass search).",
     inputSchema: {
-      period_s: number2(),
-      visible_frac: number2().optional()
+      period_s: number2().positive(),
+      visible_frac: number2().min(0).max(1).optional()
     },
     sample: { "period_s": 5600, "visible_frac": 0.1 },
     run: (args) => {

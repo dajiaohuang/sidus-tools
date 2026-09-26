@@ -2946,8 +2946,8 @@ return { elev_rad: el, slant_m: slant, note: 'Educational; full TLE look-angles 
     name: "pass_predict",
     description: "Horizon crossing time sketch from period and duty (not full pass search).",
     inputSchema: {
-    period_s: z.number(),
-    visible_frac: z.number().optional(),
+    period_s: z.number().positive(),
+    visible_frac: z.number().min(0).max(1).optional(),
   },
     sample: {"period_s":5600,"visible_frac":0.1},
     run: (args) => {
