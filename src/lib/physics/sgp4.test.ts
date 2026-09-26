@@ -340,6 +340,102 @@ describe('findNextPass refineS: bisected AOS/LOS/peak vs coarse scan', () => {
   })
 })
 
+describe('findNextPass: pass entirely between below-mask coarse samples', () => {
+  it('finds and refines a 9.8-second pass at every one-second start phase', () => {
+    const caseA = VALLADO_CASES[0]
+    const referenceTle = parseTle(`${caseA.l1}\n${caseA.l2}`)
+    expect(referenceTle.ok, 'parseTle(reference)').toBe(true)
+    if (!referenceTle.ok) throw new Error('unreachable: narrowed by expect above')
+
+    const observer = { latDeg: 34, lonDeg: -99.1, heightM: 100 }
+    const start = new Date('2000-06-27T19:30:44.546Z')
+    const reference = findNextPass({
+      satrec: referenceTle.satrec,
+      observer,
+      start,
+      horizonH: 1,
+      stepS: 1,
+      minElDeg: 80,
+      refineS: 0.1,
+    })
+
+    expect(reference, 'fine reference pass').toBeTruthy()
+    if (!reference) throw new Error('unreachable: narrowed by expect above')
+
+    expect(reference.durationS).toBeLessThan(20)
+    expect(reference.maxElDeg).toBeGreaterThan(80)
+
+    // The detector must not depend on the arbitrary phase between a requested
+    // start time and its 20-second sampling grid. Every start remains before
+    // the true AOS, avoiding the separate mid-pass-start behavior.
+    for (let offsetS = 0; offsetS < 10; offsetS++) {
+      const productionTle = parseTle(`${caseA.l1}\n${caseA.l2}`)
+      expect(productionTle.ok, `parseTle(production, offset=${offsetS})`).toBe(true)
+      if (!productionTle.ok) throw new Error('unreachable: narrowed by expect above')
+
+      const productionCadence = findNextPass({
+        satrec: productionTle.satrec,
+        observer,
+        start: new Date(start.getTime() + offsetS * 1000),
+        horizonH: 1,
+        stepS: 20,
+        minElDeg: 80,
+        refineS: 1,
+      })
+
+      expect(productionCadence, `20-second cadence pass at offset=${offsetS}s`).toBeTruthy()
+      if (!productionCadence) throw new Error('unreachable: narrowed by expect above')
+      expect(Math.abs(productionCadence.aos.getTime() - reference.aos.getTime())).toBeLessThanOrEqual(1000)
+      expect(Math.abs(productionCadence.los.getTime() - reference.los.getTime())).toBeLessThanOrEqual(1000)
+      expect(Math.abs(productionCadence.maxElDeg - reference.maxElDeg)).toBeLessThanOrEqual(0.001)
+    }
+  })
+
+  it('includes a final partial cadence interval when checking for a hidden pass', () => {
+    const caseA = VALLADO_CASES[0]
+    const p = parseTle(`${caseA.l1}\n${caseA.l2}`)
+    expect(p.ok, 'parseTle(caseA)').toBe(true)
+    if (!p.ok) throw new Error('unreachable: narrowed by expect above')
+
+    const observer = { latDeg: 34, lonDeg: -99.1, heightM: 100 }
+    const start = new Date('2000-06-27T19:30:44.546Z')
+    const pass = findNextPass({
+      satrec: p.satrec,
+      observer,
+      start,
+      horizonH: 0.006, // 21.6 s: the hidden pass is inside the final partial interval.
+      stepS: 20,
+      minElDeg: 80,
+      refineS: 0.1,
+    })
+
+    expect(pass, 'pass before 21.6-second horizon end').toBeTruthy()
+    if (!pass) throw new Error('unreachable: narrowed by expect above')
+    expect(pass.aos.getTime()).toBeGreaterThanOrEqual(start.getTime())
+    expect(pass.los.getTime()).toBeLessThanOrEqual(start.getTime() + 21_600)
+    expect(pass.durationS).toBeLessThan(20)
+  })
+
+  it('does not turn a below-mask local maximum into a pass', () => {
+    const caseA = VALLADO_CASES[0]
+    const p = parseTle(`${caseA.l1}\n${caseA.l2}`)
+    expect(p.ok, 'parseTle(caseA)').toBe(true)
+    if (!p.ok) throw new Error('unreachable: narrowed by expect above')
+
+    const pass = findNextPass({
+      satrec: p.satrec,
+      observer: { latDeg: 34, lonDeg: -99.1, heightM: 100 },
+      start: new Date('2000-06-27T19:30:44.546Z'),
+      horizonH: 0.01,
+      stepS: 20,
+      minElDeg: 80.02,
+      refineS: 0.1,
+    })
+
+    expect(pass, '80.0095-degree peak below the 80.02-degree mask').toBeNull()
+  })
+})
+
 describe('observerEciPosition round-trips through eciSiToGeodetic', () => {
   it('recovers the input geodetic lat/lon/height within tight tolerance', () => {
     // Same ellipsoid on both sides of the round trip, so the residual is

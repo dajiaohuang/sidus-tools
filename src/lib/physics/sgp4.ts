@@ -351,6 +351,57 @@ function refineElevationPeak(
   return { maxEl: bestEl, maxElAtMs: bestMs }
 }
 
+/**
+ * Refine a sampled local elevation maximum with a bounded golden-section
+ * search. This is used only when three coarse samples are all below the mask
+ * but the middle one is a local maximum: it can reveal a complete pass window
+ * that a threshold-only coarse scan would otherwise skip.
+ */
+function refineHiddenElevationPeak(
+  elevationAt: (ms: number) => number | null,
+  leftMs: number,
+  rightMs: number,
+): { maxEl: number; maxElAtMs: number } {
+  const ratio = (Math.sqrt(5) - 1) / 2
+  let lo = leftMs
+  let hi = rightMs
+  let x1 = hi - ratio * (hi - lo)
+  let x2 = lo + ratio * (hi - lo)
+  let f1 = elevationAt(x1) ?? -Infinity
+  let f2 = elevationAt(x2) ?? -Infinity
+
+  // A one-millisecond bracket is below the UI's one-second crossing
+  // resolution and prevents a narrow, near-tangent mask crossing from being
+  // lost merely because no integer-second scan point landed inside it.
+  while (hi - lo > 1) {
+    if (f1 < f2) {
+      lo = x1
+      x1 = x2
+      f1 = f2
+      x2 = lo + ratio * (hi - lo)
+      f2 = elevationAt(x2) ?? -Infinity
+    } else {
+      hi = x2
+      x2 = x1
+      f2 = f1
+      x1 = hi - ratio * (hi - lo)
+      f1 = elevationAt(x1) ?? -Infinity
+    }
+  }
+
+  const candidates = [
+    { ms: leftMs, el: elevationAt(leftMs) ?? -Infinity },
+    { ms: rightMs, el: elevationAt(rightMs) ?? -Infinity },
+    { ms: x1, el: f1 },
+    { ms: x2, el: f2 },
+    { ms: (lo + hi) / 2, el: elevationAt((lo + hi) / 2) ?? -Infinity },
+  ]
+  const best = candidates.reduce((candidateBest, candidate) =>
+    candidate.el > candidateBest.el ? candidate : candidateBest,
+  )
+  return { maxEl: best.el, maxElAtMs: best.ms }
+}
+
 /** `PassWindow` fields computed by AOS/LOS/peak search, before visibility classification. */
 type PassWindowCore = Omit<PassWindow, 'visible' | 'visibleAt'>
 
@@ -449,6 +500,7 @@ export function findNextPass(opts: {
   const t0 = opts.start.getTime()
   const tEnd = t0 + horizonH * 3600 * 1000
   const sampleS = opts.refineS ?? stepS
+  const elevationAt = (ms: number) => elevationRadAtMs(opts.satrec, opts.observer, ms)
 
   let inPass = false
   let aosMs: number | null = null
@@ -456,6 +508,10 @@ export function findNextPass(opts: {
   let maxEl = -Infinity
   let maxElAtMs: number | null = null
   let prevMs = t0
+  let prevEl: number | null = null
+  const stepMs = stepS * 1000
+  let prevPrevMs: number | null = t0 - stepMs
+  let prevPrevEl: number | null = elevationAt(prevPrevMs)
   let lastMs = t0
 
   const buildWindow = (
@@ -493,7 +549,38 @@ export function findNextPass(opts: {
     return { ...core, visible, visibleAt }
   }
 
-  for (let t = t0; t <= tEnd; t += stepS * 1000) {
+  const buildHiddenWindow = (leftMs: number, rightMs: number): PassWindow | null => {
+    const peak = refineHiddenElevationPeak(elevationAt, leftMs, rightMs)
+    if (peak.maxEl < minElRad) return null
+
+    const crossingRefineMs = (opts.refineS ?? stepS) * 1000
+    const aosBracket = bisectMaskCrossing(
+      elevationAt,
+      minElRad,
+      leftMs,
+      peak.maxElAtMs,
+      crossingRefineMs,
+    )
+    const losBracket = bisectMaskCrossing(
+      elevationAt,
+      minElRad,
+      rightMs,
+      peak.maxElAtMs,
+      crossingRefineMs,
+    )
+    return buildWindow(
+      aosBracket.aboveMs,
+      aosBracket.belowMs,
+      peak.maxEl,
+      peak.maxElAtMs,
+      losBracket.belowMs,
+      losBracket.aboveMs,
+    )
+  }
+
+  const sampleCount = Math.ceil((tEnd - t0) / stepMs) + 1
+  for (let i = 0; i < sampleCount; i++) {
+    const t = Math.min(t0 + i * stepMs, tEnd)
     const date = new Date(t)
     lastMs = t
     const st = propagateEci(opts.satrec, date)
@@ -528,7 +615,56 @@ export function findNextPass(opts: {
         maxElAtMs = null
       }
     }
+
+    // If all three samples remain below the mask but the middle sample is a
+    // local maximum, refine that interior peak. A short pass can rise above
+    // the mask and fall back below entirely between two coarse samples, in
+    // which case the normal AOS/LOS state machine never starts.
+    if (
+      !inPass &&
+      prevPrevMs !== null &&
+      prevPrevEl !== null &&
+      prevEl !== null &&
+      prevPrevEl < minElRad &&
+      prevEl < minElRad &&
+      el < minElRad &&
+      prevEl >= prevPrevEl &&
+      prevEl >= el
+    ) {
+      // The search starts at t0, so never let the optimization or AOS bracket
+      // reach into the preceding, out-of-horizon sample used to identify a
+      // local maximum exactly at the first sample.
+      const win = buildHiddenWindow(Math.max(prevPrevMs, t0), t)
+      if (win && (!opts.visibleOnly || win.visible)) return win
+    }
+
+    if (prevEl !== null) {
+      prevPrevMs = prevMs
+      prevPrevEl = prevEl
+    }
     prevMs = t
+    prevEl = el
+  }
+
+  // A final partial cadence interval can contain a complete short pass even
+  // though the regular grid never samples its right-hand endpoint. Include a
+  // bounded look-ahead only to test whether the horizon endpoint is a local
+  // maximum; all reported crossings remain inside the requested horizon.
+  const endLookaheadEl = elevationAt(tEnd + stepMs)
+  if (
+    !inPass &&
+    prevPrevMs !== null &&
+    prevPrevEl !== null &&
+    prevEl !== null &&
+    prevPrevEl < minElRad &&
+    prevEl < minElRad &&
+    endLookaheadEl !== null &&
+    endLookaheadEl < minElRad &&
+    prevEl >= prevPrevEl &&
+    prevEl >= endLookaheadEl
+  ) {
+    const win = buildHiddenWindow(Math.max(prevPrevMs, t0), tEnd)
+    if (win && (!opts.visibleOnly || win.visible)) return win
   }
 
   // Pass still open at horizon end
