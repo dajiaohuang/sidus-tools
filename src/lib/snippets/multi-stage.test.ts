@@ -13,7 +13,16 @@ const helperCases: [string, Record<string, number>, number][] = [
     300 * 9.80665 * Math.log(2),
   ],
   ['legacy short keys', { isp: 300, m0: 10, mf: 5 }, 300 * 9.80665 * Math.log(2)],
+  [
+    'near-unit mass ratio',
+    { isp_s: 320, m0_kg: 5000 + 1e-12, mf_kg: 5000 },
+    5.708221578970551e-13,
+  ],
 ]
+
+function expectRelative(actual: number, expected: number) {
+  expect(Math.abs(actual - expected) / Math.abs(expected)).toBeLessThan(1e-12)
+}
 
 function runPythonStage(stage: Record<string, number>): [number[], number] {
   const body = multiStageSnippets.code.python
@@ -53,14 +62,14 @@ describe('multi-stage snippet exports', () => {
     .each(helperCases)('evaluates Python helper input: %s', (_label, stage, expected) => {
       const [perStage, total] = runPythonStage(stage)
       expect(perStage).toHaveLength(1)
-      expect(perStage[0]).toBeCloseTo(expected, 11)
-      expect(total).toBeCloseTo(expected, 11)
+      expectRelative(perStage[0]!, expected)
+      expectRelative(total, expected)
     })
 
   it.each(helperCases)('evaluates JavaScript helper input: %s', (_label, stage, expected) => {
     const result = runJavaScriptStage(stage)
     expect(result.dv).toHaveLength(1)
-    expect(result.dv[0]).toBeCloseTo(expected, 11)
-    expect(result.dvTotal).toBeCloseTo(expected, 11)
+    expectRelative(result.dv[0]!, expected)
+    expectRelative(result.dvTotal, expected)
   })
 })

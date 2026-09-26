@@ -157,6 +157,16 @@ export const SYSTEMS_SCENARIOS: Record<string, Scenario[]> = {
         isp3: 315.9, m03: 15_642.3, mf3: 3_012.8,
       },
     },
+    {
+      name: 'near-unit-mass-ratio',
+      source: 'floating-point stability regression: close positive mass ratio preserved by current code-literal precision',
+      bag: {
+        stages: 1,
+        isp1: 320, m01: 5000 + 5e-8, mf1: 5000,
+        isp2: 311, m02: 100_000, mf2: 20_000,
+        isp3: 320, m03: 20_000, mf3: 5_000,
+      },
+    },
   ],
 
   'propellant-mass': [
