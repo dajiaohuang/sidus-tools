@@ -25,3 +25,5 @@ docs/reviews/
 docs/**/*.log
 /.cursor
 .vercel
+/.firecrawl
+/.grok
