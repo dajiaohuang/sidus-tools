@@ -15,6 +15,7 @@
   <a href="https://skills.sh/massimodeluisa/sidus-tools"><img src="https://skills.sh/b/massimodeluisa/sidus-tools" alt="skills.sh" /></a>
   <a href="https://sidus.tools"><img src="https://img.shields.io/badge/Live-sidus.tools-0B1B2B?style=flat-square" alt="Live site" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-green?style=flat-square" alt="MIT License" /></a>
+  <a href="https://coderabbit.ai"><img src="https://img.shields.io/coderabbit/prs/github/massimodeluisa/sidus-tools?utm_source=oss&utm_medium=github&utm_campaign=massimodeluisa%2Fsidus-tools&labelColor=171717&color=FF570A&link=https%3A%2F%2Fcoderabbit.ai&label=CodeRabbit+Reviews&style=flat-square" alt="CodeRabbit Reviews" /></a>
   <a href="https://isready.ai"><img src="https://isready.ai/badge/sidus.tools" alt="AI readiness" /></a>
   <a href="https://agentskills.io"><img src="https://img.shields.io/badge/Format-Agent_Skills-orange?style=flat-square" alt="Agent Skills format" /></a>
   <a href="https://modelcontextprotocol.io"><img src="https://img.shields.io/badge/MCP-public_URL-111827?style=flat-square" alt="MCP" /></a>
