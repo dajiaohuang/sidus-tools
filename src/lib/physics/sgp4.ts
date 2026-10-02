@@ -26,7 +26,7 @@ import { vdot, vnorm, vscale, vsub, vunit } from './vector'
 import { AU, EARTH_RADIUS } from './constants'
 
 export type TleParseResult =
-  | { ok: true; satrec: SatRec; name: string }
+  | { ok: true; satrec: SatRec; name: string; line1: string; line2: string }
   | { ok: false; error: string }
 
 export type EciStateSi = {
@@ -56,6 +56,17 @@ export const SAMPLE_ISS_TLE = `ISS (ZARYA)
 1 25544U 98067A   26236.43525466  .00008197  00000+0  15348-3 0  9992
 2 25544  51.6332 322.3014 0007699  78.6726 281.5127 15.49604681582335`
 
+/** Validate the standard column-69 modulo-10 checksum on a 69-column TLE line. */
+function hasValidTleChecksum(line: string): boolean {
+  if (line.length !== 69 || !/^[0-9]$/.test(line[68])) return false
+  let sum = 0
+  for (const ch of line.slice(0, 68)) {
+    if (ch >= '0' && ch <= '9') sum += Number(ch)
+    else if (ch === '-') sum += 1
+  }
+  return sum % 10 === Number(line[68])
+}
+
 /** Parse 2- or 3-line TLE text (optional name line). */
 export function parseTle(text: string): TleParseResult {
   const lines = text
@@ -81,13 +92,22 @@ export function parseTle(text: string): TleParseResult {
   if (!l1.startsWith('1 ') || !l2.startsWith('2 ')) {
     return { ok: false, error: 'TLE lines must start with "1 " and "2 ".' }
   }
+  if (l1.slice(2, 7) !== l2.slice(2, 7)) {
+    return { ok: false, error: 'Invalid TLE (checksum or format).' }
+  }
+  if (!hasValidTleChecksum(l1)) {
+    return { ok: false, error: 'Invalid TLE (checksum or format).' }
+  }
+  if (!hasValidTleChecksum(l2)) {
+    return { ok: false, error: 'Invalid TLE (checksum or format).' }
+  }
 
   try {
     const satrec = twoline2satrec(l1, l2)
     if (!satrec || (satrec as { error?: number }).error) {
       return { ok: false, error: 'Invalid TLE (checksum or format).' }
     }
-    return { ok: true, satrec, name }
+    return { ok: true, satrec, name, line1: l1, line2: l2 }
   } catch {
     return { ok: false, error: 'Failed to parse TLE.' }
   }
@@ -241,10 +261,10 @@ export function sunEciSi(date: Date): Vec3 {
  * the night side of the terminator plane (its component along the anti-sun
  * axis is positive) AND its perpendicular distance from the Earth-sun axis
  * is inside a constant-radius (Earth-radius) shadow cylinder. This ignores
- * penumbra/umbra taper and Earth's oblateness; it is the standard coarse
- * model used for naked-eye ISS-spotting predictions (Vallado, "Fundamentals
- * of Astrodynamics and Applications", shadow-analysis class), not a precise
- * eclipse solver.
+ * penumbra/umbra taper and Earth's oblateness; it is only a coarse
+ * illumination-geometry filter (Vallado, "Fundamentals of Astrodynamics and
+ * Applications", shadow-analysis class), not a precise eclipse solver or
+ * an optical brightness model.
  */
 export function isSatSunlitSi(rSatM: Vec3, date: Date): boolean {
   const sHat = vunit(sunEciSi(date))
@@ -273,12 +293,11 @@ export function sunElevationRad(observer: GeodeticDeg, date: Date): number {
 }
 
 /**
- * Naked-eye visibility threshold: sun elevation below which the observer's
- * sky is dark enough for satellite spotting. Civil twilight (-6 deg) is the
- * standard criterion used by ISS-spotting tools (e.g. Heavens-Above, NASA
- * "Spot The Station").
+ * Geometric solar-altitude cutoff for the civil-twilight part of the pass
+ * lighting filter. It does not establish detectability: apparent magnitude,
+ * sky conditions, and observer sensitivity are not modeled.
  */
-export const CIVIL_DARKNESS_RAD = (-6 * Math.PI) / 180
+export const CIVIL_TWILIGHT_RAD = (-6 * Math.PI) / 180
 
 export type PassWindow = {
   aos: Date
@@ -286,8 +305,10 @@ export type PassWindow = {
   maxElDeg: number
   maxElAt: Date
   durationS: number
-  visible: boolean
-  visibleAt: Date | null
+  /** True when a sample meets the coarse lighting-geometry test, not photometric visibility. */
+  favorableLighting: boolean
+  /** First sampled time meeting the lighting test, or null if none does. */
+  favorableLightingAt: Date | null
 }
 
 /** Elevation (rad) at `ms` (epoch millis), or null if propagation/look-angle fails. */
@@ -351,8 +372,59 @@ function refineElevationPeak(
   return { maxEl: bestEl, maxElAtMs: bestMs }
 }
 
-/** `PassWindow` fields computed by AOS/LOS/peak search, before visibility classification. */
-type PassWindowCore = Omit<PassWindow, 'visible' | 'visibleAt'>
+/**
+ * Refine a sampled local elevation maximum with a bounded golden-section
+ * search. This is used only when three coarse samples are all below the mask
+ * but the middle one is a local maximum: it can reveal a complete pass window
+ * that a threshold-only coarse scan would otherwise skip.
+ */
+function refineHiddenElevationPeak(
+  elevationAt: (ms: number) => number | null,
+  leftMs: number,
+  rightMs: number,
+): { maxEl: number; maxElAtMs: number } {
+  const ratio = (Math.sqrt(5) - 1) / 2
+  let lo = leftMs
+  let hi = rightMs
+  let x1 = hi - ratio * (hi - lo)
+  let x2 = lo + ratio * (hi - lo)
+  let f1 = elevationAt(x1) ?? -Infinity
+  let f2 = elevationAt(x2) ?? -Infinity
+
+  // A one-millisecond bracket is below the UI's one-second crossing
+  // resolution and prevents a narrow, near-tangent mask crossing from being
+  // lost merely because no integer-second scan point landed inside it.
+  while (hi - lo > 1) {
+    if (f1 < f2) {
+      lo = x1
+      x1 = x2
+      f1 = f2
+      x2 = lo + ratio * (hi - lo)
+      f2 = elevationAt(x2) ?? -Infinity
+    } else {
+      hi = x2
+      x2 = x1
+      f2 = f1
+      x1 = hi - ratio * (hi - lo)
+      f1 = elevationAt(x1) ?? -Infinity
+    }
+  }
+
+  const candidates = [
+    { ms: leftMs, el: elevationAt(leftMs) ?? -Infinity },
+    { ms: rightMs, el: elevationAt(rightMs) ?? -Infinity },
+    { ms: x1, el: f1 },
+    { ms: x2, el: f2 },
+    { ms: (lo + hi) / 2, el: elevationAt((lo + hi) / 2) ?? -Infinity },
+  ]
+  const best = candidates.reduce((candidateBest, candidate) =>
+    candidate.el > candidateBest.el ? candidate : candidateBest,
+  )
+  return { maxEl: best.el, maxElAtMs: best.ms }
+}
+
+/** `PassWindow` fields computed by AOS/LOS/peak search, before lighting classification. */
+type PassWindowCore = Omit<PassWindow, 'favorableLighting' | 'favorableLightingAt'>
 
 /** Refine a coarsely-detected pass window's AOS/LOS/peak to `refineS` resolution. */
 function refinePassWindow(
@@ -394,29 +466,28 @@ function refinePassWindow(
 }
 
 /**
- * Classify a pass window's naked-eye visibility: sunlit satellite seen
- * against a dark sky (observer's sun below civil twilight). Standard
- * ISS-spotting criterion (Heavens-Above / NASA "Spot The Station").
- * Samples the window at `max(sampleS, 5)` s steps and returns the first
- * qualifying sample, if any.
+ * Test only favorable lighting geometry: satellite outside a cylindrical
+ * Earth-shadow approximation while the observer's Sun is below civil
+ * twilight. This is not apparent-magnitude or naked-eye visibility. Samples
+ * at `max(sampleS, 5)` s steps and returns the first qualifying sample.
  */
-function classifyPassVisibility(
+function classifyPassLightingGeometry(
   satrec: SatRec,
   observer: GeodeticDeg,
   aosMs: number,
   losMs: number,
   sampleS: number,
-): { visible: boolean; visibleAt: Date | null } {
+): { favorableLighting: boolean; favorableLightingAt: Date | null } {
   const stepMs = Math.max(sampleS, 5) * 1000
   for (let t = aosMs; t <= losMs; t += stepMs) {
     const date = new Date(t)
     const st = propagateEci(satrec, date)
     if (!st) continue
-    if (isSatSunlitSi(st.r, date) && sunElevationRad(observer, date) < CIVIL_DARKNESS_RAD) {
-      return { visible: true, visibleAt: date }
+    if (isSatSunlitSi(st.r, date) && sunElevationRad(observer, date) < CIVIL_TWILIGHT_RAD) {
+      return { favorableLighting: true, favorableLightingAt: date }
     }
   }
-  return { visible: false, visibleAt: null }
+  return { favorableLighting: false, favorableLightingAt: null }
 }
 
 /**
@@ -428,10 +499,12 @@ function classifyPassVisibility(
  * neighboring `stepS` intervals at `refineS` resolution. Omit `refineS` for
  * the original quantized-to-`stepS` behavior.
  *
- * Every returned window carries a naked-eye `visible`/`visibleAt`
- * classification (see `classifyPassVisibility`). With `visibleOnly: true`,
- * non-visible passes are skipped and the scan continues to the next one;
- * returns `null` if no visible pass occurs before the horizon ends.
+ * Every returned window carries a sampled lighting-geometry result
+ * (`favorableLighting` / `favorableLightingAt`). It checks a coarse
+ * cylindrical Earth-shadow model and observer solar altitude only; it does
+ * not predict apparent magnitude or naked-eye detectability. With
+ * `favorableLightingOnly: true`, passes without a qualifying sample are
+ * skipped; returns `null` if none occurs before the horizon ends.
  */
 export function findNextPass(opts: {
   satrec: SatRec
@@ -441,7 +514,7 @@ export function findNextPass(opts: {
   stepS?: number
   minElDeg?: number
   refineS?: number
-  visibleOnly?: boolean
+  favorableLightingOnly?: boolean
 }): PassWindow | null {
   const horizonH = opts.horizonH ?? 24
   const stepS = opts.stepS ?? 30
@@ -449,6 +522,7 @@ export function findNextPass(opts: {
   const t0 = opts.start.getTime()
   const tEnd = t0 + horizonH * 3600 * 1000
   const sampleS = opts.refineS ?? stepS
+  const elevationAt = (ms: number) => elevationRadAtMs(opts.satrec, opts.observer, ms)
 
   let inPass = false
   let aosMs: number | null = null
@@ -456,6 +530,10 @@ export function findNextPass(opts: {
   let maxEl = -Infinity
   let maxElAtMs: number | null = null
   let prevMs = t0
+  let prevEl: number | null = null
+  const stepMs = stepS * 1000
+  let prevPrevMs: number | null = t0 - stepMs
+  let prevPrevEl: number | null = elevationAt(prevPrevMs)
   let lastMs = t0
 
   const buildWindow = (
@@ -483,17 +561,48 @@ export function findNextPass(opts: {
             maxElAt: new Date(curMaxElAtMs),
             durationS: (losMs - curAosMs) / 1000,
           }
-    const { visible, visibleAt } = classifyPassVisibility(
+    const { favorableLighting, favorableLightingAt } = classifyPassLightingGeometry(
       opts.satrec,
       opts.observer,
       core.aos.getTime(),
       core.los.getTime(),
       sampleS,
     )
-    return { ...core, visible, visibleAt }
+    return { ...core, favorableLighting, favorableLightingAt }
   }
 
-  for (let t = t0; t <= tEnd; t += stepS * 1000) {
+  const buildHiddenWindow = (leftMs: number, rightMs: number): PassWindow | null => {
+    const peak = refineHiddenElevationPeak(elevationAt, leftMs, rightMs)
+    if (peak.maxEl < minElRad) return null
+
+    const crossingRefineMs = (opts.refineS ?? stepS) * 1000
+    const aosBracket = bisectMaskCrossing(
+      elevationAt,
+      minElRad,
+      leftMs,
+      peak.maxElAtMs,
+      crossingRefineMs,
+    )
+    const losBracket = bisectMaskCrossing(
+      elevationAt,
+      minElRad,
+      rightMs,
+      peak.maxElAtMs,
+      crossingRefineMs,
+    )
+    return buildWindow(
+      aosBracket.aboveMs,
+      aosBracket.belowMs,
+      peak.maxEl,
+      peak.maxElAtMs,
+      losBracket.belowMs,
+      losBracket.aboveMs,
+    )
+  }
+
+  const sampleCount = Math.ceil((tEnd - t0) / stepMs) + 1
+  for (let i = 0; i < sampleCount; i++) {
+    const t = Math.min(t0 + i * stepMs, tEnd)
     const date = new Date(t)
     lastMs = t
     const st = propagateEci(opts.satrec, date)
@@ -518,8 +627,8 @@ export function findNextPass(opts: {
         const losMs = t
         if (aosMs !== null && aosBelowMs !== null && maxElAtMs !== null) {
           const win = buildWindow(aosMs, aosBelowMs, maxEl, maxElAtMs, losMs, losAboveMs)
-          if (!opts.visibleOnly || win.visible) return win
-          // visibleOnly and this pass wasn't visible: keep scanning for the next one.
+          if (!opts.favorableLightingOnly || win.favorableLighting) return win
+          // Keep scanning when this pass has no favorable lighting sample.
         }
         inPass = false
         aosMs = null
@@ -528,13 +637,62 @@ export function findNextPass(opts: {
         maxElAtMs = null
       }
     }
+
+    // If all three samples remain below the mask but the middle sample is a
+    // local maximum, refine that interior peak. A short pass can rise above
+    // the mask and fall back below entirely between two coarse samples, in
+    // which case the normal AOS/LOS state machine never starts.
+    if (
+      !inPass &&
+      prevPrevMs !== null &&
+      prevPrevEl !== null &&
+      prevEl !== null &&
+      prevPrevEl < minElRad &&
+      prevEl < minElRad &&
+      el < minElRad &&
+      prevEl >= prevPrevEl &&
+      prevEl >= el
+    ) {
+      // The search starts at t0, so never let the optimization or AOS bracket
+      // reach into the preceding, out-of-horizon sample used to identify a
+      // local maximum exactly at the first sample.
+      const win = buildHiddenWindow(Math.max(prevPrevMs, t0), t)
+      if (win && (!opts.favorableLightingOnly || win.favorableLighting)) return win
+    }
+
+    if (prevEl !== null) {
+      prevPrevMs = prevMs
+      prevPrevEl = prevEl
+    }
     prevMs = t
+    prevEl = el
+  }
+
+  // A final partial cadence interval can contain a complete short pass even
+  // though the regular grid never samples its right-hand endpoint. Include a
+  // bounded look-ahead only to test whether the horizon endpoint is a local
+  // maximum; all reported crossings remain inside the requested horizon.
+  const endLookaheadEl = elevationAt(tEnd + stepMs)
+  if (
+    !inPass &&
+    prevPrevMs !== null &&
+    prevPrevEl !== null &&
+    prevEl !== null &&
+    prevPrevEl < minElRad &&
+    prevEl < minElRad &&
+    endLookaheadEl !== null &&
+    endLookaheadEl < minElRad &&
+    prevEl >= prevPrevEl &&
+    prevEl >= endLookaheadEl
+  ) {
+    const win = buildHiddenWindow(Math.max(prevPrevMs, t0), tEnd)
+    if (win && (!opts.favorableLightingOnly || win.favorableLighting)) return win
   }
 
   // Pass still open at horizon end
   if (inPass && aosMs !== null && aosBelowMs !== null && maxElAtMs !== null) {
     const win = buildWindow(aosMs, aosBelowMs, maxEl, maxElAtMs, lastMs, null)
-    if (!opts.visibleOnly || win.visible) return win
+    if (!opts.favorableLightingOnly || win.favorableLighting) return win
     return null
   }
   return null

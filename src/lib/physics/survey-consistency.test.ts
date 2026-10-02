@@ -20,6 +20,13 @@ describe('tools catalog quality gates', () => {
     }
   })
 
+  it('links the free-space path-loss citation to ITU-R P.525-5', () => {
+    expect(SOURCES['itu-fspl']?.url).toBe(
+      'https://www.itu.int/rec/R-REC-P.525-5-202411-I/en',
+    )
+    expect(SOURCES['itu-fspl']?.name).toContain('ITU-R P.525-5')
+  })
+
   it('normalizeTags merges partial-pressure and thermal synonyms', () => {
     expect(normalizeTags(['ppO2', 'ppCO2', 'cabin'])).toEqual(['atmosphere'])
     expect(normalizeTags(['cooling', 'TCS', 'thermal'])).toEqual(['thermal'])

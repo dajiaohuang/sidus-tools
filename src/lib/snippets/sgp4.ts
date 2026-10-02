@@ -41,11 +41,9 @@ export const sgp4Snippets: FormulaSnippet = {
     javascript: `// SGP4 via satellite.js: ${ASSUMPTIONS}
 import { twoline2satrec, propagate, gstime, eciToGeodetic, degreesLat, degreesLong } from 'satellite.js'
 
-const tle1 = '1 25544U 98067A   24100.50000000  .00016717  00000-0  10270-3 0  9995'
-const tle2 = '2 25544  51.6416 120.4627 0006703 130.5360 325.0288 15.49507895600000'
-const satrec = twoline2satrec(tle1, tle2)
+const satrec = twoline2satrec(tleLine1, tleLine2)
 
-const date = new Date() // or fixed UTC
+const date = new Date(at) // selected propagation time (UTC)
 const pv = propagate(satrec, date)
 if (!pv?.position || !pv?.velocity || typeof pv.position === 'boolean') {
   throw new Error('propagation failed')
@@ -69,7 +67,7 @@ import {
 } from 'satellite.js'
 
 const satrec = twoline2satrec(tleLine1, tleLine2)
-const date = new Date()
+const date = new Date(at) // selected propagation time (UTC)
 const pv = propagate(satrec, date)
 if (!pv?.position || !pv?.velocity || typeof pv.position === 'boolean') {
   throw new Error('propagation failed')
@@ -88,13 +86,11 @@ const alt_m = geo.height * 1000`,
 
     python: `# SGP4 via python-sgp4: ${ASSUMPTIONS}
 from sgp4.api import Satrec, jday
-from datetime import datetime, timezone
+from datetime import datetime
 
-tle1 = "1 25544U 98067A   24100.50000000  .00016717  00000-0  10270-3 0  9995"
-tle2 = "2 25544  51.6416 120.4627 0006703 130.5360 325.0288 15.49507895600000"
-sat = Satrec.twoline2rv(tle1, tle2)
+sat = Satrec.twoline2rv(tleLine1, tleLine2)
 
-t = datetime.now(timezone.utc)
+t = datetime.fromisoformat(at.replace("Z", "+00:00"))
 jd, fr = jday(t.year, t.month, t.day, t.hour, t.minute, t.second + t.microsecond*1e-6)
 err, r_km, v_kms = sat.sgp4(jd, fr)  # TEME km, km/s
 if err != 0:

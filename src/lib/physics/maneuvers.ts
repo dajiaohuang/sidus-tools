@@ -59,13 +59,23 @@ export function circularizeBurn(
   e: number,
   at: 'peri' | 'apo',
 ): { r: number; vEll: number; vCirc: number; dv: number } | null {
-  if (!(a > 0) || e < 0 || e >= 1) return null
+  if (
+    !Number.isFinite(mu) || !(mu > 0) ||
+    !Number.isFinite(a) || !(a > 0) ||
+    !Number.isFinite(e) || e < 0 || e >= 1 ||
+    (at !== 'peri' && at !== 'apo')
+  ) return null
   const rp = a * (1 - e)
   const ra = a * (1 + e)
   const r = at === 'peri' ? rp : ra
+  if (!Number.isFinite(r) || !(r > 0)) return null
   const vEll = visViva(mu, r, a)
   const vCirc = circularOrbitVelocity(mu, r)
-  return { r, vEll, vCirc, dv: Math.abs(vEll - vCirc) }
+  const dv = Math.abs(vEll - vCirc)
+  if (!Number.isFinite(vEll) || !(vEll > 0) || !Number.isFinite(vCirc) || !(vCirc > 0) || !Number.isFinite(dv)) {
+    return null
+  }
+  return { r, vEll, vCirc, dv }
 }
 
 /** GEO radius for body: a such that T = sidereal day (Earth default 86164.0905 s). */

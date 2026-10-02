@@ -12,6 +12,7 @@ import {
   liohDuration,
   liohForCo2,
   LIOH_CO2_CAPACITY,
+  LIOH_THEORETICAL_CO2_CAPACITY,
   METABOLIC_RATES,
   metabolicBudget,
   type MetabolicActivity,
@@ -25,7 +26,7 @@ const ACTS = Object.keys(METABOLIC_RATES) as MetabolicActivity[]
 const SCHEMA = {
   m: numParam(2.0, { min: 0.01 }),
   mu: strParam('kg', TOOL_UNIT_SETS.mass),
-  capacity: numParam(LIOH_CO2_CAPACITY, { min: 0.1, max: 1 }),
+  capacity: numParam(LIOH_CO2_CAPACITY, { min: 0.1, max: LIOH_THEORETICAL_CO2_CAPACITY }),
   crew: numParam(3, { min: 1, max: 12 }),
   activity: strParam('nominal', ACTS),
   mode: strParam('crew', ['crew', 'manual'] as const),
@@ -52,12 +53,14 @@ export function LiohScrubberTool() {
     const d = liohDuration(m, co2Rate, p.capacity)
     if (!d) return null
     const co2PerDay = co2Rate * 86400
+    const liohPerDay = liohForCo2(co2PerDay, p.capacity)
+    if (liohPerDay == null) return null
     return {
       ...d,
       co2PerDay,
       co2Rate,
-      liohPerDay: liohForCo2(co2PerDay, p.capacity),
-      theoreticalCap: m * (0.04401 / (2 * 0.02395)),
+      liohPerDay,
+      theoreticalCap: m * LIOH_THEORETICAL_CO2_CAPACITY,
     }
   }, [act, co2RateManual, m, p.capacity, p.crew, p.mode])
 
@@ -81,7 +84,7 @@ export function LiohScrubberTool() {
             unit="kg CO₂ / kg LiOH"
             type="number"
             min={0.1}
-            max={1}
+            max={LIOH_THEORETICAL_CO2_CAPACITY}
             step="any"
             value={p.capacity}
             onChange={(e) => setP({ capacity: Number(e.target.value) })}
@@ -181,7 +184,11 @@ export function LiohScrubberTool() {
           </div>
         )
       }
-      code={<CodeExport formulaId="lioh-scrubber" values={{ m, co2RateManual, capacity: p.capacity, crew: p.crew, co2_day: p.co2_day, activity: p.activity, mode: p.mode }} />}
+      code={
+        res ? (
+          <CodeExport formulaId="lioh-scrubber" values={{ m, co2RateManual, capacity: p.capacity, crew: p.crew, co2_day: p.co2_day, activity: p.activity, mode: p.mode }} />
+        ) : null
+      }
     />
   )
 }
