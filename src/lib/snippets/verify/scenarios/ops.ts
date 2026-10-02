@@ -2,10 +2,8 @@
  * Verification scenarios for ground-ops/tracking pilot tools.
  * See scenarios/index.ts for how these merge into the runner's SCENARIOS map.
  *
- * `look-angles` is UNVERIFIABLE (EXPECTED returns `{}` regardless of bag; see
- * expected/ops.ts), so these scenarios never reach a numeric comparison — they
- * exist to satisfy the pilot's >=3-scenario minimum and to document plausible
- * topocentric SEZ inputs (satellite ECEF, observer geodetic) for future waves.
+ * Look-angle scenarios pass precomputed satellite ECEF coordinates in metres
+ * and observer geodetic coordinates in radians and metres.
  */
 import type { Scenario } from '../inputs'
 
@@ -141,13 +139,13 @@ export const OPS_SCENARIOS: Record<string, Scenario[]> = {
 
   battery: [
     {
-      name: 'smallsat-bus',
-      source: 'representative smallsat Li-ion pack: 50 Ah, 28 V bus, 100 W load',
+      name: 'synthetic-pack-estimate',
+      source: 'illustrative synthetic input: 50 Ah, 28 V constant-voltage assumption, 100 W constant load; not a battery-specific discharge profile',
       bag: { C_Ah: 50, V: 28, P: 100 },
     },
     {
-      name: 'cubesat-cell',
-      source: 'representative cubesat single Li-ion cell: 2.5 Ah, 3.7 V, 5 W load',
+      name: 'synthetic-cell-estimate',
+      source: 'illustrative synthetic input: 2.5 Ah, 3.7 V constant-voltage assumption, 5 W constant load; not a cell-specific discharge profile',
       bag: { C_Ah: 2.5, V: 3.7, P: 5 },
     },
     {
@@ -421,8 +419,9 @@ export const OPS_SCENARIOS: Record<string, Scenario[]> = {
       bag: { p0: 100, d: 0, years: 10 },
     },
     {
-      name: 'geo-15yr-gaas',
-      source: 'representative GaAs triple-junction degradation ≈2.5%/yr, well-known 15-year GEO design life',
+      name: 'synthetic-constant-compound-loss',
+      source:
+        'synthetic inputs: assume a constant compounded 2.5% fractional power loss per year for 15 years; not a mission-specific GaAs or GEO performance estimate',
       bag: { p0: 200, d: 0.025, years: 15 },
     },
     {
@@ -439,8 +438,9 @@ export const OPS_SCENARIOS: Record<string, Scenario[]> = {
       bag: { eUsed: 500, eCap: 500 },
     },
     {
-      name: 'leo-design-limit',
-      source: 'well-known LEO cycling-battery design limit ≈20% DoD',
+      name: 'representative-nicd-leo-20-percent',
+      source:
+        'NASA NTRS 19930009226: 20% is a conservative NiCd assumption for a 2-year LEO mission (~11,000 cycles); representative case, not a universal limit.',
       bag: { eUsed: 100, eCap: 500 },
     },
     {
@@ -530,9 +530,19 @@ export const OPS_SCENARIOS: Record<string, Scenario[]> = {
       bag: { T: 5778, lam: 500e-9 },
     },
     {
+      name: 'high-exponent-representable-tail',
+      source: 'independent NIST Planck-law Decimal anchor; exp(x) overflows while B_lambda remains representable',
+      bag: { T: 200_000, lam: 1e-10 },
+    },
+    {
+      name: 'rayleigh-jeans-small-exponent',
+      source: 'independent Decimal evaluation of the NIST Planck law; exercises expm1 cancellation near x=0',
+      bag: { T: 300, lam: 100 },
+    },
+    {
       name: 'cmb-branch',
       source:
-        'branch coverage: well-known cosmic microwave background temperature 2.725 K at a near-IR wavelength ⇒ x≫700, exact hard-zero clamp regime',
+        'branch coverage: well-known cosmic microwave background temperature 2.725 K at a near-IR wavelength; final radiance underflows binary64',
       bag: { T: 2.725, lam: 1e-6 },
     },
     {

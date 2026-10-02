@@ -87,8 +87,10 @@ export function apsidesWithSpeeds(mu: number, a: number, e: number) {
     return null
   }
   const { rp, ra } = apsides(a, e)
-  const vp = visViva(mu, rp, a)
-  const va = visViva(mu, ra, a)
+  const sqrtMu = Math.sqrt(mu)
+  const sqrtA = Math.sqrt(a)
+  const vp = (sqrtMu * Math.sqrt((1 + e) / (1 - e))) / sqrtA
+  const va = (sqrtMu * Math.sqrt((1 - e) / (1 + e))) / sqrtA
   return { rp, ra, vp, va }
 }
 
