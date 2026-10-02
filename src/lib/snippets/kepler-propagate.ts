@@ -437,15 +437,15 @@ r_z = r(3);
 v_x = v(1);
 v_y = v(2);
 v_z = v(3);
-fprintf('r0n = %g\\n', r0n);
-fprintf('v0n = %g\\n', v0n);
-fprintf('rdv = %g\\n', rdv);
-fprintf('r_x = %g\\n', r_x);
-fprintf('r_y = %g\\n', r_y);
-fprintf('r_z = %g\\n', r_z);
-fprintf('v_x = %g\\n', v_x);
-fprintf('v_y = %g\\n', v_y);
-fprintf('v_z = %g\\n', v_z);`,
+fprintf('r0n = %.17g\\n', r0n);
+fprintf('v0n = %.17g\\n', v0n);
+fprintf('rdv = %.17g\\n', rdv);
+fprintf('r_x = %.17g\\n', r_x);
+fprintf('r_y = %.17g\\n', r_y);
+fprintf('r_z = %.17g\\n', r_z);
+fprintf('v_x = %.17g\\n', v_x);
+fprintf('v_y = %.17g\\n', v_y);
+fprintf('v_z = %.17g\\n', v_z);`,
 
     julia: `# Universal Kepler propagate: ${ASSUMPTIONS}
 using LinearAlgebra
