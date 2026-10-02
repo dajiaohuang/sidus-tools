@@ -536,6 +536,7 @@ export function magnetorquerMoment(turns: number, current: number, area: number)
 
 /** Capture Δv circularize at periapsis from hyperbolic: Δv = v_p_hyp − v_circ. */
 export function captureCircularizeDv(mu: number, rp: number, vInf: number): number | null {
+  if (!Number.isFinite(mu) || !Number.isFinite(rp) || !Number.isFinite(vInf)) return null
   if (!(mu > 0) || !(rp > 0) || !(vInf >= 0)) return null
   const vp = Math.sqrt(vInf * vInf + (2 * mu) / rp)
   const vc = Math.sqrt(mu / rp)

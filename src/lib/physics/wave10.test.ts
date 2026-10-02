@@ -84,6 +84,29 @@ describe('Planck B(λ, T)', () => {
     expect(Bpeak).toBeGreaterThan(Bred)
     expect(Bpeak).toBeGreaterThan(Buv)
   })
+
+  it('preserves independently anchored high-exponent radiance until the result underflows', () => {
+    // 80-digit Decimal evaluations of the NIST wavelength law, using exact SI
+    // constants and exact binary64 inputs.
+    const issueInput = planckSpectralRadiance(1e-10, 205392.84475430887)
+    expect(issueInput).not.toBeNull()
+    expect(issueInput! / 7.122670560662916e-271).toBeCloseTo(1, 12)
+
+    // At x ≈ 719.388, exp(x) overflows binary64 but B_lambda remains finite.
+    const overflowInput = planckSpectralRadiance(1e-10, 200_000)
+    expect(overflowInput).not.toBeNull()
+    expect(overflowInput! / 4.461677095938781e-279).toBeCloseTo(1, 12)
+
+    // At this wavelength, the exact Planck tail is below the binary64 range.
+    expect(planckSpectralRadiance(1e-10, 160_000)).toBe(0)
+  })
+
+  it('matches an independent Rayleigh-Jeans-limit anchor without exp-minus-one cancellation', () => {
+    // 80-digit Decimal evaluation for the exact binary64 inputs lambda=100 m, T=300 K.
+    const radiance = planckSpectralRadiance(100, 300)
+    expect(radiance).not.toBeNull()
+    expect(radiance! / 2.4834483485500135e-20).toBeCloseTo(1, 14)
+  })
 })
 
 describe('EIRP and G/T', () => {

@@ -35,6 +35,7 @@ import {
   cabinFromMasses,
   cabinMassesFromComposition,
   liohDuration,
+  LIOH_THEORETICAL_CO2_CAPACITY,
   leakDepressTime,
   coolantMassFlow,
   muFromMass,
@@ -72,6 +73,7 @@ import {
   apoapsisRaiseFromCircular,
   deltaVBudget,
   equalStageMassRatio,
+  normalizeEqualStageCount,
   semiMajorFromPeriod,
   horizonSlantRange,
   antennaBeamwidth,
@@ -265,15 +267,22 @@ return { body: body.id, r_m: r, v_m_s: circularOrbitVelocity(body.mu, r), period
   },
   {
     name: "hohmann",
-    description: "Hohmann transfer Δv and TOF between circular coplanar orbits.",
+    description: "Hohmann transfer Δv and TOF between circular coplanar orbits; mu and radii must be finite and positive.",
     inputSchema: {
-    r1_m: z.number(),
-    r2_m: z.number(),
-    mu: z.number().optional(),
+    r1_m: z.number().finite().positive(),
+    r2_m: z.number().finite().positive(),
+    mu: z.number().finite().positive().optional(),
   },
     sample: {"r1_m":6778137,"r2_m":42164000},
     run: (args) => {
-      return hohmannTransfer(args.mu ?? EARTH_MU, args.r1_m, args.r2_m)
+      const mu = args.mu ?? EARTH_MU
+      if (
+        ![mu, args.r1_m, args.r2_m].every(Number.isFinite) ||
+        !(mu > 0) ||
+        !(args.r1_m > 0) ||
+        !(args.r2_m > 0)
+      ) return null
+      return hohmannTransfer(mu, args.r1_m, args.r2_m)
     },
   },
   {
@@ -290,16 +299,24 @@ return { body: body.id, r_m: r, v_m_s: circularOrbitVelocity(body.mu, r), period
   },
   {
     name: "bielliptic",
-    description: "Bielliptic three-burn transfer via intermediate apo rb.",
+    description: "Bielliptic three-burn transfer via intermediate apoapsis rb, which must exceed both endpoint radii; mu and radii must be finite and positive.",
     inputSchema: {
-    r1_m: z.number(),
-    r2_m: z.number(),
-    rb_m: z.number(),
-    mu: z.number().optional(),
+    r1_m: z.number().finite().positive(),
+    r2_m: z.number().finite().positive(),
+    rb_m: z.number().finite().positive(),
+    mu: z.number().finite().positive().optional(),
   },
     sample: {"r1_m":6778137,"r2_m":63246000,"rb_m":168656000},
     run: (args) => {
-      return biellipticTransfer(args.mu ?? EARTH_MU, args.r1_m, args.r2_m, args.rb_m)
+      const mu = args.mu ?? EARTH_MU
+      if (
+        ![mu, args.r1_m, args.r2_m, args.rb_m].every(Number.isFinite) ||
+        !(mu > 0) ||
+        !(args.r1_m > 0) ||
+        !(args.r2_m > 0) ||
+        !(args.rb_m > Math.max(args.r1_m, args.r2_m))
+      ) return null
+      return biellipticTransfer(mu, args.r1_m, args.r2_m, args.rb_m)
     },
   },
   {
@@ -444,7 +461,7 @@ return cwTwoImpulseToOrigin(n, { x: args.x0_m, y: args.y0_m, z: args.z0_m }, arg
     gr_dbi: z.number(),
     freq_hz: z.number(),
     range_m: z.number(),
-    other_loss_db: z.number().optional(),
+    other_loss_db: z.number().min(0).finite().optional(),
     t_sys_k: z.number().optional(),
     required_cn0_dbhz: z.number().optional(),
   },
@@ -488,8 +505,8 @@ return cwTwoImpulseToOrigin(n, { x: args.x0_m, y: args.y0_m, z: args.z0_m }, arg
     temp_k: z.number(),
     pressure_pa: z.number(),
     dry_o2_frac: z.number(),
-    pp_co2_pa: z.number(),
-    relative_humidity: z.number(),
+    pp_co2_pa: z.number().min(0),
+    relative_humidity: z.number().min(0).max(1),
   },
     sample: {"volume_m3":100,"temp_k":293.15,"pressure_pa":101325,"dry_o2_frac":0.21,"pp_co2_pa":400,"relative_humidity":0.4},
     run: (args) => {
@@ -503,7 +520,7 @@ if (!masses) return null; return cabinFromMasses(args.volume_m3, args.temp_k, ma
     inputSchema: {
     lioh_kg: z.number(),
     co2_rate_kg_s: z.number(),
-    capacity: z.number().optional(),
+    capacity: z.number().positive().max(LIOH_THEORETICAL_CO2_CAPACITY).optional(),
   },
     sample: {"lioh_kg":2,"co2_rate_kg_s":0.00004},
     run: (args) => {
@@ -683,14 +700,15 @@ return { c3_m2_s2: c3, v_p_m_s: vp, e: hyperbolicEccentricity(mu, args.r_m, args
     name: "circularize",
     description: "Circularize burn at apo or peri.",
     inputSchema: {
-    a_m: z.number(),
-    e: z.number(),
-    at: z.string(),
-    mu: z.number().optional(),
+    a_m: z.number().finite().positive(),
+    e: z.number().finite().min(0).lt(1),
+    at: z.enum(['peri', 'apo']),
+    mu: z.number().finite().positive().optional(),
   },
     sample: {"a_m":7500000,"e":0.1,"at":"apo"},
     run: (args) => {
-      return circularizeBurn(args.mu ?? EARTH_MU, args.a_m, args.e, args.at === 'peri' ? 'peri' : 'apo')
+      if (args.at !== 'peri' && args.at !== 'apo') return null
+      return circularizeBurn(args.mu === undefined ? EARTH_MU : args.mu, args.a_m, args.e, args.at)
     },
   },
   {
@@ -887,7 +905,8 @@ return dv == null ? null : { dv_m_s: dv, impulse_n_s: args.thrust_n * args.burn_
   },
     sample: {"total_dv_m_s":9000,"n_stages":3,"isp_s":300},
     run: (args) => {
-      return equalStageMassRatio(args.total_dv_m_s, Math.round(args.n_stages), args.isp_s)
+      const nStages = normalizeEqualStageCount(args.n_stages)
+      return nStages === null ? null : equalStageMassRatio(args.total_dv_m_s, nStages, args.isp_s)
     },
   },
   {
@@ -1126,11 +1145,10 @@ return { beta_kg_m2: beta, dv_per_rev_m_s: dv }
     name: "orbital_energy",
     description: "Specific orbital energy.",
     inputSchema: {
-    r_m: z.number(),
     a_m: z.number(),
     mu: z.number().optional(),
   },
-    sample: {"r_m":6778137,"a_m":6778137},
+    sample: {"a_m":6778137},
     run: (args) => {
       const e = specificEnergyCircular(args.mu ?? EARTH_MU, args.a_m); return { energy_j_kg: e }
     },
@@ -1139,14 +1157,22 @@ return { beta_kg_m2: beta, dv_per_rev_m_s: dv }
     name: "true_anomaly",
     description: "Radius from true anomaly.",
     inputSchema: {
-    a_m: z.number(),
-    e: z.number(),
-    nu_deg: z.number(),
-  },
-    sample: {"a_m":8000000,"e":0.1,"nu_deg":45},
+      a_m: z.number().positive(),
+      e: z.number().min(0).max(0.999),
+      nu_deg: z.number(),
+    },
+    sample: { a_m: 8_000_000, e: 0.1, nu_deg: 45 },
     run: (args) => {
-      const nu = (args.nu_deg * Math.PI) / 180; const p = args.a_m * (1 - args.e ** 2); const r = p / (1 + args.e * Math.cos(nu));
-return { r_m: r, nu_rad: nu }
+      if (!(args.a_m > 0) || !Number.isFinite(args.a_m)) return null
+      if (!Number.isFinite(args.e) || !(args.e >= 0 && args.e <= 0.999)) return null
+      if (!Number.isFinite(args.nu_deg)) return null
+      const nu = (args.nu_deg * Math.PI) / 180
+      const p = args.a_m * (1 - args.e ** 2)
+      const denominator = 1 + args.e * Math.cos(nu)
+      if (!(denominator > 0) || !Number.isFinite(denominator)) return null
+      const r = p / denominator
+      if (!(r > 0) || !Number.isFinite(r)) return null
+      return { r_m: r, nu_rad: nu }
     },
   },
   {
@@ -1641,13 +1667,13 @@ return { cstar_m_m_s: cm, cstar_ideal_m_s: ci, eta: cm != null && ci ? cm / ci :
     name: "laser_link_budget",
     description: "Optical link received power sketch.",
     inputSchema: {
-    pt_w: z.number(),
-    gt: z.number(),
-    gr: z.number(),
-    wavelength_m: z.number(),
-    range_m: z.number(),
-    eta_t: z.number().optional(),
-    eta_r: z.number().optional(),
+    pt_w: z.number().positive().finite(),
+    gt: z.number().positive().finite(),
+    gr: z.number().positive().finite(),
+    wavelength_m: z.number().positive().finite(),
+    range_m: z.number().positive().finite(),
+    eta_t: z.number().positive().max(1).finite().optional(),
+    eta_r: z.number().positive().max(1).finite().optional(),
   },
     sample: {"pt_w":1,"gt":100000,"gr":100000,"wavelength_m":0.00000155,"range_m":1000000,"eta_t":0.8,"eta_r":0.7},
     run: (args) => {
@@ -2213,17 +2239,17 @@ return w == null ? null : { swath_m: w }
   },
   {
     name: "arg_perigee_drift_j2",
-    description: "J2 argument of perigee drift.",
+    description: "First-order secular J2 argument-of-perigee rate for elliptic orbits (0 < e < 1); undefined for e = 0.",
     inputSchema: {
     a_m: z.number(),
-    e: z.number(),
+    e: z.number().gt(0).lt(1),
     i_deg: z.number(),
   },
     sample: {"a_m":6778137,"e":0.001,"i_deg":51.6},
     run: (args) => {
       const a = args.a_m
       const e = args.e
-      if (!(a > 0) || !(e >= 0) || !(e < 1)) return null
+      if (!(a > 0) || !(e > 0) || !(e < 1)) return null
       const n = Math.sqrt(EARTH_MU / (a * a * a))
       const p = a * (1 - e * e)
       const r = argPerigeeDriftJ2(n, 1.08262668e-3, EARTH_RADIUS, p, (args.i_deg * Math.PI) / 180)
@@ -2337,9 +2363,9 @@ return w == null ? null : { swath_m: w }
     name: "capture_circularize",
     description: "Capture then circularize Δv.",
     inputSchema: {
-    rp_m: z.number(),
-    v_inf_m_s: z.number(),
-    mu: z.number().optional(),
+    rp_m: z.number().finite().positive(),
+    v_inf_m_s: z.number().finite().min(0),
+    mu: z.number().finite().positive().optional(),
   },
     sample: {"rp_m":6778137,"v_inf_m_s":2000},
     run: (args) => {
@@ -2928,32 +2954,40 @@ return w == null ? null : { swath_m: w }
     name: "sgp4",
     description: "Mean motion from TLE mean-motion revs/day (not full SGP4 prop).",
     inputSchema: {
-    n_rev_day: z.number(),
+    n_rev_day: z.number().positive(),
   },
     sample: {"n_rev_day":15.5},
     run: (args) => {
-      const n = args.n_rev_day * 2 * Math.PI / 86400; return { n_rad_s: n, period_s: 2 * Math.PI / n, note: 'Use UI SGP4 tool for full TLE propagation' }
+      const nRevDay = args.n_rev_day
+      if (typeof nRevDay !== 'number' || !Number.isFinite(nRevDay) || nRevDay <= 0) return null
+      const n = (nRevDay / 86400) * (2 * Math.PI)
+      const period = 86400 / nRevDay
+      if (!Number.isFinite(n) || n <= 0 || !Number.isFinite(period) || period <= 0) return null
+      return { n_rad_s: n, period_s: period, note: 'Use UI SGP4 tool for full TLE propagation' }
     },
   },
   {
     name: "look_angles",
     description: "Simple elevation from range and heights (not full ECI look).",
     inputSchema: {
-    ground_range_m: z.number(),
+    ground_range_m: z.number().nonnegative(),
     delta_h_m: z.number(),
   },
     sample: {"ground_range_m":500000,"delta_h_m":400000},
     run: (args) => {
-      const el = elevationFromRangeHeight(args.ground_range_m, args.delta_h_m); const slant = slantRange(args.ground_range_m, args.delta_h_m);
-return { elev_rad: el, slant_m: slant, note: 'Educational; full TLE look-angles in UI' }
+      if (args.ground_range_m === 0 && args.delta_h_m === 0) return null
+      const el = elevationFromRangeHeight(args.ground_range_m, args.delta_h_m)
+      const slant = slantRange(args.ground_range_m, args.delta_h_m)
+      if (el == null || slant == null || !Number.isFinite(el) || !Number.isFinite(slant)) return null
+      return { elev_rad: el, slant_m: slant, note: 'Educational; full TLE look-angles in UI' }
     },
   },
   {
     name: "pass_predict",
     description: "Horizon crossing time sketch from period and duty (not full pass search).",
     inputSchema: {
-    period_s: z.number(),
-    visible_frac: z.number().optional(),
+    period_s: z.number().positive(),
+    visible_frac: z.number().min(0).max(1).optional(),
   },
     sample: {"period_s":5600,"visible_frac":0.1},
     run: (args) => {

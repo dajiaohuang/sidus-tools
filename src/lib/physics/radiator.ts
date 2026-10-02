@@ -76,7 +76,7 @@ export type RadiatorHeatPumpInput = {
   q: number
   tColdK: number
   tHotK: number
-  /** Given cooling COP; wins over carnotFraction when both are set. */
+  /** Given cooling COP; wins over carnotFraction when both are set and cannot exceed Carnot COP. */
   cop?: number
   /** Second-law fraction: COP = carnotFraction × T_c/(T_h − T_c). */
   carnotFraction?: number
@@ -121,7 +121,7 @@ export function radiatorHeatPump(i: RadiatorHeatPumpInput): RadiatorHeatPump | n
   const copCarnot = i.tColdK / (i.tHotK - i.tColdK)
   let cop: number
   if (i.cop != null) {
-    if (!(i.cop > 0)) return null
+    if (!(i.cop > 0) || i.cop > copCarnot) return null
     cop = i.cop
   } else if (i.carnotFraction != null) {
     if (!(i.carnotFraction > 0) || i.carnotFraction > 1) return null

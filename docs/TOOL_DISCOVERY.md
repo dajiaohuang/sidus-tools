@@ -4,7 +4,7 @@
 **Scope:** Pure-SI educational calculators fit for SIDUS (browser, no backend math).  
 **Sources:** Catalog (`src/data/tools.ts`), agency OSS portals (NASA code.nasa.gov, ESA RF/downstream OSS, Libre Space), smallsat propulsion surveys, GEO propellant-budget literature, GNSS open stacks (GNSS-SDR, GPS-SDR-SIM), optical ground-station communities.
 
-Related: [AGENCY_OPEN_SOURCE_SURVEY.md](./AGENCY_OPEN_SOURCE_SURVEY.md), [ENGINEERING_TOOLS_SURVEY.md](./ENGINEERING_TOOLS_SURVEY.md), [CONVENTIONS.md](../CONVENTIONS.md).
+Related: [INDEX.md](../INDEX.md), [CONVENTIONS.md](../CONVENTIONS.md).
 
 ---
 

@@ -223,6 +223,7 @@ export const SAMPLE: LiveCodeValues = {
   m_CO2: 1,
   m_O2: 1,
   m_N2: 1,
+  m_H2O: 1,
   m_lioh: 1,
   mCO2: 1,
   mO2: 1,
@@ -434,6 +435,9 @@ export const SAMPLE: LiveCodeValues = {
 export const SAMPLE_OVERRIDES: Record<string, LiveCodeValues> = {
   'panel-eol-power': { d: 0.005, p0: 200, years: 15 },
   'gnss-troposphere-delay': { elev: Math.PI / 6, pressurePa: 101325, tK: 288.15, vaporPressurePa: 1100 },
+  // Exercise the representable high-exponent tail; the shared bag's wavelength
+  // and temperature are unrelated to this tool and miss exp(x) overflow.
+  'planck-radiance': { lam: 1e-10, T: 200_000 },
   // Bag-level G is the gravitational constant; this tool's G is antenna gain, so override with a physical value.
   'antenna-gain-effective': { G: 1000, lam: 0.1 },
   'cr3bp-jacobi': { mu: 0.01215, x: 0.8, y: 0, vx: 0, vy: 0.1 },
@@ -519,7 +523,7 @@ export const SAMPLE_OVERRIDES: Record<string, LiveCodeValues> = {
   // Radiator free vars (n_sides, S, f_sun, F, albedo, alpha_ir) exist in no shared bag.
   'radiator-net-flux': { T: 293.15, eps: 0.92, alpha: 0.09, n_sides: 2, S: 1366, f_sun: 1, F: 0.25, albedo: 0.3, Te: 253.15, alpha_ir: 0.09 },
   // LTAN/JD/omega_sun exist in no shared bag; shared bag's J2/mu/R are reused.
-  'sso-dawn-dusk': { h: 500_000, ltan_h: 18, jd: 2461212.5, mu: 3.986004418e14, R: 6_378_137, J2: 1.08262668e-3, omega_sun: 1.9909865927683785e-7 },
+  'sso-dawn-dusk': { h: 500_000, ltan_h: 18, jd: 2461212.5, mu: 3.986004418e14, R: 6_378_137, J2: 1.08262668e-3, omega_sun: 1.9910638518083137e-7 },
   // Latent-heat/quality/pump free vars exist in no shared bag.
   'two-phase-loop': { Q: 1e6, h_fg: 1186.28e3, dx: 1, cp: 4738.9, dT: 10, rho_l: 610.39, dp: 1e5, eta_p: 0.5 },
   // Heat-pump temperature pair and Carnot fraction exist in no shared bag.
@@ -578,12 +582,7 @@ export function scenariosFor(toolId: string): { name: string; source?: string; b
 
 /**
  * The bag as a snippet actually receives it: every number round-tripped through the
- * same literal formatter `liveValues` uses to emit the live-inputs preamble.
- *
- * `formatCodeNumber` keeps 7 significant digits for |x| >= 1e7 or |x| < 1e-3, so a
- * snippet given Earth's mu computes with 3.986004e14, not 3.986004418e14. Comparing a
- * listing against physics fed the unrounded value would flag that injection rounding as
- * a formula error in every mu-bearing tool.
+ * same shortest-decimal literal formatter `liveValues` uses for its input preamble.
  */
 export function asInjected(values: LiveCodeValues): LiveCodeValues {
   const out: LiveCodeValues = {}
