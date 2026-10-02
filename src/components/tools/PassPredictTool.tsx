@@ -131,7 +131,7 @@ export function PassPredictTool() {
       stepS: SEARCH_STEP_S,
       refineS: 1,
       minElDeg: p.minEl,
-      visibleOnly: p.vis === '1',
+      favorableLightingOnly: p.vis === '1',
     })
   }, [p.hours, p.minEl, p.vis, parsed, effectiveStart, observer, observerValid])
 
@@ -203,14 +203,17 @@ export function PassPredictTool() {
     return t('fields.count_in_pass', { los: formatHms(pass.los.getTime() - nowMs) })
   }, [pass, nowMs, t])
 
-  const visibilityLine = useMemo(() => {
-    if (!pass) return ''
-    if (pass.visible && pass.visibleAt) {
-      const vfmt = formatInZone(pass.visibleAt, zone, i18n.language)
-      return t('fields.pass_visible', { time: `${vfmt.time} ${vfmt.zoneAbbr}` })
+  const lightingLine = useMemo(() => {
+    if (!pass || !parsed.ok) return ''
+    if (pass.favorableLighting && pass.favorableLightingAt) {
+      const vfmt = formatInZone(pass.favorableLightingAt, zone, i18n.language)
+      return t('fields.pass_lighting_favorable', {
+        name: parsed.name,
+        time: `${vfmt.time} ${vfmt.zoneAbbr}`,
+      })
     }
-    return t('fields.pass_not_visible')
-  }, [pass, zone, i18n.language, t])
+    return t('fields.pass_lighting_not_favorable', { name: parsed.name })
+  }, [pass, parsed, zone, i18n.language, t])
 
   const rawMark = p.mark === 'now' || p.mark === 'peak' ? p.mark : 'aos'
   const effectiveMark: 'now' | 'aos' | 'peak' = pass ? rawMark : 'now'
@@ -525,7 +528,7 @@ export function PassPredictTool() {
           />
           <div className="col-span-full flex flex-wrap items-center gap-2">
             <Chip active={p.vis === '1'} onClick={() => setP({ vis: p.vis === '1' ? '0' : '1' })}>
-              {t('fields.only_visible')}
+              {t('fields.only_favorable_lighting')}
             </Chip>
           </div>
 
@@ -572,7 +575,7 @@ export function PassPredictTool() {
               ) : null}
             </div>
             <p className="font-mono text-sm text-fg">{countdownLine}</p>
-            <p className="font-mono text-sm text-muted">{visibilityLine}</p>
+            <p className="font-mono text-sm text-muted">{lightingLine}</p>
             <div className="sidus-results">
               <ResultCard
                 label={t('fields.aos_local')}

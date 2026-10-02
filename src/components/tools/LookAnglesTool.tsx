@@ -178,7 +178,7 @@ export function LookAnglesTool() {
         )
       }
       code={
-        observerValid ? (
+        observerValid && look && satEcef ? (
           <CodeExport
             formulaId="look-angles"
             values={{
@@ -186,9 +186,9 @@ export function LookAnglesTool() {
               lon: toSi(p.lon, 'deg'),
               h_m: p.h_m,
               at: p.at,
-              sat_x: satEcef?.[0],
-              sat_y: satEcef?.[1],
-              sat_z: satEcef?.[2],
+              sat_x: satEcef[0],
+              sat_y: satEcef[1],
+              sat_z: satEcef[2],
             }}
           />
         ) : null

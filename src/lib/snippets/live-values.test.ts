@@ -12,12 +12,39 @@ import {
   wrapAsRunnable,
 } from './live-values'
 import { getSnippets } from './index'
+import { normalizeEqualStageCount } from '@/lib/physics'
 
 describe('live code values', () => {
   it('formats numbers for code', () => {
     expect(formatCodeNumber(400)).toBe('400')
     expect(formatCodeNumber(3.986004418e14)).toMatch(/e14$/i)
     expect(formatCodeNumber(0.0000123)).toMatch(/e-/i)
+
+    const roundTripValues = [0.9999999999999, 0.9999999999999999, 0.3333333333333333, 3.986004418e14, 0.0000123, Number.MIN_VALUE]
+    for (const value of roundTripValues) {
+      expect(Number(formatCodeNumber(value))).toBe(value)
+    }
+    expect(formatCodeNumber(0.9999999999999)).toBe('0.9999999999999')
+    expect(Object.is(Number(formatCodeNumber(-0)), -0)).toBe(true)
+  })
+
+  it('preserves near-boundary values in generated language inputs', () => {
+    const eccentricity = 0.9999999999999
+    const executableLanguages = [
+      'python',
+      'javascript',
+      'typescript',
+      'c',
+      'cpp',
+      'rust',
+      'zig',
+      'matlab',
+      'julia',
+      'fortran',
+    ] as const
+    for (const lang of executableLanguages) {
+      expect(liveValuesPreamble(lang, { e: eccentricity })).toContain('0.9999999999999')
+    }
   })
 
   it('builds python preamble from live values', () => {
@@ -152,6 +179,25 @@ int main(void) {
     expect(out).toContain('#include <cmath>')
     expect(out).toContain('int main()')
     expect(out).toContain('std::printf')
+  })
+
+  it('preserves near-unity numeric output in C, C++, MATLAB, and custom MATLAB snippets', () => {
+    const ratio = Math.exp((1e-6 / 3) / (300 * 9.80665))
+    expect(ratio).toBeGreaterThan(1)
+    expect(Number(ratio.toPrecision(9))).toBe(1)
+    expect(Number(ratio.toPrecision(6))).toBe(1)
+    expect(Number(ratio.toPrecision(17))).toBe(ratio)
+
+    const c = wrapAsRunnable('double ratio = 1.0000000001133018;', 'c', {})
+    const cpp = wrapAsRunnable('double ratio = 1.0000000001133018;', 'cpp', {})
+    const matlab = renderLiveCode('ratio = 1.0000000001133018;', 'matlab', {})
+    expect(c).toMatch(/ratio = %\.17g/)
+    expect(cpp).toMatch(/ratio = %\.17g/)
+    expect(matlab).toMatch(/ratio = %\.17g/)
+
+    const keplerMatlab = renderLiveCode(getSnippets('kepler-propagate')!.code.matlab!, 'matlab', {})
+    expect(keplerMatlab).toContain("fprintf('r0n = %.17g")
+    expect(keplerMatlab).toContain("fprintf('v0n = %.17g")
   })
 
   it('wraps rust fragment into fn main (not top-level let)', () => {
@@ -355,6 +401,24 @@ const si = 1`),
     expect(out).toContain('const double n = 3')
     expect(out).toMatch(/dv\s*\/\s*n/)
     expect(out).toContain('g0 = 9.80665')
+  })
+
+  it('equal-stage fractional UI input exports the same rounded stage count as the calculator', () => {
+    const sn = getSnippets('equal-stage')!
+    const nStages = normalizeEqualStageCount(2.4)
+    const languages = [
+      'python', 'javascript', 'typescript', 'c', 'cpp', 'rust', 'zig', 'fortran', 'matlab', 'julia',
+    ] as const
+    for (const language of languages) {
+      const source = sn.code[language]
+      expect(source, language).toBeTruthy()
+      const out = renderLiveCode(source!, language, { dv: 9000, n: nStages!, isp: 300 })
+      expect(out, language).toMatch(/\bn(?::\s*f64)?\s*=\s*2(?:\.0)?(?:_f64|d0)?(?=;|\s|$)/)
+      expect(out, language).toContain('dv / n')
+    }
+
+    const exportedFormula = Math.exp((9000 / nStages!) / (300 * 9.80665))
+    expect(exportedFormula).toBeCloseTo(4.616211372684578, 14)
   })
 
   it('ideal-thrust is linear (no mdot used before define)', () => {

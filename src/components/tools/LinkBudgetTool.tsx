@@ -174,7 +174,7 @@ export function LinkBudgetTool() {
           </div>
         )
       }
-      code={
+      code={res ? (
         <CodeExport
           formulaId="link-budget"
           values={{
@@ -210,7 +210,7 @@ export function LinkBudgetTool() {
             req: p.req,
           }}
         />
-      }
+      ) : undefined}
     />
   )
 }

@@ -21578,7 +21578,8 @@ var BODIES = [
   { id: "saturn", name: "Saturn", mu: 37931187e9, radius: 58232e3, mass: 56834e22, color: "#d4c4a0", type: "planet" },
   { id: "uranus", name: "Uranus", mu: 5793939e9, radius: 25362e3, mass: 8681e22, color: "#9ec4c8", type: "planet" },
   { id: "neptune", name: "Neptune", mu: 6836529e9, radius: 24622e3, mass: 102413e21, color: "#5a7ab0", type: "planet" },
-  { id: "pluto", name: "Pluto", mu: 871e9, radius: 1188300, mass: 1303e19, color: "#b8a898", type: "dwarf" }
+  // JPL PLU060 Pluto-body GM: 869.3 ± 0.4 km³/s² (not Pluto-system GM).
+  { id: "pluto", name: "Pluto", mu: 8693e8, radius: 1188300, mass: 1303e19, color: "#b8a898", type: "dwarf" }
 ];
 function getBody(id) {
   return BODIES.find((b) => b.id === id) ?? BODIES.find((b) => b.id === "earth");
@@ -21652,18 +21653,15 @@ function apsidesWithSpeeds(mu2, a, e) {
     return null;
   }
   const { rp, ra } = apsides(a, e);
-  const vp = visViva(mu2, rp, a);
-  const va = visViva(mu2, ra, a);
+  const sqrtMu = Math.sqrt(mu2);
+  const sqrtA = Math.sqrt(a);
+  const vp = sqrtMu * Math.sqrt((1 + e) / (1 - e)) / sqrtA;
+  const va = sqrtMu * Math.sqrt((1 - e) / (1 + e)) / sqrtA;
   return { rp, ra, vp, va };
 }
 function rocketDeltaV(ispS, m0, mf, g0 = 9.80665) {
   if (!(ispS > 0) || !(m0 > 0) || !(mf > 0) || m0 <= mf) return NaN;
   return ispS * g0 * Math.log(m0 / mf);
-}
-function rocketMassInitial(ispS, deltaV, mf, g0 = 9.80665) {
-  if (!(ispS > 0) || !(mf > 0) || !(deltaV >= 0)) return NaN;
-  const ve = ispS * g0;
-  return mf * Math.exp(deltaV / ve);
 }
 
 // src/lib/physics/units.ts
@@ -21948,6 +21946,7 @@ function lambertSolve(mu2, r1, r2, tof, shortWay = true) {
   let y = 0;
   let C2 = 0.5;
   let S = 1 / 6;
+  let converged = false;
   for (let iter = 0; iter < maxIter; iter++) {
     C2 = stumpffC(z);
     S = stumpffS(z);
@@ -21956,11 +21955,11 @@ function lambertSolve(mu2, r1, r2, tof, shortWay = true) {
       z += 0.1;
       continue;
     }
-    const chi = Math.sqrt(y / C2);
-    const dt = (chi * chi * chi * S + A * Math.sqrt(y)) / Math.sqrt(mu2);
+    const chi2 = Math.sqrt(y / C2);
+    const dt = (chi2 * chi2 * chi2 * S + A * Math.sqrt(y)) / Math.sqrt(mu2);
     let dtdz;
     if (Math.abs(z) > 1e-6) {
-      dtdz = (chi * chi * chi * (0.5 / z) * (C2 - 3 * S / (2 * C2)) + 0.75 * (S / C2) * A * Math.sqrt(y) / C2 + A * (0.5 / Math.sqrt(y))) / Math.sqrt(mu2);
+      dtdz = (chi2 * chi2 * chi2 * (0.5 / z) * (C2 - 3 * S / (2 * C2)) + 0.75 * (S / C2) * A * Math.sqrt(y) / C2 + A * (0.5 / Math.sqrt(y))) / Math.sqrt(mu2);
       const dz2 = 1e-4;
       const Cp = stumpffC(z + dz2);
       const Sp = stumpffS(z + dz2);
@@ -21976,13 +21975,22 @@ function lambertSolve(mu2, r1, r2, tof, shortWay = true) {
     }
     if (!Number.isFinite(dtdz) || Math.abs(dtdz) < 1e-18) break;
     const dz = (tof - dt) / dtdz;
+    if (!Number.isFinite(dz)) break;
     z += dz;
-    if (Math.abs(dz) < tol) break;
+    if (Math.abs(dz) < tol) {
+      converged = true;
+      break;
+    }
   }
+  if (!converged) return null;
   C2 = stumpffC(z);
   S = stumpffS(z);
   y = r1n + r2n + A * (z * S - 1) / Math.sqrt(C2);
   if (!(y > 0)) return null;
+  const chi = Math.sqrt(y / C2);
+  const solvedTof = (chi * chi * chi * S + A * Math.sqrt(y)) / Math.sqrt(mu2);
+  const tofTolerance = Math.max(1e-8, tol * Math.max(1, tof));
+  if (!Number.isFinite(solvedTof) || Math.abs(solvedTof - tof) > tofTolerance) return null;
   const f = 1 - y / r1n;
   const g = A * Math.sqrt(y / mu2);
   const gdot = 1 - y / r2n;
@@ -21999,6 +22007,10 @@ function lambertSolve(mu2, r1, r2, tof, shortWay = true) {
   const v1n = vnorm(v1);
   const energy = v1n * v1n / 2 - mu2 / r1n;
   const a = Math.abs(energy) > 1e-16 ? -mu2 / (2 * energy) : Infinity;
+  if (a > 0) {
+    const period = 2 * Math.PI * Math.sqrt(a * a * a / mu2);
+    if (tof >= period) return null;
+  }
   const hvec = [
     r1[1] * v1[2] - r1[2] * v1[1],
     r1[2] * v1[0] - r1[0] * v1[2],
@@ -22128,7 +22140,7 @@ function sunPos(jday2) {
 function gmstRad(date4) {
   return gstime(date4);
 }
-var CIVIL_DARKNESS_RAD = -6 * Math.PI / 180;
+var CIVIL_TWILIGHT_RAD = -6 * Math.PI / 180;
 
 // src/lib/physics/j2.ts
 var EARTH_J2 = 0.00108262668;
@@ -22159,27 +22171,29 @@ var ISA_L = 65e-4;
 var ISA_G0 = 9.80665;
 var ISA_R_AIR = 287.05287;
 var ISA_GAMMA = 1.4;
+var ISA_GEOPOTENTIAL_RADIUS_M = 6356660;
 function isaAtmosphere(h) {
   if (!Number.isFinite(h) || h < 0 || h > 32e3) return null;
+  const H = h * ISA_GEOPOTENTIAL_RADIUS_M / (h + ISA_GEOPOTENTIAL_RADIUS_M);
   let T;
   let p;
   let layer;
-  if (h <= 11e3) {
+  if (H <= 11e3) {
     layer = "troposphere";
-    T = ISA_T0 - ISA_L * h;
+    T = ISA_T0 - ISA_L * H;
     p = ISA_P0 * (T / ISA_T0) ** (ISA_G0 / (ISA_L * ISA_R_AIR));
-  } else if (h <= 2e4) {
+  } else if (H <= 2e4) {
     layer = "tropopause";
     const T11 = ISA_T0 - ISA_L * 11e3;
     const p11 = ISA_P0 * (T11 / ISA_T0) ** (ISA_G0 / (ISA_L * ISA_R_AIR));
     T = T11;
-    p = p11 * Math.exp(-ISA_G0 * (h - 11e3) / (ISA_R_AIR * T11));
+    p = p11 * Math.exp(-ISA_G0 * (H - 11e3) / (ISA_R_AIR * T11));
   } else {
     layer = "stratosphere";
     const T11 = ISA_T0 - ISA_L * 11e3;
     const p11 = ISA_P0 * (T11 / ISA_T0) ** (ISA_G0 / (ISA_L * ISA_R_AIR));
     const p20 = p11 * Math.exp(-ISA_G0 * (2e4 - 11e3) / (ISA_R_AIR * T11));
-    T = 216.65 + 1e-3 * (h - 2e4);
+    T = 216.65 + 1e-3 * (H - 2e4);
     p = p20 * (T / 216.65) ** (-ISA_G0 / (1e-3 * ISA_R_AIR));
   }
   const rho = p / (ISA_R_AIR * T);
@@ -22216,7 +22230,7 @@ function launchAzimuth(latRad, iRad) {
 }
 
 // src/lib/physics/sso.ts
-var OMEGA_SUN = 2 * Math.PI / (365.256363004 * 86400);
+var OMEGA_SUN = 2 * Math.PI / (365.24219 * 86400);
 function ssoInclination(a, mu2 = EARTH_MU, R = EARTH_RADIUS, j22 = EARTH_J2, omegaSun = OMEGA_SUN) {
   if (!(a > R) || !(mu2 > 0)) return null;
   const n = Math.sqrt(mu2 / (a * a * a));
@@ -22288,6 +22302,7 @@ function linkBudget(input) {
   const { ptW, gtDbi, grDbi, freqHz, rangeM } = input;
   if (!(ptW > 0) || !(freqHz > 0) || !(rangeM > 0)) return null;
   const other = input.otherLossDb ?? 0;
+  if (!Number.isFinite(other) || other < 0) return null;
   const freqMHz = freqHz / 1e6;
   const rangeKm = rangeM / 1e3;
   const lfs = freeSpacePathLossDb(rangeKm, freqMHz);
@@ -22345,6 +22360,8 @@ var M_O2 = 0.031998;
 var M_CO2 = 0.04401;
 var M_N2 = 0.028014;
 var M_H2O = 0.018015;
+var M_LIOH = 0.02395;
+var LIOH_THEORETICAL_CO2_CAPACITY = M_CO2 / (2 * M_LIOH);
 var LIOH_CO2_CAPACITY = 0.85;
 var METABOLIC_RATES = {
   // 3.60e-4 kg/min O2, 4.55e-4 CO2
@@ -22426,12 +22443,15 @@ function cabinFromMasses(V, T, masses) {
   };
 }
 function cabinMassesFromComposition(V, T, pTotalPa, dryO2Frac, ppCO2Pa = 0, rh = 0) {
+  if (![V, T, pTotalPa, dryO2Frac, ppCO2Pa, rh].every(Number.isFinite)) return null;
   if (!(V > 0) || !(T > 0) || !(pTotalPa > 0)) return null;
   if (dryO2Frac < 0 || dryO2Frac > 1) return null;
+  if (ppCO2Pa < 0 || rh < 0 || rh > 1) return null;
   const Tc = T - 273.15;
   const pSat = 610.94 * Math.exp(17.625 * Tc / (Tc + 243.04));
-  const ppH2O = Math.min(pTotalPa * 0.5, Math.max(0, rh) * pSat);
-  const pDry = Math.max(0, pTotalPa - ppH2O - Math.max(0, ppCO2Pa));
+  const ppH2O = rh * pSat;
+  const pDry = pTotalPa - ppH2O - ppCO2Pa;
+  if (!(pDry >= 0)) return null;
   const ppO2 = dryO2Frac * pDry;
   const ppN2 = (1 - dryO2Frac) * pDry;
   const n = (p) => p * V / (R_UNIV * T);
@@ -22443,7 +22463,7 @@ function cabinMassesFromComposition(V, T, pTotalPa, dryO2Frac, ppCO2Pa = 0, rh =
   };
 }
 function liohDuration(mLiohKg, co2RateKgS, capacity = LIOH_CO2_CAPACITY) {
-  if (!(mLiohKg > 0) || !(co2RateKgS > 0) || !(capacity > 0)) return null;
+  if (!(mLiohKg > 0) || !(co2RateKgS > 0) || !(capacity > 0) || !Number.isFinite(mLiohKg) || !Number.isFinite(co2RateKgS) || !Number.isFinite(capacity) || capacity > LIOH_THEORETICAL_CO2_CAPACITY) return null;
   const capacityKg = mLiohKg * capacity;
   return { capacityKg, durationS: capacityKg / co2RateKgS };
 }
@@ -22573,13 +22593,18 @@ function hohmannWithPlaneChange(mu2, r1, r2, deltaIRad) {
   };
 }
 function circularizeBurn(mu2, a, e, at) {
-  if (!(a > 0) || e < 0 || e >= 1) return null;
+  if (!Number.isFinite(mu2) || !(mu2 > 0) || !Number.isFinite(a) || !(a > 0) || !Number.isFinite(e) || e < 0 || e >= 1 || at !== "peri" && at !== "apo") return null;
   const rp = a * (1 - e);
   const ra = a * (1 + e);
   const r = at === "peri" ? rp : ra;
+  if (!Number.isFinite(r) || !(r > 0)) return null;
   const vEll = visViva(mu2, r, a);
   const vCirc = circularOrbitVelocity(mu2, r);
-  return { r, vEll, vCirc, dv: Math.abs(vEll - vCirc) };
+  const dv = Math.abs(vEll - vCirc);
+  if (!Number.isFinite(vEll) || !(vEll > 0) || !Number.isFinite(vCirc) || !(vCirc > 0) || !Number.isFinite(dv)) {
+    return null;
+  }
+  return { r, vEll, vCirc, dv };
 }
 function geoRadius(mu2, periodS = 86164.0905) {
   if (!(mu2 > 0) || !(periodS > 0)) return null;
@@ -22606,9 +22631,13 @@ function idealThrust(mdot, ve) {
   return mdot * ve;
 }
 function propellantForDeltaV(ispS, deltaV, dryMass, g0 = G0) {
-  const m0 = rocketMassInitial(ispS, deltaV, dryMass, g0);
-  if (!Number.isFinite(m0) || m0 <= dryMass) return null;
-  return { m0, prop: m0 - dryMass, ratio: m0 / dryMass };
+  if (!(ispS > 0) || !(deltaV >= 0) || !(dryMass > 0) || !(g0 > 0)) return null;
+  const exponent = deltaV / (ispS * g0);
+  const ratio = Math.exp(exponent);
+  const m0 = dryMass * ratio;
+  const prop = dryMass * Math.expm1(exponent);
+  if (!Number.isFinite(m0) || !Number.isFinite(prop) || !Number.isFinite(ratio)) return null;
+  return { m0, prop, ratio };
 }
 
 // src/lib/physics/ops.ts
@@ -22678,8 +22707,13 @@ function meanMotionFromAltitude(h, mu2 = EARTH_MU, bodyR = EARTH_RADIUS) {
   const n = Math.sqrt(mu2 / (a * a * a));
   return { a, n, period: orbitalPeriod(mu2, a), v: circularOrbitVelocity(mu2, a) };
 }
+function normalizeEqualStageCount(nStages) {
+  if (!Number.isFinite(nStages)) return null;
+  const rounded = Math.round(nStages);
+  return Number.isSafeInteger(rounded) && rounded >= 1 ? rounded : null;
+}
 function equalStageMassRatio(totalDv, nStages, ispS, g0 = 9.80665) {
-  if (!(totalDv > 0) || !(nStages >= 1) || !(ispS > 0)) return null;
+  if (!(totalDv >= 0) || !Number.isSafeInteger(nStages) || nStages < 1 || !(ispS > 0) || !(g0 > 0)) return null;
   const ve = ispS * g0;
   const dvStage = totalDv / nStages;
   return { dvStage, massRatio: Math.exp(dvStage / ve), ve };
@@ -23123,7 +23157,7 @@ function klobucharIonoDelayM(elevRad, tecu, fHz = 157542e4) {
 function opticalLinkReceivedPower(opts) {
   const { ptW, etaT, etaR, gt, gr, wavelengthM: lam, rangeM: R } = opts;
   const L = opts.lossLin ?? 1;
-  if (!(ptW > 0) || !(etaT > 0) || !(etaR > 0) || !(gt > 0) || !(gr > 0) || !(lam > 0) || !(R > 0) || !(L > 0))
+  if (![ptW, etaT, etaR, gt, gr, lam, R, L].every(Number.isFinite) || !(ptW > 0) || !(etaT > 0 && etaT <= 1) || !(etaR > 0 && etaR <= 1) || !(gt > 0) || !(gr > 0) || !(lam > 0) || !(R > 0) || !(L >= 1))
     return null;
   const fspl = (lam / (4 * Math.PI * R)) ** 2;
   const pr = ptW * etaT * etaR * gt * gr * fspl / L;
@@ -23395,6 +23429,7 @@ function magnetorquerMoment(turns, current, area) {
   return turns * current * area;
 }
 function captureCircularizeDv(mu2, rp, vInf) {
+  if (!Number.isFinite(mu2) || !Number.isFinite(rp) || !Number.isFinite(vInf)) return null;
   if (!(mu2 > 0) || !(rp > 0) || !(vInf >= 0)) return null;
   const vp = Math.sqrt(vInf * vInf + 2 * mu2 / rp);
   const vc = Math.sqrt(mu2 / rp);
@@ -23542,9 +23577,14 @@ function planckSpectralRadiance(lambdaM, tempK) {
   if (!(lambdaM > 0) || !(tempK > 0)) return null;
   const x = PLANCK_H * C / (lambdaM * BOLTZMANN_K * tempK);
   if (!Number.isFinite(x) || x <= 0) return null;
-  if (x > 700) return 0;
-  const num = 2 * PLANCK_H * C * C / lambdaM ** 5;
-  const B = num / (Math.exp(x) - 1);
+  let B;
+  if (x > 50) {
+    const logB = Math.log(2 * PLANCK_H * C * C) - 5 * Math.log(lambdaM) - x;
+    B = Math.exp(logB);
+  } else {
+    const num = 2 * PLANCK_H * C * C / lambdaM ** 5;
+    B = num / Math.expm1(x);
+  }
   return Number.isFinite(B) && B >= 0 ? B : null;
 }
 function eirpLinear(pt, gainLin) {
@@ -24151,7 +24191,7 @@ function radiatorHeatPump(i) {
   const copCarnot = i.tColdK / (i.tHotK - i.tColdK);
   let cop;
   if (i.cop != null) {
-    if (!(i.cop > 0)) return null;
+    if (!(i.cop > 0) || i.cop > copCarnot) return null;
     cop = i.cop;
   } else if (i.carnotFraction != null) {
     if (!(i.carnotFraction > 0) || i.carnotFraction > 1) return null;
@@ -24428,15 +24468,17 @@ var MCP_TOOL_DEFS = [
   },
   {
     name: "hohmann",
-    description: "Hohmann transfer \u0394v and TOF between circular coplanar orbits.",
+    description: "Hohmann transfer \u0394v and TOF between circular coplanar orbits; mu and radii must be finite and positive.",
     inputSchema: {
-      r1_m: number2(),
-      r2_m: number2(),
-      mu: number2().optional()
+      r1_m: number2().finite().positive(),
+      r2_m: number2().finite().positive(),
+      mu: number2().finite().positive().optional()
     },
     sample: { "r1_m": 6778137, "r2_m": 42164e3 },
     run: (args) => {
-      return hohmannTransfer(args.mu ?? EARTH_MU, args.r1_m, args.r2_m);
+      const mu2 = args.mu ?? EARTH_MU;
+      if (![mu2, args.r1_m, args.r2_m].every(Number.isFinite) || !(mu2 > 0) || !(args.r1_m > 0) || !(args.r2_m > 0)) return null;
+      return hohmannTransfer(mu2, args.r1_m, args.r2_m);
     }
   },
   {
@@ -24454,16 +24496,18 @@ var MCP_TOOL_DEFS = [
   },
   {
     name: "bielliptic",
-    description: "Bielliptic three-burn transfer via intermediate apo rb.",
+    description: "Bielliptic three-burn transfer via intermediate apoapsis rb, which must exceed both endpoint radii; mu and radii must be finite and positive.",
     inputSchema: {
-      r1_m: number2(),
-      r2_m: number2(),
-      rb_m: number2(),
-      mu: number2().optional()
+      r1_m: number2().finite().positive(),
+      r2_m: number2().finite().positive(),
+      rb_m: number2().finite().positive(),
+      mu: number2().finite().positive().optional()
     },
     sample: { "r1_m": 6778137, "r2_m": 63246e3, "rb_m": 168656e3 },
     run: (args) => {
-      return biellipticTransfer(args.mu ?? EARTH_MU, args.r1_m, args.r2_m, args.rb_m);
+      const mu2 = args.mu ?? EARTH_MU;
+      if (![mu2, args.r1_m, args.r2_m, args.rb_m].every(Number.isFinite) || !(mu2 > 0) || !(args.r1_m > 0) || !(args.r2_m > 0) || !(args.rb_m > Math.max(args.r1_m, args.r2_m))) return null;
+      return biellipticTransfer(mu2, args.r1_m, args.r2_m, args.rb_m);
     }
   },
   {
@@ -24616,7 +24660,7 @@ var MCP_TOOL_DEFS = [
       gr_dbi: number2(),
       freq_hz: number2(),
       range_m: number2(),
-      other_loss_db: number2().optional(),
+      other_loss_db: number2().min(0).finite().optional(),
       t_sys_k: number2().optional(),
       required_cn0_dbhz: number2().optional()
     },
@@ -24668,8 +24712,8 @@ var MCP_TOOL_DEFS = [
       temp_k: number2(),
       pressure_pa: number2(),
       dry_o2_frac: number2(),
-      pp_co2_pa: number2(),
-      relative_humidity: number2()
+      pp_co2_pa: number2().min(0),
+      relative_humidity: number2().min(0).max(1)
     },
     sample: { "volume_m3": 100, "temp_k": 293.15, "pressure_pa": 101325, "dry_o2_frac": 0.21, "pp_co2_pa": 400, "relative_humidity": 0.4 },
     run: (args) => {
@@ -24684,7 +24728,7 @@ var MCP_TOOL_DEFS = [
     inputSchema: {
       lioh_kg: number2(),
       co2_rate_kg_s: number2(),
-      capacity: number2().optional()
+      capacity: number2().positive().max(LIOH_THEORETICAL_CO2_CAPACITY).optional()
     },
     sample: { "lioh_kg": 2, "co2_rate_kg_s": 4e-5 },
     run: (args) => {
@@ -24869,14 +24913,15 @@ var MCP_TOOL_DEFS = [
     name: "circularize",
     description: "Circularize burn at apo or peri.",
     inputSchema: {
-      a_m: number2(),
-      e: number2(),
-      at: string2(),
-      mu: number2().optional()
+      a_m: number2().finite().positive(),
+      e: number2().finite().min(0).lt(1),
+      at: _enum(["peri", "apo"]),
+      mu: number2().finite().positive().optional()
     },
     sample: { "a_m": 75e5, "e": 0.1, "at": "apo" },
     run: (args) => {
-      return circularizeBurn(args.mu ?? EARTH_MU, args.a_m, args.e, args.at === "peri" ? "peri" : "apo");
+      if (args.at !== "peri" && args.at !== "apo") return null;
+      return circularizeBurn(args.mu === void 0 ? EARTH_MU : args.mu, args.a_m, args.e, args.at);
     }
   },
   {
@@ -25076,7 +25121,8 @@ var MCP_TOOL_DEFS = [
     },
     sample: { "total_dv_m_s": 9e3, "n_stages": 3, "isp_s": 300 },
     run: (args) => {
-      return equalStageMassRatio(args.total_dv_m_s, Math.round(args.n_stages), args.isp_s);
+      const nStages = normalizeEqualStageCount(args.n_stages);
+      return nStages === null ? null : equalStageMassRatio(args.total_dv_m_s, nStages, args.isp_s);
     }
   },
   {
@@ -25324,11 +25370,10 @@ var MCP_TOOL_DEFS = [
     name: "orbital_energy",
     description: "Specific orbital energy.",
     inputSchema: {
-      r_m: number2(),
       a_m: number2(),
       mu: number2().optional()
     },
-    sample: { "r_m": 6778137, "a_m": 6778137 },
+    sample: { "a_m": 6778137 },
     run: (args) => {
       const e = specificEnergyCircular(args.mu ?? EARTH_MU, args.a_m);
       return { energy_j_kg: e };
@@ -25338,15 +25383,21 @@ var MCP_TOOL_DEFS = [
     name: "true_anomaly",
     description: "Radius from true anomaly.",
     inputSchema: {
-      a_m: number2(),
-      e: number2(),
+      a_m: number2().positive(),
+      e: number2().min(0).max(0.999),
       nu_deg: number2()
     },
-    sample: { "a_m": 8e6, "e": 0.1, "nu_deg": 45 },
+    sample: { a_m: 8e6, e: 0.1, nu_deg: 45 },
     run: (args) => {
+      if (!(args.a_m > 0) || !Number.isFinite(args.a_m)) return null;
+      if (!Number.isFinite(args.e) || !(args.e >= 0 && args.e <= 0.999)) return null;
+      if (!Number.isFinite(args.nu_deg)) return null;
       const nu = args.nu_deg * Math.PI / 180;
       const p = args.a_m * (1 - args.e ** 2);
-      const r = p / (1 + args.e * Math.cos(nu));
+      const denominator = 1 + args.e * Math.cos(nu);
+      if (!(denominator > 0) || !Number.isFinite(denominator)) return null;
+      const r = p / denominator;
+      if (!(r > 0) || !Number.isFinite(r)) return null;
       return { r_m: r, nu_rad: nu };
     }
   },
@@ -25872,13 +25923,13 @@ var MCP_TOOL_DEFS = [
     name: "laser_link_budget",
     description: "Optical link received power sketch.",
     inputSchema: {
-      pt_w: number2(),
-      gt: number2(),
-      gr: number2(),
-      wavelength_m: number2(),
-      range_m: number2(),
-      eta_t: number2().optional(),
-      eta_r: number2().optional()
+      pt_w: number2().positive().finite(),
+      gt: number2().positive().finite(),
+      gr: number2().positive().finite(),
+      wavelength_m: number2().positive().finite(),
+      range_m: number2().positive().finite(),
+      eta_t: number2().positive().max(1).finite().optional(),
+      eta_r: number2().positive().max(1).finite().optional()
     },
     sample: { "pt_w": 1, "gt": 1e5, "gr": 1e5, "wavelength_m": 155e-8, "range_m": 1e6, "eta_t": 0.8, "eta_r": 0.7 },
     run: (args) => {
@@ -26473,17 +26524,17 @@ var MCP_TOOL_DEFS = [
   },
   {
     name: "arg_perigee_drift_j2",
-    description: "J2 argument of perigee drift.",
+    description: "First-order secular J2 argument-of-perigee rate for elliptic orbits (0 < e < 1); undefined for e = 0.",
     inputSchema: {
       a_m: number2(),
-      e: number2(),
+      e: number2().gt(0).lt(1),
       i_deg: number2()
     },
     sample: { "a_m": 6778137, "e": 1e-3, "i_deg": 51.6 },
     run: (args) => {
       const a = args.a_m;
       const e = args.e;
-      if (!(a > 0) || !(e >= 0) || !(e < 1)) return null;
+      if (!(a > 0) || !(e > 0) || !(e < 1)) return null;
       const n = Math.sqrt(EARTH_MU / (a * a * a));
       const p = a * (1 - e * e);
       const r = argPerigeeDriftJ2(n, 0.00108262668, EARTH_RADIUS, p, args.i_deg * Math.PI / 180);
@@ -26602,9 +26653,9 @@ var MCP_TOOL_DEFS = [
     name: "capture_circularize",
     description: "Capture then circularize \u0394v.",
     inputSchema: {
-      rp_m: number2(),
-      v_inf_m_s: number2(),
-      mu: number2().optional()
+      rp_m: number2().finite().positive(),
+      v_inf_m_s: number2().finite().min(0),
+      mu: number2().finite().positive().optional()
     },
     sample: { "rp_m": 6778137, "v_inf_m_s": 2e3 },
     run: (args) => {
@@ -27239,25 +27290,31 @@ var MCP_TOOL_DEFS = [
     name: "sgp4",
     description: "Mean motion from TLE mean-motion revs/day (not full SGP4 prop).",
     inputSchema: {
-      n_rev_day: number2()
+      n_rev_day: number2().positive()
     },
     sample: { "n_rev_day": 15.5 },
     run: (args) => {
-      const n = args.n_rev_day * 2 * Math.PI / 86400;
-      return { n_rad_s: n, period_s: 2 * Math.PI / n, note: "Use UI SGP4 tool for full TLE propagation" };
+      const nRevDay = args.n_rev_day;
+      if (typeof nRevDay !== "number" || !Number.isFinite(nRevDay) || nRevDay <= 0) return null;
+      const n = nRevDay / 86400 * (2 * Math.PI);
+      const period = 86400 / nRevDay;
+      if (!Number.isFinite(n) || n <= 0 || !Number.isFinite(period) || period <= 0) return null;
+      return { n_rad_s: n, period_s: period, note: "Use UI SGP4 tool for full TLE propagation" };
     }
   },
   {
     name: "look_angles",
     description: "Simple elevation from range and heights (not full ECI look).",
     inputSchema: {
-      ground_range_m: number2(),
+      ground_range_m: number2().nonnegative(),
       delta_h_m: number2()
     },
     sample: { "ground_range_m": 5e5, "delta_h_m": 4e5 },
     run: (args) => {
+      if (args.ground_range_m === 0 && args.delta_h_m === 0) return null;
       const el = elevationFromRangeHeight(args.ground_range_m, args.delta_h_m);
       const slant = slantRange(args.ground_range_m, args.delta_h_m);
+      if (el == null || slant == null || !Number.isFinite(el) || !Number.isFinite(slant)) return null;
       return { elev_rad: el, slant_m: slant, note: "Educational; full TLE look-angles in UI" };
     }
   },
@@ -27265,8 +27322,8 @@ var MCP_TOOL_DEFS = [
     name: "pass_predict",
     description: "Horizon crossing time sketch from period and duty (not full pass search).",
     inputSchema: {
-      period_s: number2(),
-      visible_frac: number2().optional()
+      period_s: number2().positive(),
+      visible_frac: number2().min(0).max(1).optional()
     },
     sample: { "period_s": 5600, "visible_frac": 0.1 },
     run: (args) => {

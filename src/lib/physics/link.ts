@@ -45,6 +45,7 @@ export function linkBudget(input: LinkBudgetInput): LinkBudgetResult | null {
   const { ptW, gtDbi, grDbi, freqHz, rangeM } = input
   if (!(ptW > 0) || !(freqHz > 0) || !(rangeM > 0)) return null
   const other = input.otherLossDb ?? 0
+  if (!Number.isFinite(other) || other < 0) return null
   const freqMHz = freqHz / 1e6
   const rangeKm = rangeM / 1000
   const lfs = freeSpacePathLossDb(rangeKm, freqMHz)

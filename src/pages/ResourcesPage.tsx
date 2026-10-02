@@ -48,26 +48,31 @@ export function ResourcesPage() {
           {SCENES.map((scene) => (
             <li key={scene.id} className="sidus-card flex flex-col p-5 sm:p-6">
               <h3 className="font-display text-base font-medium text-fg">{t(scene.titleKey)}</h3>
-              <p className="mt-3 flex-1 text-sm leading-relaxed text-muted">{t(scene.blurbKey)}</p>
-              <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-border pt-3">
-                <Link
-                  to={sceneHref(scene)}
-                  className="inline-flex h-8 items-center border border-border-strong bg-bg-elevated px-2.5 font-mono text-[10px] uppercase tracking-wider text-muted no-underline hover:border-muted hover:text-fg"
-                >
-                  {t('scenes.open')}
-                </Link>
-                {sceneCitations(scene).map(({ group, url }) => (
-                  <a
-                    key={group}
-                    href={url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center gap-1 font-mono text-[10px] uppercase tracking-wider text-subtle hover:text-fg"
+              <p className="mt-3 text-sm leading-relaxed text-muted">{t(scene.blurbKey)}</p>
+              <div className="mt-auto pt-4">
+                <div className="border-t border-border pt-3">
+                  <Link
+                    to={sceneHref(scene)}
+                    className="inline-flex h-8 items-center border border-border-strong bg-bg-elevated px-2.5 font-mono text-[10px] uppercase tracking-wider text-muted no-underline hover:border-muted hover:text-fg"
                   >
-                    {t('scenes.cite')} · {t(`fields.sat_group_${group}`)}
-                    <ExternalLink className="size-3 shrink-0" aria-hidden />
-                  </a>
-                ))}
+                    {t('scenes.open')}
+                  </Link>
+                  <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-[10px] uppercase tracking-wider text-subtle">
+                    <span>{t('scenes.cite')}</span>
+                    {sceneCitations(scene).map(({ group, url }) => (
+                      <a
+                        key={group}
+                        href={url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1 no-underline hover:text-fg"
+                      >
+                        {t(`fields.sat_group_${group}`)}
+                        <ExternalLink className="size-3 shrink-0" aria-hidden />
+                      </a>
+                    ))}
+                  </div>
+                </div>
               </div>
             </li>
           ))}

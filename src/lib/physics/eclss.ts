@@ -10,6 +10,8 @@ export const M_N2 = 0.028014
 export const M_H2O = 0.018015
 /** LiOH molar mass kg/mol */
 export const M_LIOH = 0.02395
+/** Stoichiometric maximum: one CO2 molecule per two LiOH molecules [kg/kg]. */
+export const LIOH_THEORETICAL_CO2_CAPACITY = M_CO2 / (2 * M_LIOH)
 /**
  * Practical CO2 capacity of LiOH canisters (kg CO2 / kg LiOH).
  * Stoichiometry 2 LiOH + CO2 → Li2CO3 + H2O ⇒ 0.919 kg/kg theoretical;
@@ -167,13 +169,16 @@ export function cabinMassesFromComposition(
   ppCO2Pa = 0,
   rh = 0,
 ): { o2: number; n2: number; co2: number; h2o: number } | null {
+  if (![V, T, pTotalPa, dryO2Frac, ppCO2Pa, rh].every(Number.isFinite)) return null
   if (!(V > 0) || !(T > 0) || !(pTotalPa > 0)) return null
   if (dryO2Frac < 0 || dryO2Frac > 1) return null
+  if (ppCO2Pa < 0 || rh < 0 || rh > 1) return null
   // Saturation vapor pressure water (Tetens, Pa)
   const Tc = T - 273.15
   const pSat = 610.94 * Math.exp((17.625 * Tc) / (Tc + 243.04))
-  const ppH2O = Math.min(pTotalPa * 0.5, Math.max(0, rh) * pSat)
-  const pDry = Math.max(0, pTotalPa - ppH2O - Math.max(0, ppCO2Pa))
+  const ppH2O = rh * pSat
+  const pDry = pTotalPa - ppH2O - ppCO2Pa
+  if (!(pDry >= 0)) return null
   const ppO2 = dryO2Frac * pDry
   const ppN2 = (1 - dryO2Frac) * pDry
   const n = (p: number) => (p * V) / (R_UNIV * T)
@@ -196,8 +201,9 @@ export function applyMetabolism(
 ): { masses: typeof masses; atm: CabinAtmosphere } | null {
   const b = metabolicBudget(activity, durationS, crew)
   if (!b) return null
+  if (b.o2Kg > masses.o2) return null
   const next = {
-    o2: Math.max(0, masses.o2 - b.o2Kg),
+    o2: masses.o2 - b.o2Kg,
     n2: masses.n2,
     co2: masses.co2 + b.co2Kg,
     h2o: masses.h2o + b.h2oKg,
@@ -216,7 +222,15 @@ export function liohDuration(
   co2RateKgS: number,
   capacity = LIOH_CO2_CAPACITY,
 ): { capacityKg: number; durationS: number } | null {
-  if (!(mLiohKg > 0) || !(co2RateKgS > 0) || !(capacity > 0)) return null
+  if (
+    !(mLiohKg > 0) ||
+    !(co2RateKgS > 0) ||
+    !(capacity > 0) ||
+    !Number.isFinite(mLiohKg) ||
+    !Number.isFinite(co2RateKgS) ||
+    !Number.isFinite(capacity) ||
+    capacity > LIOH_THEORETICAL_CO2_CAPACITY
+  ) return null
   const capacityKg = mLiohKg * capacity
   return { capacityKg, durationS: capacityKg / co2RateKgS }
 }
@@ -224,7 +238,14 @@ export function liohDuration(
 /**
  * Stoichiometric LiOH mass for a given CO2 mass (theoretical + practical).
  */
-export function liohForCo2(co2Kg: number, capacity = LIOH_CO2_CAPACITY): number {
+export function liohForCo2(co2Kg: number, capacity = LIOH_CO2_CAPACITY): number | null {
+  if (
+    !(co2Kg >= 0) ||
+    !(capacity > 0) ||
+    !Number.isFinite(co2Kg) ||
+    !Number.isFinite(capacity) ||
+    capacity > LIOH_THEORETICAL_CO2_CAPACITY
+  ) return null
   return co2Kg / capacity
 }
 
