@@ -330,6 +330,54 @@ describe('snippet verification expected values', () => {
   it('covers exactly the pilots plus every landed coverage wave', () => {
     expect(Object.keys(EXPECTED).sort()).toEqual([...COVERED].sort())
   })
+
+  it('matches the analytic southwest ENU look-angle vector', () => {
+    const fixed = EXPECTED['elevation-azimuth']({ east: -1, north: 0, up: 1 })
+    expect(fixed.rho).toBeCloseTo(Math.sqrt(2), 14)
+    expect(fixed.el).toBeCloseTo(Math.PI / 4, 14)
+    expect(fixed.az).toBeCloseTo((3 * Math.PI) / 2, 14)
+    expect(fixed.az).toBeGreaterThanOrEqual(0)
+    expect(fixed.az).toBeLessThan(2 * Math.PI)
+  })
+
+  it('matches the analytic west-quadrant look-angle vector', () => {
+    const fixed = EXPECTED['look-angles']({
+      sat_x: 6_379_137,
+      sat_y: -1000,
+      sat_z: 0,
+      lat: 0,
+      lon: 0,
+      h_m: 0,
+    })
+    expect(fixed.range_m).toBeCloseTo(Math.sqrt(2_000_000), 9)
+    expect(fixed.el).toBeCloseTo(Math.PI / 4, 14)
+    expect(fixed.az).toBeCloseTo((3 * Math.PI) / 2, 14)
+    expect(fixed.az).toBeGreaterThanOrEqual(0)
+    expect(fixed.az).toBeLessThan(2 * Math.PI)
+  })
+
+  it('matches analytic north/east/south/west vectors at an equatorial WGS-84 observer', () => {
+    const cases = [
+      { name: 'north', sat_x: 6_379_137, sat_y: 0, sat_z: 1000, az: 0 },
+      { name: 'east', sat_x: 6_379_137, sat_y: 1000, sat_z: 0, az: Math.PI / 2 },
+      { name: 'south', sat_x: 6_379_137, sat_y: 0, sat_z: -1000, az: Math.PI },
+      { name: 'west', sat_x: 6_379_137, sat_y: -1000, sat_z: 0, az: (3 * Math.PI) / 2 },
+    ]
+
+    for (const c of cases) {
+      const got = EXPECTED['look-angles']({
+        sat_x: c.sat_x,
+        sat_y: c.sat_y,
+        sat_z: c.sat_z,
+        lat: 0,
+        lon: 0,
+        h_m: 0,
+      })
+      expect(got.range_m, c.name).toBeCloseTo(Math.sqrt(2_000_000), 9)
+      expect(got.el, c.name).toBeCloseTo(Math.PI / 4, 14)
+      expect(got.az, c.name).toBeCloseTo(c.az, 14)
+    }
+  })
 })
 
 /**
@@ -361,4 +409,53 @@ describe('snippet verification scenarios', () => {
       })
     })
   }
+})
+
+describe('dynamic-pressure independent USSA 1976 anchors', () => {
+  const reference = EXPECTED['dynamic-pressure']!
+
+  it('preserves the sea-level reference state', () => {
+    const out = reference({ h: 0, v: 300 })
+    expect(out.T).toBeCloseTo(288.15, 10)
+    expect(out.p).toBeCloseTo(101_325, 8)
+    expect(out.rho).toBeCloseTo(1.225, 7)
+    expect(out.q).toBeCloseTo(55_125, 2)
+  })
+
+  it('is continuous at the geopotential 11 km and 20 km layer boundaries', () => {
+    const h11 = 11_019.06815051547
+    const at11 = reference({ h: h11, v: 300 })
+    expect(at11.T).toBeCloseTo(216.65, 5)
+    expect(at11.p).toBeCloseTo(22_632.040095, 3)
+
+    const h20 = 20_063.12473763781
+    const at20 = reference({ h: h20, v: 300 })
+    expect(at20.T).toBeCloseTo(216.65, 5)
+    expect(at20.p).toBeCloseTo(5_474.877424, 3)
+  })
+
+  it('matches the geometric 20 km isothermal-layer reference', () => {
+    const out = reference({ h: 20_000, v: 300 })
+    expect(out.T).toBeCloseTo(216.65, 8)
+    expect(out.p).toBeCloseTo(5_529.30148278, 5)
+    expect(out.rho).toBeCloseTo(0.0889098102871, 10)
+    expect(out.q).toBeCloseTo(4_000.94146292, 6)
+  })
+
+  it('matches the geometric 32 km upper-limit stratosphere reference', () => {
+    const out = reference({ h: 32_000, v: 300 })
+    expect(out.T).toBeCloseTo(228.489715997, 8)
+    expect(out.p).toBeCloseTo(889.061807060, 6)
+    expect(out.rho).toBeCloseTo(0.0135551211255, 12)
+    expect(out.q).toBeCloseTo(609.980450648, 8)
+  })
+
+  it('keeps the upper-layer cases in the cross-language scenario bag', () => {
+    const names = scenariosFor('dynamic-pressure').map((scenario) => scenario.name)
+    expect(names).toContain('sea-level')
+    expect(names).toContain('geopotential-11-km-layer-boundary')
+    expect(names).toContain('geometric-20-km-tropopause-layer')
+    expect(names).toContain('geopotential-20-km-layer-boundary')
+    expect(names).toContain('geometric-32-km-page-limit')
+  })
 })

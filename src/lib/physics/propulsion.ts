@@ -28,9 +28,13 @@ export function propellantForDeltaV(
   dryMass: number,
   g0 = G0,
 ): { m0: number; prop: number; ratio: number } | null {
-  const m0 = rocketMassInitial(ispS, deltaV, dryMass, g0)
-  if (!Number.isFinite(m0) || m0 <= dryMass) return null
-  return { m0, prop: m0 - dryMass, ratio: m0 / dryMass }
+  if (!(ispS > 0) || !(deltaV >= 0) || !(dryMass > 0) || !(g0 > 0)) return null
+  const exponent = deltaV / (ispS * g0)
+  const ratio = Math.exp(exponent)
+  const m0 = dryMass * ratio
+  const prop = dryMass * Math.expm1(exponent)
+  if (!Number.isFinite(m0) || !Number.isFinite(prop) || !Number.isFinite(ratio)) return null
+  return { m0, prop, ratio }
 }
 
 /** Mass ratio required: m0/mf = exp(Δv / (Isp g0)). */

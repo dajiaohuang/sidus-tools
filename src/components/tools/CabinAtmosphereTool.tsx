@@ -12,6 +12,7 @@ import {
   atmosphereFlags,
   cabinFromMasses,
   cabinMassesFromComposition,
+  metabolicBudget,
   METABOLIC_RATES,
   type MetabolicActivity,
   TOOL_UNIT_SETS,
@@ -55,6 +56,8 @@ export function CabinAtmosphereTool() {
     if (p.activity !== 'none' && p.crew > 0 && hoursS > 0) {
       const act = p.activity as MetabolicActivity
       if (act in METABOLIC_RATES) {
+        const budget = metabolicBudget(act, hoursS, p.crew)
+        if (budget && budget.o2Kg > masses0.o2) return { error: 'oxygen-depleted' as const }
         const step = applyMetabolism(V, T, masses0, act, hoursS, p.crew)
         if (step) {
           masses = step.masses
@@ -62,7 +65,7 @@ export function CabinAtmosphereTool() {
             crew: p.crew,
             activity: t(`fields.activity_${act}`),
           })
-        }
+        } else return null
       }
     }
     const atm = cabinFromMasses(V, T, masses)
@@ -70,9 +73,10 @@ export function CabinAtmosphereTool() {
     return { masses, atm, note, flags: atmosphereFlags(atm) }
   }, [T, V, hoursS, p.activity, p.crew, p.o2frac, p.rh, pTotal, ppco2Pa, t])
 
-  // Snippet free vars (m_O2/m_N2/m_CO2) must stay present even when `res` is
-  // null (invalid inputs): recompute from the base composition unconditionally.
+  // Keep snippet inputs available for invalid states, but prefer the exact
+  // post-metabolism masses represented by the visible result when it exists.
   const massesForCode = cabinMassesFromComposition(V, T, pTotal, p.o2frac, ppco2Pa, p.rh)
+  const snippetMasses = res?.masses ?? massesForCode ?? { o2: 0, n2: 0, co2: 0, h2o: 0 }
 
   return (
     <ToolShell
@@ -173,6 +177,8 @@ export function CabinAtmosphereTool() {
       results={
         !res ? (
           <p className="font-mono text-sm text-muted">{t('fields.invalid_cabin_inputs')}</p>
+        ) : 'error' in res ? (
+          <p className="font-mono text-sm text-muted">{t('fields.error_cabin_o2_depleted')}</p>
         ) : (
           <div className="space-y-3">
             <p className="font-mono text-[11px] text-muted">{res.note}</p>
@@ -249,7 +255,29 @@ export function CabinAtmosphereTool() {
           </div>
         )
       }
-      code={<CodeExport formulaId="cabin-atmosphere" values={{ V, T, pTotal, ppco2Pa, hoursS, p: p.p, o2frac: p.o2frac, ppco2: p.ppco2, rh: p.rh, crew: p.crew, hours: p.hours, activity: p.activity, m_O2: massesForCode?.o2 ?? 0, m_N2: massesForCode?.n2 ?? 0, m_CO2: massesForCode?.co2 ?? 0 }} />}
+      code={
+        <CodeExport
+          formulaId="cabin-atmosphere"
+          values={{
+            V,
+            T,
+            pTotal,
+            ppco2Pa,
+            hoursS,
+            p: p.p,
+            o2frac: p.o2frac,
+            ppco2: p.ppco2,
+            rh: p.rh,
+            crew: p.crew,
+            hours: p.hours,
+            activity: p.activity,
+            m_O2: snippetMasses.o2,
+            m_N2: snippetMasses.n2,
+            m_CO2: snippetMasses.co2,
+            m_H2O: snippetMasses.h2o,
+          }}
+        />
+      }
     />
   )
 }

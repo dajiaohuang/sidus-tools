@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  CIVIL_DARKNESS_RAD,
+  CIVIL_TWILIGHT_RAD,
   eciSiToEcefSi,
   eciSiToGeodetic,
   findNextPass,
@@ -9,6 +9,7 @@ import {
   observerEciPosition,
   parseTle,
   propagateEci,
+  SAMPLE_ISS_TLE,
   sunEciSi,
   sunElevationRad,
   topocentricSezSi,
@@ -263,11 +264,36 @@ describe('TLE parsing', () => {
     expect(p.ok).toBe(false)
   })
 
+  it('rejects line pairs with different NORAD catalog numbers', () => {
+    const line1 = VALLADO_CASES[0].l1
+    const line2 = VALLADO_CASES[1].l2
+    const p = parseTle(`${line1}\n${line2}`)
+    expect(p.ok).toBe(false)
+  })
+
+  it('rejects an invalid checksum on either 69-character element line', () => {
+    const { l1, l2 } = VALLADO_CASES[0]
+    const corruptChecksum = (line: string) => `${line.slice(0, 68)}${(Number(line[68]) + 1) % 10}`
+    expect(parseTle(`${corruptChecksum(l1)}\n${l2}`).ok).toBe(false)
+    expect(parseTle(`${l1}\n${corruptChecksum(l2)}`).ok).toBe(false)
+  })
+
+  it('rejects truncated element lines and accepts the shipped demo TLE', () => {
+    const { l1, l2 } = VALLADO_CASES[0]
+    const p = parseTle(`${l1.slice(0, -1)}\n${l2}`)
+    expect(p.ok).toBe(false)
+    expect(parseTle(SAMPLE_ISS_TLE).ok).toBe(true)
+  })
+
   it('parses a 3-line TLE (name + lines) and returns the name', () => {
     const caseA = VALLADO_CASES[0]
     const p = parseTle(`STR#3 SGP4 TEST\n${caseA.l1}\n${caseA.l2}`)
     expect(p.ok).toBe(true)
-    if (p.ok) expect(p.name).toBe('STR#3 SGP4 TEST')
+    if (p.ok) {
+      expect(p.name).toBe('STR#3 SGP4 TEST')
+      expect(p.line1).toBe(caseA.l1)
+      expect(p.line2).toBe(caseA.l2)
+    }
   })
 })
 
@@ -337,6 +363,102 @@ describe('findNextPass refineS: bisected AOS/LOS/peak vs coarse scan', () => {
     // (e) durationS consistent with los - aos within 1 ms
     const expectedDurationS = (refined.los.getTime() - refined.aos.getTime()) / 1000
     expect(Math.abs(refined.durationS - expectedDurationS)).toBeLessThanOrEqual(0.001)
+  })
+})
+
+describe('findNextPass: pass entirely between below-mask coarse samples', () => {
+  it('finds and refines a 9.8-second pass at every one-second start phase', () => {
+    const caseA = VALLADO_CASES[0]
+    const referenceTle = parseTle(`${caseA.l1}\n${caseA.l2}`)
+    expect(referenceTle.ok, 'parseTle(reference)').toBe(true)
+    if (!referenceTle.ok) throw new Error('unreachable: narrowed by expect above')
+
+    const observer = { latDeg: 34, lonDeg: -99.1, heightM: 100 }
+    const start = new Date('2000-06-27T19:30:44.546Z')
+    const reference = findNextPass({
+      satrec: referenceTle.satrec,
+      observer,
+      start,
+      horizonH: 1,
+      stepS: 1,
+      minElDeg: 80,
+      refineS: 0.1,
+    })
+
+    expect(reference, 'fine reference pass').toBeTruthy()
+    if (!reference) throw new Error('unreachable: narrowed by expect above')
+
+    expect(reference.durationS).toBeLessThan(20)
+    expect(reference.maxElDeg).toBeGreaterThan(80)
+
+    // The detector must not depend on the arbitrary phase between a requested
+    // start time and its 20-second sampling grid. Every start remains before
+    // the true AOS, avoiding the separate mid-pass-start behavior.
+    for (let offsetS = 0; offsetS < 10; offsetS++) {
+      const productionTle = parseTle(`${caseA.l1}\n${caseA.l2}`)
+      expect(productionTle.ok, `parseTle(production, offset=${offsetS})`).toBe(true)
+      if (!productionTle.ok) throw new Error('unreachable: narrowed by expect above')
+
+      const productionCadence = findNextPass({
+        satrec: productionTle.satrec,
+        observer,
+        start: new Date(start.getTime() + offsetS * 1000),
+        horizonH: 1,
+        stepS: 20,
+        minElDeg: 80,
+        refineS: 1,
+      })
+
+      expect(productionCadence, `20-second cadence pass at offset=${offsetS}s`).toBeTruthy()
+      if (!productionCadence) throw new Error('unreachable: narrowed by expect above')
+      expect(Math.abs(productionCadence.aos.getTime() - reference.aos.getTime())).toBeLessThanOrEqual(1000)
+      expect(Math.abs(productionCadence.los.getTime() - reference.los.getTime())).toBeLessThanOrEqual(1000)
+      expect(Math.abs(productionCadence.maxElDeg - reference.maxElDeg)).toBeLessThanOrEqual(0.001)
+    }
+  })
+
+  it('includes a final partial cadence interval when checking for a hidden pass', () => {
+    const caseA = VALLADO_CASES[0]
+    const p = parseTle(`${caseA.l1}\n${caseA.l2}`)
+    expect(p.ok, 'parseTle(caseA)').toBe(true)
+    if (!p.ok) throw new Error('unreachable: narrowed by expect above')
+
+    const observer = { latDeg: 34, lonDeg: -99.1, heightM: 100 }
+    const start = new Date('2000-06-27T19:30:44.546Z')
+    const pass = findNextPass({
+      satrec: p.satrec,
+      observer,
+      start,
+      horizonH: 0.006, // 21.6 s: the hidden pass is inside the final partial interval.
+      stepS: 20,
+      minElDeg: 80,
+      refineS: 0.1,
+    })
+
+    expect(pass, 'pass before 21.6-second horizon end').toBeTruthy()
+    if (!pass) throw new Error('unreachable: narrowed by expect above')
+    expect(pass.aos.getTime()).toBeGreaterThanOrEqual(start.getTime())
+    expect(pass.los.getTime()).toBeLessThanOrEqual(start.getTime() + 21_600)
+    expect(pass.durationS).toBeLessThan(20)
+  })
+
+  it('does not turn a below-mask local maximum into a pass', () => {
+    const caseA = VALLADO_CASES[0]
+    const p = parseTle(`${caseA.l1}\n${caseA.l2}`)
+    expect(p.ok, 'parseTle(caseA)').toBe(true)
+    if (!p.ok) throw new Error('unreachable: narrowed by expect above')
+
+    const pass = findNextPass({
+      satrec: p.satrec,
+      observer: { latDeg: 34, lonDeg: -99.1, heightM: 100 },
+      start: new Date('2000-06-27T19:30:44.546Z'),
+      horizonH: 0.01,
+      stepS: 20,
+      minElDeg: 80.02,
+      refineS: 0.1,
+    })
+
+    expect(pass, '80.0095-degree peak below the 80.02-degree mask').toBeNull()
   })
 })
 
@@ -488,8 +610,8 @@ describe('sunElevationRad', () => {
   })
 })
 
-describe('findNextPass: visible classification', () => {
-  it('CASE A TLE (00005), observer 34N/-118W, refineS=1 over 48h: visible field is self-consistent', () => {
+describe('findNextPass: favorable lighting geometry classification', () => {
+  it('CASE A TLE (00005), observer 34N/-118W, refineS=1 over 48h: lighting fields match the geometry checks', () => {
     const l1 = '1 00005U 58002B   00179.78495062  .00000023  00000-0  28098-4 0  4753'
     const l2 = '2 00005  34.2682 348.7242 1859667 331.7664  19.3264 10.82419157413667'
     const p = parseTle(`${l1}\n${l2}`)
@@ -510,32 +632,64 @@ describe('findNextPass: visible classification', () => {
     expect(pass, 'findNextPass over 48h').toBeTruthy()
     if (!pass) throw new Error('unreachable: narrowed by expect above')
 
-    expect(typeof pass.visible).toBe('boolean')
-    expect(pass.visible ? pass.visibleAt !== null : pass.visibleAt === null).toBe(true)
+    expect(typeof pass.favorableLighting).toBe('boolean')
+    expect(pass.favorableLighting ? pass.favorableLightingAt !== null : pass.favorableLightingAt === null).toBe(true)
 
-    if (pass.visible) {
-      if (!pass.visibleAt) throw new Error('unreachable: narrowed by expect above')
-      const st = propagateEci(p.satrec, pass.visibleAt)
-      expect(st, 'propagateEci at visibleAt').toBeTruthy()
+    if (pass.favorableLighting) {
+      if (!pass.favorableLightingAt) throw new Error('unreachable: narrowed by expect above')
+      const st = propagateEci(p.satrec, pass.favorableLightingAt)
+      expect(st, 'propagateEci at favorableLightingAt').toBeTruthy()
       if (!st) throw new Error('unreachable: narrowed by expect above')
 
-      expect(sunElevationRad(observer, pass.visibleAt)).toBeLessThan(CIVIL_DARKNESS_RAD)
-      expect(isSatSunlitSi(st.r, pass.visibleAt)).toBe(true)
+      expect(sunElevationRad(observer, pass.favorableLightingAt)).toBeLessThan(CIVIL_TWILIGHT_RAD)
+      expect(isSatSunlitSi(st.r, pass.favorableLightingAt)).toBe(true)
     }
 
-    const visibleOnly = findNextPass({
+    const favorableLightingOnly = findNextPass({
       satrec: p.satrec,
       observer,
       start,
       horizonH: 48,
       stepS: 30,
       refineS: 1,
-      visibleOnly: true,
+      favorableLightingOnly: true,
     })
-    if (visibleOnly === null) {
-      expect(visibleOnly).toBeNull()
+    if (favorableLightingOnly === null) {
+      expect(favorableLightingOnly).toBeNull()
     } else {
-      expect(visibleOnly.visible).toBe(true)
+      expect(favorableLightingOnly.favorableLighting).toBe(true)
     }
+  })
+
+  it('returns a favorable-lighting pass only at a sample that is sunlit and after local civil twilight', () => {
+    const l1 = '1 00005U 58002B   00179.78495062  .00000023  00000-0  28098-4 0  4753'
+    const l2 = '2 00005  34.2682 348.7242 1859667 331.7664  19.3264 10.82419157413667'
+    const p = parseTle(`${l1}\n${l2}`)
+    expect(p.ok, 'parseTle(caseA)').toBe(true)
+    if (!p.ok) throw new Error('unreachable: narrowed by expect above')
+
+    const observer = { latDeg: 0, lonDeg: -118, heightM: 100 }
+    const pass = findNextPass({
+      satrec: p.satrec,
+      observer,
+      start: new Date('2000-06-28T02:30:00Z'),
+      horizonH: 24,
+      stepS: 20,
+      refineS: 1,
+      minElDeg: 10,
+      favorableLightingOnly: true,
+    })
+    expect(pass?.favorableLighting).toBe(true)
+    if (!pass) throw new Error('unreachable: narrowed by expect above')
+    expect(pass.favorableLightingAt).not.toBeNull()
+    if (!pass.favorableLightingAt) throw new Error('unreachable: narrowed by expect above')
+
+    const state = propagateEci(p.satrec, pass.favorableLightingAt)
+    expect(state, 'propagateEci at favorableLightingAt').toBeTruthy()
+    if (!state) throw new Error('unreachable: narrowed by expect above')
+    expect(isSatSunlitSi(state.r, pass.favorableLightingAt)).toBe(true)
+    expect(sunElevationRad(observer, pass.favorableLightingAt)).toBeLessThan(CIVIL_TWILIGHT_RAD)
+    expect(pass.favorableLightingAt.getTime()).toBeGreaterThanOrEqual(pass.aos.getTime())
+    expect(pass.favorableLightingAt.getTime()).toBeLessThanOrEqual(pass.los.getTime())
   })
 })

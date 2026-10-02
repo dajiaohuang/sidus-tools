@@ -5,18 +5,16 @@ export type LiveCodeValue = number | string | boolean | null | undefined
 
 export type LiveCodeValues = Record<string, LiveCodeValue>
 
-/** Format a number for readable code literals. */
+/** Format a number as a readable decimal that round-trips to the same binary64 value. */
 export function formatCodeNumber(n: number): string {
   if (!Number.isFinite(n)) return 'NaN'
-  if (Object.is(n, -0)) return '0'
+  if (Object.is(n, -0)) return '-0.0'
   const a = Math.abs(n)
   if (a !== 0 && (a < 1e-3 || a >= 1e7)) {
-    return n.toExponential(6).replace(/e\+?(-?)0*(\d+)/, 'e$1$2')
+    return n.toExponential().replace(/e\+?(-?)0*(\d+)/, 'e$1$2')
   }
   if (Number.isInteger(n)) return String(n)
-  const s = n.toPrecision(12)
-  if (s.includes('e') || s.includes('E')) return s
-  return s.replace(/(\.\d*?[1-9])0+$/, '$1').replace(/\.0+$/, '')
+  return n.toString()
 }
 
 /** Keywords that cannot be bare identifiers in a given language. */
@@ -1169,18 +1167,18 @@ function printLines(
     case 'julia':
       return finalNames.map((n) => `println("${n} = ", ${n})`)
     case 'matlab':
-      return finalNames.map((n) => `fprintf('${n} = %g\\n', ${n});`)
+      return finalNames.map((n) => `fprintf('${n} = %.17g\\n', ${n});`)
     case 'c':
       return finalNames.map((n) => {
         const raw = bag[n]
         if (typeof raw === 'string') return `printf("${n} = %s\\n", ${n});`
-        return `printf("${n} = %.9g\\n", (double)(${n}));`
+        return `printf("${n} = %.17g\\n", (double)(${n}));`
       })
     case 'cpp':
       return finalNames.map((n) => {
         const raw = bag[n]
         if (typeof raw === 'string') return `std::printf("${n} = %s\\n", ${n});`
-        return `std::printf("${n} = %.9g\\n", static_cast<double>(${n}));`
+        return `std::printf("${n} = %.17g\\n", static_cast<double>(${n}));`
       })
     case 'rust':
       return finalNames.map((n) => `println!("${n} = {:?}", ${n});`)
